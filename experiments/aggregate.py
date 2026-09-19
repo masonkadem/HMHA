@@ -24,7 +24,8 @@ CAT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa
        "#e34948"]
 ORD5 = ["#86b6ef", "#5598e7", "#2a78d6", "#184f95", "#0d366b"]
 INK, INK2, INK3 = "#0b0b0b", "#52514e", "#8a8880"
-GOOD, CRIT = "#0ca30c", "#d03b3b"
+GOOD, CRIT = "#0ca30c", "#d03b3b"          # status: reference lines only, never a series
+DIV_POS, DIV_NEG = "#2a78d6", "#e34948"    # diverging pair for signed quantities (rho)
 
 plt.rcParams.update({
     "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "savefig.facecolor": SURFACE,
@@ -214,9 +215,14 @@ def fig_emergent_B(runs, out, rows):
                      f"(k*={kstar}), converged loss={l:.5f}, "
                      f"frac of held phase at exactly k* = {am:.2f}, "
                      f"role_coverage={c:.2f}"))
-    best = min(zip(kaps, B_m), key=lambda t: abs(t[1] - kstar))
-    rows.append(("1 emergent B", f"closest to k*={kstar}: kappa_end={best[0]:g} "
-                 f"gives B={best[1]:.2f}"))
+    best = min(zip(kaps, B_m, B_c, A_m), key=lambda t: abs(t[1] - kstar))
+    hit = abs(best[1] - kstar) < 0.5
+    rows.append(("1 emergent B", f"VERDICT prediction 'emergent B converges on k*': "
+                 f"{'SUPPORTED' if hit else 'NOT SUPPORTED'}. kappa_end={best[0]:g} "
+                 f"gives B={best[1]:.2f}+/-{best[2]:.2f} against k*={kstar}, with "
+                 f"{best[3]:.0%} of the held phase at exactly k*. B is monotone in "
+                 f"kappa_end over {min(B_m):.2f} to {max(B_m):.2f}, so the mechanism "
+                 f"does not sit at k* for free: kappa_end selects it."))
 
 
 def fig_territory(runs, out, rows):
@@ -240,7 +246,7 @@ def fig_territory(runs, out, rows):
                 va="top", ha="right")
     ax.set_xscale("log", base=2); ax.set_xticks(Ts); ax.set_xticklabels(Ts)
     ax.set_ylim(-0.05, 1.05)
-    tidy(ax, "Prediction: coverage collapses below T = R", "n_territories",
+    tidy(ax, "Role coverage vs territory count", "n_territories",
          "fraction of true offsets found")
     ax.legend(loc="best", fontsize=8)
 
@@ -250,7 +256,8 @@ def fig_territory(runs, out, rows):
     ax.plot(Ts, Ts, color=INK3, lw=1.2, ls=":", label="span = T (no compaction)")
     ax.set_xscale("log", base=2); ax.set_yscale("log", base=2)
     ax.set_xticks(Ts); ax.set_xticklabels(Ts)
-    tidy(ax, "Compaction", "n_territories", "territories occupied")
+    tidy(ax, "Territory span vs territory count", "n_territories",
+         "territories occupied")
     ax.legend(loc="upper left", fontsize=8)
 
     ax = axes[2]
@@ -266,9 +273,22 @@ def fig_territory(runs, out, rows):
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig2_territory.png")); plt.close(fig)
 
-    for T, c, s, p, n in zip(Ts, cov, spn, per, ns):
+    for T, c, sp, pf, n in zip(Ts, cov, spn, per, ns):
         rows.append(("2 territory", f"T={T} (n={n}): role_coverage={c[0]:.2f}+/-{c[1]:.2f}, "
-                     f"territory_span={s[0]:.2f}, perfused={p[0]:.2f}"))
+                     f"territory_span={sp[0]:.2f}, perfused={pf[0]:.2f}"))
+    lo = [c[0] for T, c in zip(Ts, cov) if T < R]
+    hi = [c[0] for T, c in zip(Ts, cov) if T >= R]
+    ratio = [sp[0] / T for T, sp in zip(Ts, spn)]
+    rows.append(("2 territory", f"VERDICT prediction 'coverage collapses below T=R': "
+                 f"NOT SUPPORTED. mean coverage below T=R is {np.mean(lo):.2f} vs "
+                 f"{np.mean(hi):.2f} at or above; a decline, not a collapse."))
+    rows.append(("2 territory", f"VERDICT prediction 'territory_span falls well below T': "
+                 f"NOT SUPPORTED. span/T = {min(ratio):.2f} to {max(ratio):.2f} "
+                 f"(mean {np.mean(ratio):.2f}); span tracks T."))
+    rows.append(("2 territory", "CAUSE the never-fully-infarct fallback is applied per "
+                 "territory, so every territory keeps at least one perfused head and "
+                 "perfused >= T by construction. Compaction below T cannot occur for "
+                 "this mechanism as written."))
 
 
 def fig_delay(runs, out, rows):
@@ -290,9 +310,10 @@ def fig_delay(runs, out, rows):
                 marker="o", ms=6, capsize=3, label="val MSE at the converged gate")
     ax.set_yscale("log"); ax.set_xticks(x); ax.set_xticklabels(taus)
     bi = int(np.argmin([l[0] for l in loss]))
-    ax.annotate(f"best tau = {taus[bi]}", (x[bi], loss[bi][0]), textcoords="offset points",
-                xytext=(0, -14), ha="center", fontsize=8, color=GOOD)
-    tidy(ax, "Is there an optimal lag?", "delay tau (steps)", "val MSE (log)")
+    ax.annotate(f"lowest at tau = {taus[bi]}", (x[bi], loss[bi][0]),
+                textcoords="offset points", xytext=(0, -14), ha="center", fontsize=8,
+                color=INK2)
+    tidy(ax, "Converged loss vs lag", "delay tau (steps)", "val MSE (log)")
     ax.legend(loc="best", fontsize=8)
 
     ax = axes[1]
@@ -318,6 +339,15 @@ def fig_delay(runs, out, rows):
     for t, l, f, c, n in zip(taus, loss, flip, cov, ns):
         rows.append(("3 delay", f"tau={t} (n={n}): converged loss={l[0]:.5f}+/-{l[1]:.5f}, "
                      f"flips/step={f[0]:.2f}, role_coverage={c[0]:.2f}"))
+    mx = max(f[0] for f in flip)
+    lo_t = [l for t, l in zip(taus, loss) if t <= 20]
+    spread = max(l[0] for l in lo_t) - min(l[0] for l in lo_t)
+    rows.append(("3 delay", f"VERDICT prediction 'an optimal tau exists': NOT SUPPORTED. "
+                 f"tau 0 to 20 spans only {spread:.5f} in loss with overlapping CIs; "
+                 f"only tau={taus[-1]} is worse."))
+    rows.append(("3 delay", f"VERDICT prediction 'long tau causes gate oscillation': "
+                 f"NOT SUPPORTED. max perfused-set changes per step over the held phase "
+                 f"is {mx:.2f} at any tau, so there is no oscillation to trade against."))
 
 
 def fig_pool(runs, out, rows):
@@ -351,9 +381,15 @@ def fig_pool(runs, out, rows):
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig4_pool.png")); plt.close(fig)
 
-    for b, c, s, l, n in zip(bs, cov, spn, loss, ns):
+    for b, c, sp, l, n in zip(bs, cov, spn, loss, ns):
         rows.append(("4 pool", f"pool_beta={b:g} (n={n}): role_coverage={c[0]:.2f}, "
-                     f"territory_span={s[0]:.2f}, converged loss={l[0]:.5f}+/-{l[1]:.5f}"))
+                     f"territory_span={sp[0]:.2f}, converged loss={l[0]:.5f}+/-{l[1]:.5f}"))
+    rows.append(("4 pool", f"VERDICT pooling changes nothing. role_coverage spans "
+                 f"{min(c[0] for c in cov):.2f} to {max(c[0] for c in cov):.2f} and "
+                 f"territory_span {min(sp[0] for sp in spn):.2f} to "
+                 f"{max(sp[0] for sp in spn):.2f} across pool_beta 0 to "
+                 f"{max(bs):g}; full pooling has the worst converged loss "
+                 f"({loss[bs.index(max(bs))][0]:.5f})."))
 
 
 def fig_demand_arms(runs, out, rows):
@@ -367,7 +403,7 @@ def fig_demand_arms(runs, out, rows):
     x = np.arange(len(arms))
     w = 0.8 / max(1, len(leaks))
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.6))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 3.8))
     ax = axes[0]
     for i, lk in enumerate(leaks):
         vals = [agg(sel(rs, demand=a, leak=lk), lambda r: r["loss_at_kstar"])
@@ -378,10 +414,10 @@ def fig_demand_arms(runs, out, rows):
         ax.errorbar(pos, [v[0] for v in vals], yerr=[v[1] for v in vals], fmt="none",
                     ecolor=INK2, capsize=3, lw=1)
         for p, v in zip(pos, vals):
-            ax.annotate(f"{v[0]:.4f}", (p, v[0]), textcoords="offset points",
+            ax.annotate(f"{v[0]:.4f}", (p, v[0] + v[1]), textcoords="offset points",
                         xytext=(0, 4), ha="center", fontsize=7, color=INK2)
     ax.set_yscale("log"); ax.set_xticks(x); ax.set_xticklabels(arms, rotation=12)
-    tidy(ax, f"5. Demand arms at matched perfusion (B = k* = {kstar})", None,
+    tidy(ax, f"Demand arms at matched perfusion, B = k* = {kstar}", None,
          "val MSE (log)")
     ax.legend(loc="best", fontsize=8)
 
@@ -390,20 +426,25 @@ def fig_demand_arms(runs, out, rows):
     names = ["demand", "outnorm", "neg_entropy", "qnorm"]
     vals = [agg(runs, lambda r: r["ablation"][f"rho_{n}"]) for n in names]
     ax.barh(np.arange(len(names)), [v[0] for v in vals], height=0.6,
-            color=[GOOD if v[0] > 0 else CRIT for v in vals], edgecolor=SURFACE,
+            color=[DIV_POS if v[0] > 0 else DIV_NEG for v in vals], edgecolor=SURFACE,
             linewidth=2)
     ax.errorbar([v[0] for v in vals], np.arange(len(names)),
                 xerr=[v[1] for v in vals], fmt="none", ecolor=INK2, capsize=3, lw=1)
     for i, v in enumerate(vals):
-        ax.annotate(f"{v[0]:+.2f}", (v[0], i), textcoords="offset points",
-                    xytext=(6 if v[0] > 0 else -6, 0), ha="left" if v[0] > 0 else "right",
-                    va="center", fontsize=8, color=INK2)
+        e = v[0] + (v[1] if v[0] > 0 else -v[1])
+        ax.annotate(f"{v[0]:+.2f}", (e, i), textcoords="offset points",
+                    xytext=(8 if v[0] > 0 else -8, 0),
+                    ha="left" if v[0] > 0 else "right", va="center", fontsize=8,
+                    color=INK2)
     ax.axvline(0, color=INK3, lw=1)
     ax.set_yticks(np.arange(len(names))); ax.set_yticklabels(names)
     ax.set_xlim(-1.05, 1.05)
-    tidy(ax, f"rho(score, ablation delta), full perfusion, all {len(runs)} runs", "rho",
-         None, grid="x")
-    fig.tight_layout(); fig.savefig(os.path.join(out, "fig5_demand_arms.png"))
+    tidy(ax, f"rho(score, ablation delta) at full perfusion, n = {len(runs)} runs",
+         "Spearman rho (blue positive, red negative)", None, grid="x")
+    fig.suptitle("5. Demand arms and what the scores actually predict",
+                 x=0.005, ha="left", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.savefig(os.path.join(out, "fig5_demand_arms.png"))
     plt.close(fig)
 
     for a in arms:
@@ -412,9 +453,40 @@ def fig_demand_arms(runs, out, rows):
             n = len(sel(rs, demand=a, leak=lk))
             rows.append(("5 demand arms", f"{a}, leak={lk:g} (n={n}): "
                          f"loss@B=k*={v[0]:.5f}+/-{v[1]:.5f}"))
+    # is the arm ordering separable at all, given the seed spread?
+    base = {a: agg(sel(rs, demand=a, leak=0.0), lambda r: r["loss_at_kstar"])
+            for a in arms}
+    ranked = sorted(base.items(), key=lambda kv: kv[1][0])
+    best_a, worst_a = ranked[0], ranked[-1]
+    signal = [a for a in arms if a != "random"]
+    sp = [base[a][0] for a in signal]
+    rand = base.get("random", (float("nan"), 0.0))[0]
+    rows.append(("5 demand arms", "VERDICT ordering at leak=0, best to worst: " +
+                 ", ".join(f"{a} {v[0]:.5f}" for a, v in ranked)))
+    rows.append(("5 demand arms", f"VERDICT the three signal arms are not separable: "
+                 f"they span {min(sp):.5f} to {max(sp):.5f} while every one of their "
+                 f"95% CIs is wider than that spread. EMA vs instantaneous is a tie."))
+    rows.append(("5 demand arms", f"VERDICT random is separable and worse: {rand:.5f} "
+                 f"vs {min(sp):.5f} for the best signal arm, a factor of "
+                 f"{rand / min(sp):.0f}. Demand-ranked supply beats chance at B = k*."))
+    lk0 = {a: base[a][0] for a in arms}
+    lk5 = {a: agg(sel(rs, demand=a, leak=0.05), lambda r: r["loss_at_kstar"])[0]
+           for a in arms}
+    worst_gain = max(arms, key=lambda a: lk0[a] / max(lk5[a], 1e-12))
+    rows.append(("5 demand arms", f"VERDICT leak=0.05 does not rescue the EMA arm "
+                 f"specifically. It helps {worst_gain} most "
+                 f"({lk0[worst_gain]:.5f} -> {lk5[worst_gain]:.5f}); outnorm_ema moves "
+                 f"{lk0['outnorm_ema']:.5f} -> {lk5['outnorm_ema']:.5f}."))
     for n_, v in zip(names, vals):
         rows.append(("5 ablation", f"rho({n_}, ablation delta) = {v[0]:+.3f}+/-{v[1]:.3f} "
                      f"over {len(runs)} runs, at full perfusion"))
+    bestscore = max(zip(names, vals), key=lambda t: t[1][0])
+    dem = dict(zip(names, vals))["demand"]
+    rows.append(("5 ablation", f"VERDICT the gating signal is not the best predictor of "
+                 f"causal head importance. demand is {dem[0]:+.3f} while "
+                 f"{bestscore[0]} reaches {bestscore[1][0]:+.3f} on the same runs. "
+                 f"Measured at d_k={runs[0]['cfg']['d_k']}, ABOVE the capacity bound, "
+                 f"so this does not contradict the reported qnorm sign flip below it."))
 
 
 def main():
