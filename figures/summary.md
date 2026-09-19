@@ -1,6 +1,6 @@
 # Results
 
-Computed from 60 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 66 runs in `results/`. Every number here and in the figures is read from those pickles.
 
 
 ## 0 ground truth
@@ -38,4 +38,16 @@ Computed from 60 runs in `results/`. Every number here and in the figures is rea
 
 - pool_beta=0 (n=3): role_coverage=0.92, territory_span=6.67, converged loss=0.00007+/-0.00005
 - pool_beta=0.25 (n=3): role_coverage=1.00, territory_span=7.67, converged loss=0.00004+/-0.00001
-- pool_beta=0.5 (n=2): role_coverage=0.88, territory_span=7.00, converged loss=0.00010+/-0.00015
+- pool_beta=0.5 (n=3): role_coverage=0.92, territory_span=7.33, converged loss=0.00008+/-0.00010
+- pool_beta=1 (n=3): role_coverage=1.00, territory_span=7.67, converged loss=0.00029+/-0.00007
+
+## 5 demand arms
+
+- outnorm_ema, leak=0 (n=2): loss@B=k*=0.00175+/-0.00235
+
+## 5 ablation
+
+- rho(demand, ablation delta) = +0.394+/-0.073 over 66 runs, at full perfusion
+- rho(outnorm, ablation delta) = +0.403+/-0.082 over 66 runs, at full perfusion
+- rho(neg_entropy, ablation delta) = +0.546+/-0.063 over 66 runs, at full perfusion
+- rho(qnorm, ablation delta) = +0.581+/-0.064 over 66 runs, at full perfusion
