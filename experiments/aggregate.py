@@ -35,9 +35,13 @@ plt.rcParams.update({
 })
 
 
+def nlab(ns):
+    return f"n = {ns[0]}" if len(set(ns)) == 1 else f"n = {min(ns)}-{max(ns)}"
+
+
 def tidy(ax, title=None, xlabel=None, ylabel=None, grid="y"):
     if title:
-        ax.set_title(title, loc="left", color=INK, fontweight="semibold")
+        ax.set_title(title, loc="left", color=INK, fontweight="bold")
     if xlabel:
         ax.set_xlabel(xlabel)
     if ylabel:
@@ -84,6 +88,18 @@ def agg(rs, fn):
     v = np.array([fn(r) for r in rs], dtype=float)
     m, ci = mean_ci(v.reshape(len(v), 1))
     return float(m[0]), float(ci[0])
+
+
+def frac_at_kstar(r):
+    """Fraction of the held final phase whose perfused set has exactly k* heads. For
+    the emergent-B mechanisms this is the honest version of 'did it find k*': B is not
+    imposed, so a run can pass through k* early and settle somewhere else."""
+    led = r["hist"]["ledger"]
+    if led is None or len(led) < 10:
+        return float("nan")
+    hold = int((r["cfg"]["budget_hold_frac"] + r["cfg"]["budget_anneal_frac"]) * len(led))
+    a = (led[hold:] > r["cfg"]["leak"] + 1e-9).sum(axis=1)
+    return float((a == r["kstar"]).mean()) if len(a) else float("nan")
 
 
 def gate_flips(r):
@@ -147,10 +163,10 @@ def fig_emergent_B(runs, out, rows):
     kstar = rs[0]["kstar"]
     kaps = list(g)
     B_m, B_c = zip(*[agg(v, lambda r: r["recovery"]["n_perfused"]) for v in g.values()])
-    L_m, L_c = zip(*[agg(v, lambda r: r["loss_at_kstar"]) for v in g.values()])
-    # the annealing schedule does not always visit B == k* exactly; report the level
-    # the loss was actually read at so the number is not silently mislabelled.
-    A_m = [agg(v, lambda r: r["B_at_kstar"])[0] for v in g.values()]
+    L_m, L_c = zip(*[agg(v, lambda r: r["final_loss"]) for v in g.values()])
+    # B is emergent here, so record how much of the converged phase was actually spent
+    # at k* rather than implying the run was ever held there.
+    A_m = [agg(v, frac_at_kstar)[0] for v in g.values()]
     C_m, C_c = zip(*[agg(v, lambda r: r["recovery"]["role_coverage"]) for v in g.values()])
     ns = [len(v) for v in g.values()]
 
@@ -159,37 +175,44 @@ def fig_emergent_B(runs, out, rows):
     ax.errorbar(kaps, B_m, yerr=B_c, color=CAT[0], lw=2, marker="o", ms=6, capsize=3,
                 label="emergent perfused count B")
     ax.axhline(kstar, color=GOOD, lw=1.5, ls="--", label=f"true k* = {kstar}")
-    for x, y in zip(kaps, B_m):
-        ax.annotate(f"{y:.1f}", (x, y), textcoords="offset points", xytext=(0, 7),
+    for x, y, e in zip(kaps, B_m, B_c):
+        ax.annotate(f"{y:.1f}", (x, y + e), textcoords="offset points", xytext=(0, 5),
                     ha="center", fontsize=8, color=INK2)
+    ax.set_xticks(kaps); ax.set_xticklabels([f"{k:g}" for k in kaps])
     tidy(ax, "Emergent B vs ischemia depth", "kappa_end", "perfused heads")
-    ax.legend(loc="upper right", fontsize=8)
+    ax.legend(loc="lower left", fontsize=8)
 
     ax = axes[1]
     ax.errorbar(kaps, L_m, yerr=L_c, color=CAT[1], lw=2, marker="s", ms=6, capsize=3,
-                label=f"val MSE at B = k* = {kstar}")
+                label="val MSE at the converged gate")
+    ax.axhline(rs[0]["trivial"], color=INK3, lw=1.2, ls=":")
+    ax.annotate(f"trivial {rs[0]['trivial']:.3f}", (kaps[0], rs[0]["trivial"]),
+                color=INK2, fontsize=8, va="bottom", ha="left")
     ax.set_yscale("log")
-    tidy(ax, "Loss at the true circuit size", "kappa_end", "val MSE (log)")
+    ax.set_xticks(kaps); ax.set_xticklabels([f"{k:g}" for k in kaps])
+    tidy(ax, "Cost of over-starvation", "kappa_end", "val MSE (log)")
     ax.legend(loc="best", fontsize=8)
 
     ax = axes[2]
     ax.errorbar(kaps, C_m, yerr=C_c, color=CAT[2], lw=2, marker="^", ms=6, capsize=3,
                 label="role coverage at the final gate")
-    ax.set_ylim(-0.05, 1.05)
-    for x, y in zip(kaps, C_m):
-        ax.annotate(f"{y:.2f}", (x, y), textcoords="offset points", xytext=(0, 7),
+    ax.set_ylim(-0.05, 1.15)
+    for x, y, e in zip(kaps, C_m, C_c):
+        ax.annotate(f"{y:.2f}", (x, y + e), textcoords="offset points", xytext=(0, 5),
                     ha="center", fontsize=8, color=INK2)
+    ax.set_xticks(kaps); ax.set_xticklabels([f"{k:g}" for k in kaps])
     tidy(ax, "Role recovery", "kappa_end", "fraction of true offsets found")
     ax.legend(loc="best", fontsize=8)
 
     fig.suptitle(f"1. Emergent B vs true k*  (threshold supply, outnorm_ema demand, "
-                 f"n = {min(ns)}-{max(ns)} seeds)", x=0.005, ha="left", fontsize=11)
+                 f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig1_emergent_B.png")); plt.close(fig)
 
     for k, b, bc, l, c, n, am in zip(kaps, B_m, B_c, L_m, C_m, ns, A_m):
-        rows.append(("1 emergent B", f"kappa_end={k:g} (n={n}): B={b:.2f}+/-{bc:.2f}, "
-                     f"loss={l:.5f} read at mean B={am:.1f} (k*={kstar}), "
+        rows.append(("1 emergent B", f"kappa_end={k:g} (n={n}): B={b:.2f}+/-{bc:.2f} "
+                     f"(k*={kstar}), converged loss={l:.5f}, "
+                     f"frac of held phase at exactly k* = {am:.2f}, "
                      f"role_coverage={c:.2f}"))
     best = min(zip(kaps, B_m), key=lambda t: abs(t[1] - kstar))
     rows.append(("1 emergent B", f"closest to k*={kstar}: kappa_end={best[0]:g} "
@@ -239,7 +262,7 @@ def fig_territory(runs, out, rows):
     ax.legend(loc="best", fontsize=8)
 
     fig.suptitle(f"2. Territory compaction  (territory supply, R = {R}, "
-                 f"n = {min(ns)}-{max(ns)} seeds)", x=0.005, ha="left", fontsize=11)
+                 f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig2_territory.png")); plt.close(fig)
 
@@ -256,7 +279,7 @@ def fig_delay(runs, out, rows):
         return
     taus = list(g)
     x = np.arange(len(taus))
-    loss = [agg(v, lambda r: r["loss_at_kstar"]) for v in g.values()]
+    loss = [agg(v, lambda r: r["final_loss"]) for v in g.values()]
     flip = [agg(v, gate_flips) for v in g.values()]
     cov = [agg(v, lambda r: r["recovery"]["role_coverage"]) for v in g.values()]
     ns = [len(v) for v in g.values()]
@@ -264,7 +287,7 @@ def fig_delay(runs, out, rows):
     fig, axes = plt.subplots(1, 3, figsize=(11, 3.4))
     ax = axes[0]
     ax.errorbar(x, [l[0] for l in loss], yerr=[l[1] for l in loss], color=CAT[0], lw=2,
-                marker="o", ms=6, capsize=3, label=f"val MSE at B = k* = {rs[0]['kstar']}")
+                marker="o", ms=6, capsize=3, label="val MSE at the converged gate")
     ax.set_yscale("log"); ax.set_xticks(x); ax.set_xticklabels(taus)
     bi = int(np.argmin([l[0] for l in loss]))
     ax.annotate(f"best tau = {taus[bi]}", (x[bi], loss[bi][0]), textcoords="offset points",
@@ -288,12 +311,12 @@ def fig_delay(runs, out, rows):
     ax.legend(loc="best", fontsize=8)
 
     fig.suptitle(f"3. Delay  (threshold supply, kappa_end = 1.5, "
-                 f"n = {min(ns)}-{max(ns)} seeds)", x=0.005, ha="left", fontsize=11)
+                 f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig3_delay.png")); plt.close(fig)
 
     for t, l, f, c, n in zip(taus, loss, flip, cov, ns):
-        rows.append(("3 delay", f"tau={t} (n={n}): loss@k*={l[0]:.5f}+/-{l[1]:.5f}, "
+        rows.append(("3 delay", f"tau={t} (n={n}): converged loss={l[0]:.5f}+/-{l[1]:.5f}, "
                      f"flips/step={f[0]:.2f}, role_coverage={c[0]:.2f}"))
 
 
@@ -306,14 +329,14 @@ def fig_pool(runs, out, rows):
     x = np.arange(len(bs))
     cov = [agg(v, lambda r: r["recovery"]["role_coverage"]) for v in g.values()]
     spn = [agg(v, lambda r: r["recovery"]["territory_span"]) for v in g.values()]
-    loss = [agg(v, lambda r: r["loss_at_kstar"]) for v in g.values()]
+    loss = [agg(v, lambda r: r["final_loss"]) for v in g.values()]
     ns = [len(v) for v in g.values()]
 
     fig, axes = plt.subplots(1, 3, figsize=(11, 3.4))
     for ax, vals, col, mk, lab, yl in [
             (axes[0], cov, CAT[0], "o", "role coverage", "fraction of true offsets found"),
             (axes[1], spn, CAT[1], "s", "territory span of role heads", "territories"),
-            (axes[2], loss, CAT[2], "^", f"val MSE at B = k* = {rs[0]['kstar']}",
+            (axes[2], loss, CAT[2], "^", "val MSE at the converged gate",
              "val MSE (log)")]:
         ax.errorbar(x, [v[0] for v in vals], yerr=[v[1] for v in vals], color=col, lw=2,
                     marker=mk, ms=6, capsize=3, label=lab)
@@ -324,13 +347,13 @@ def fig_pool(runs, out, rows):
     axes[2].set_yscale("log")
 
     fig.suptitle(f"4. Pooled demand  (territory supply, T = 8, "
-                 f"n = {min(ns)}-{max(ns)} seeds)", x=0.005, ha="left", fontsize=11)
+                 f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(os.path.join(out, "fig4_pool.png")); plt.close(fig)
 
     for b, c, s, l, n in zip(bs, cov, spn, loss, ns):
         rows.append(("4 pool", f"pool_beta={b:g} (n={n}): role_coverage={c[0]:.2f}, "
-                     f"territory_span={s[0]:.2f}, loss@k*={l[0]:.5f}+/-{l[1]:.5f}"))
+                     f"territory_span={s[0]:.2f}, converged loss={l[0]:.5f}+/-{l[1]:.5f}"))
 
 
 def fig_demand_arms(runs, out, rows):
