@@ -1,7 +1,12 @@
 # Results
 
-Computed from 88 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 90 runs in `results/`. Every number here and in the figures is read from those pickles.
 
+
+## 1 task
+
+- true offsets [1, 5, 9, 13]; a dense 4-head model implements [1, 5, 9, 13]
+- under supply, 4 of 32 heads survive and cover 75% of the true offsets, final loss 0.00027 against trivial 1.007
 
 ## 1 emergent B
 
@@ -29,11 +34,11 @@ Computed from 88 runs in `results/`. Every number here and in the figures is rea
 
 ## 5 ablation
 
-- rho(demand, ablation delta) = +0.379+/-0.066 over 88 runs, at full perfusion
-- rho(outnorm, ablation delta) = +0.295+/-0.097 over 88 runs, at full perfusion
-- rho(neg_entropy, ablation delta) = +0.452+/-0.083 over 88 runs, at full perfusion
-- rho(qnorm, ablation delta) = +0.484+/-0.085 over 88 runs, at full perfusion
-- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.379 while qnorm reaches +0.484 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
+- rho(demand, ablation delta) = +0.375+/-0.065 over 90 runs, at full perfusion
+- rho(outnorm, ablation delta) = +0.292+/-0.095 over 90 runs, at full perfusion
+- rho(neg_entropy, ablation delta) = +0.460+/-0.082 over 90 runs, at full perfusion
+- rho(qnorm, ablation delta) = +0.490+/-0.083 over 90 runs, at full perfusion
+- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.375 while qnorm reaches +0.490 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
 
 ## 0 ground truth
 

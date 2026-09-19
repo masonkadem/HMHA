@@ -120,45 +120,53 @@ def gate_flips(r):
 # ---------------------------------------------------------------- figures
 
 def _panel_schematic(ax, ex, offs):
-    """What the task asks for, drawn from one real batch element."""
+    """What the task asks for, drawn from one real batch element.
+
+    Rows follow the data flow: the query carries a position, it reads R fixed offsets
+    from memory, and those R reads are the R blocks of the target.
+    """
     N = ex["N"]
-    y0, h = 0.0, 0.62
+    Y_Q, Y_M, Y_T, h = 2.45, 1.30, 0.05, 0.60
+
+    ax.text(-0.9, Y_Q + h / 2, f"query token\ncarries p = {ex['p']}", ha="right",
+            va="center", fontsize=8.5, color=INK)
+    ax.text(-0.9, Y_M + h / 2, "memory Y\nby position", ha="right", va="center",
+            fontsize=8.5, color=INK)
+    ax.text(-0.9, Y_T + h / 2, "target\nR blocks", ha="right", va="center",
+            fontsize=8.5, color=INK)
+
     for j in range(N):
-        ax.add_patch(plt.Rectangle((j, y0), 0.86, h, facecolor="#eceae5",
+        ax.add_patch(plt.Rectangle((j, Y_M), 0.86, h, facecolor="#eceae5",
                                    edgecolor=INK3, lw=0.6))
-        ax.text(j + 0.43, y0 + h / 2, str(j), ha="center", va="center", fontsize=6.5,
+        ax.text(j + 0.43, Y_M + h / 2, str(j), ha="center", va="center", fontsize=6.5,
                 color=INK2)
-    ax.text(-0.9, y0 + h / 2, "memory Y\nposition", ha="right", va="center",
-            fontsize=8, color=INK)
 
-    p = ex["p"]
-    ax.add_patch(plt.Rectangle((p, 2.25), 0.86, h, facecolor=CAT[0], edgecolor="none"))
-    ax.text(p + 0.43, 2.25 + h / 2, str(p), ha="center", va="center", fontsize=7,
+    p_ = ex["p"]
+    ax.add_patch(plt.Rectangle((p_, Y_Q), 0.86, h, facecolor=INK, edgecolor="none"))
+    ax.text(p_ + 0.43, Y_Q + h / 2, str(p_), ha="center", va="center", fontsize=7.5,
             color="white", fontweight="bold")
-    ax.text(-0.9, 2.25 + h / 2, f"query token\ncarries p = {p}", ha="right",
-            va="center", fontsize=8, color=INK)
 
+    w = (N - 0.6) / len(offs)
     for r, off in enumerate(offs):
-        j = (p + off) % N
-        col = CAT[(r + 1) % len(CAT)]
-        ax.annotate("", xy=(j + 0.43, y0 + h + 0.04), xytext=(p + 0.43, 2.22),
-                    arrowprops=dict(arrowstyle="-|>", color=col, lw=1.4,
-                                    connectionstyle="arc3,rad=-0.25",
-                                    shrinkA=0, shrinkB=1))
-        ax.add_patch(plt.Rectangle((j, y0), 0.86, h, facecolor="none", edgecolor=col,
-                                   lw=1.8))
-        bx = 1.0 + r * (N - 2.0) / len(offs)
-        ax.add_patch(plt.Rectangle((bx, 1.25), (N - 2.0) / len(offs) - 0.18, h,
-                                   facecolor=col, edgecolor="none", alpha=0.85))
-        ax.text(bx + ((N - 2.0) / len(offs) - 0.18) / 2, 1.25 + h / 2,
-                f"+{off}", ha="center", va="center", fontsize=8, color="white",
-                fontweight="bold")
-    ax.text(-0.9, 1.25 + h / 2, "target\nR blocks", ha="right", va="center",
-            fontsize=8, color=INK)
-    ax.set_xlim(-6.2, N + 0.4); ax.set_ylim(-0.35, 3.15)
+        j = (p_ + off) % N
+        col = CAT[r % len(CAT)]
+        ax.annotate("", xy=(j + 0.43, Y_M + h + 0.03), xytext=(p_ + 0.43, Y_Q - 0.03),
+                    arrowprops=dict(arrowstyle="-|>", color=col, lw=1.5,
+                                    connectionstyle="arc3,rad=-0.22",
+                                    shrinkA=0, shrinkB=2))
+        ax.add_patch(plt.Rectangle((j, Y_M), 0.86, h, facecolor="none", edgecolor=col,
+                                   lw=2.0))
+        bx = r * w
+        ax.add_patch(plt.Rectangle((bx, Y_T), w - 0.18, h, facecolor=col,
+                                   edgecolor="none"))
+        ax.text(bx + (w - 0.18) / 2, Y_T + h / 2,
+                f"content at ({p_}+{off}) mod {N} = {j}", ha="center", va="center",
+                fontsize=7, color="white", fontweight="bold")
+    ax.set_xlim(-6.4, N + 0.3); ax.set_ylim(-0.12, 3.18)
     ax.axis("off")
-    ax.set_title("a  Each query reads R fixed offsets from memory", loc="left",
-                 color=INK, fontweight="bold")
+    ax.set_title("a   Each query reads R fixed offsets from memory. One head cannot "
+                 "serve two offsets, so k* = R exactly.",
+                 loc="left", color=INK, fontweight="bold", pad=6)
 
 
 def _panel_roles(ax, prof, offs, title, active=None):
@@ -170,12 +178,12 @@ def _panel_roles(ax, prof, offs, title, active=None):
     im = ax.imshow(P, aspect="auto", cmap="Blues", vmin=0,
                    extent=(-0.5, prof.shape[1] - 0.5, len(keep) - 0.5, -0.5))
     for off in offs:
-        ax.axvline(off, color=CAT[1], lw=1.1, ls="--", alpha=0.9)
+        ax.axvline(off, color=INK2, lw=0.9, ls="--", alpha=0.65)
     ax.set_yticks(range(len(keep)))
-    ax.set_yticklabels([f"h{h}" for h in keep], fontsize=7)
+    ax.set_yticklabels([f"head {h}" for h in keep], fontsize=7)
     ax.set_xticks(offs); ax.set_xticklabels([f"+{o}" for o in offs], fontsize=8)
-    ax.set_xlabel("attention offset from p")
-    ax.set_title(title, loc="left", color=INK, fontweight="bold")
+    ax.set_xlabel("attention offset from p", fontsize=8.5)
+    ax.set_title(title, loc="left", color=INK, fontweight="bold", fontsize=9.5)
     for sp in ax.spines.values():
         sp.set_visible(False)
     return im
@@ -189,57 +197,59 @@ def fig_task(runs, out, rows):
         return
     with open(cache, "rb") as f:
         tp = pickle.load(f)
-    offs = tp["offsets"]
+    offs, H = tp["offsets"], tp["cfg"]["num_heads"]
 
-    fig = plt.figure(figsize=(12, 6.4))
-    gs = fig.add_gridspec(2, 3, height_ratios=[0.92, 1.0], hspace=0.42, wspace=0.34)
+    fig = plt.figure(figsize=(12, 6.6))
+    gs = fig.add_gridspec(2, 3, height_ratios=[0.82, 1.0], hspace=0.30, wspace=0.40,
+                          left=0.055, right=0.975, top=0.90, bottom=0.10)
     _panel_schematic(fig.add_subplot(gs[0, :]), tp["example"], offs)
 
     ax = fig.add_subplot(gs[1, 0])
     _panel_roles(ax, tp["dense_profile"], offs,
-                 f"b  A dense {len(offs)}-head model: one head per offset")
+                 f"b   Dense {len(offs)}-head model: one head per offset")
 
     ax = fig.add_subplot(gs[1, 1])
     im = _panel_roles(ax, tp["hemo_profile"], offs,
-                      f"c  Surviving heads under supply ({tp['n_perfused']} perfused "
-                      f"of {tp['cfg']['num_heads']})", active=tp["hemo_active"])
-    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+                      f"c   Survivors under supply: {tp['n_perfused']} of {H} heads",
+                      active=tp["hemo_active"])
+    cb = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.02)
     cb.set_label("mean attention", fontsize=7)
     cb.ax.tick_params(labelsize=6)
 
     ax = fig.add_subplot(gs[1, 2])
     ks = gt[0]["redundancy"]["ks"]
-    curves = np.array([r["redundancy"]["curve"] for r in gt])
-    m, ci = mean_ci(curves)
+    m, ci = mean_ci(np.array([r["redundancy"]["curve"] for r in gt]))
     triv = float(np.mean([r["redundancy"]["trivial"] for r in gt]))
     th = float(np.mean([r["redundancy"]["thresh"] for r in gt]))
     ax.errorbar(ks, m, yerr=ci, color=CAT[0], lw=2, marker="o", ms=5, capsize=3,
-                label=f"dense, k heads (n={len(gt)})")
+                label=f"dense, k heads from scratch (n={len(gt)})")
     ax.axhline(triv, color=INK3, lw=1.2, ls=":")
-    ax.text(ks[0], triv, f" trivial {triv:.3f}", color=INK2, fontsize=7.5, va="bottom")
+    ax.text(ks[-1], triv, f"trivial {triv:.3f} ", color=INK2, fontsize=7,
+            va="bottom", ha="right")
     ax.axhline(th, color=CRIT, lw=1.2, ls="--")
-    ax.text(ks[0], th, f" solved threshold {th:.4f}", color=CRIT, fontsize=7.5,
-            va="bottom")
+    ax.text(ks[-1], th, f"solved threshold {th:.4f} ", color=CRIT, fontsize=7,
+            va="bottom", ha="right")
     ax.axvline(len(offs), color=GOOD, lw=1.4)
-    ax.text(len(offs), m.max(), f" k* = {len(offs)} ", color=GOOD, fontsize=7.5,
-            rotation=90, va="top", ha="right")
+    ax.text(len(offs), m.max(), f" k* = {len(offs)}", color=GOOD, fontsize=8,
+            va="top", ha="left")
     ax.set_xscale("log", base=2); ax.set_yscale("log")
-    ax.set_xticks(ks); ax.set_xticklabels(ks)
-    tidy(ax, "d  Ground truth: k* is exactly R", "dense heads k", "val MSE (log)")
-    ax.legend(loc="lower left", fontsize=7.5)
+    ax.set_xticks(ks); ax.set_xticklabels(ks, fontsize=8)
+    tidy(ax, "d   Ground truth: k* is exactly R", "dense heads k", "val MSE (log)")
+    ax.xaxis.label.set_fontsize(8.5); ax.yaxis.label.set_fontsize(8.5)
+    ax.title.set_fontsize(9.5)
+    ax.legend(loc="lower left", fontsize=7)
 
-    fig.suptitle(f"Figure 1  The multi_relation benchmark: the true circuit is known "
-                 f"by construction (N={tp['cfg']['seq_len']}, R={len(offs)}, "
-                 f"offsets {offs})", x=0.006, ha="left", fontsize=11.5)
-    fig.savefig(os.path.join(out, "fig1_task.png"), bbox_inches="tight")
+    fig.suptitle(f"Figure 1   The multi_relation benchmark: the true circuit is known "
+                 f"by construction   (N = {tp['cfg']['seq_len']}, R = {len(offs)}, "
+                 f"offsets {offs}, H = {H})", x=0.006, ha="left", fontsize=11.5)
+    fig.savefig(os.path.join(out, "fig1_task.png"))
     plt.close(fig)
 
     dense_roles = sorted(set(tp["dense_profile"].argmax(1).tolist()))
     rows.append(("1 task", f"true offsets {offs}; a dense {len(offs)}-head model "
                  f"implements {dense_roles}"))
-    rows.append(("1 task", f"under supply, {tp['n_perfused']} of "
-                 f"{tp['cfg']['num_heads']} heads survive and cover "
-                 f"{tp['role_coverage']:.0%} of the true offsets, final loss "
+    rows.append(("1 task", f"under supply, {tp['n_perfused']} of {H} heads survive and "
+                 f"cover {tp['role_coverage']:.0%} of the true offsets, final loss "
                  f"{tp['final_loss']:.5f} against trivial {tp['trivial']:.3f}"))
 
 
