@@ -1,6 +1,6 @@
 # Results
 
-Computed from 30 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 40 runs in `results/`. Every number here and in the figures is read from those pickles.
 
 
 ## 0 ground truth
@@ -20,4 +20,7 @@ Computed from 30 runs in `results/`. Every number here and in the figures is rea
 ## 2 territory
 
 - T=1 (n=3): role_coverage=0.25+/-0.00, territory_span=1.00, perfused=1.00
-- T=2 (n=2): role_coverage=0.50+/-0.00, territory_span=2.00, perfused=2.00
+- T=2 (n=3): role_coverage=0.50+/-0.00, territory_span=2.00, perfused=2.00
+- T=4 (n=3): role_coverage=0.75+/-0.00, territory_span=4.00, perfused=4.00
+- T=8 (n=3): role_coverage=0.92+/-0.16, territory_span=7.67, perfused=8.00
+- T=16 (n=3): role_coverage=1.00+/-0.00, territory_span=15.33, perfused=16.00

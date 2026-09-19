@@ -69,7 +69,13 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         X, Y, T, _ = make_batch(cfg.batch_size, cfg, device)
         if hemo:
             kappa, B = schedule(step, cfg, H, total)
-            pred, g = model(X, Y, kappa=kappa, B_active=B)
+            # The budget ladder belongs to topk supply (see Cfg: "budget schedule, topk
+            # only"). Passing it to territory supply sent it down the local top-k branch
+            # with a global budget that anneals to budget_min, which forces exactly
+            # max(1, round(budget_min/T)) = 1 head per territory: B is then pinned to T
+            # by construction and nothing about it is emergent.
+            pred, g = model(X, Y, kappa=kappa,
+                            B_active=B if cfg.supply == "topk" else None)
         else:
             kappa, B = None, H
             pred, g = model(X, Y)
@@ -88,7 +94,9 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         if (step % cfg.val_every == 0 or step == total - 1
                 or (hemo and (nxt != B or nper != prev))):
             prev = nper
-            kw = dict(kappa=kappa, B_active=B, update=False) if hemo else {}
+            kw = (dict(kappa=kappa, update=False,
+                       B_active=B if cfg.supply == "topk" else None)
+                  if hemo else {})
             h["val_step"].append(step)
             h["val_loss"].append(evaluate(model, val, **kw))
             h["budget"].append(B)

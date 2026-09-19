@@ -21,6 +21,10 @@ tie. The two mechanisms below break that.
              because all of them score heads independently.
              Prediction: circuits compact into territories, and role recovery collapses
              when the number of territories falls below the number of roles.
+
+             kappa is normalised per territory by local_kappa, because a threshold in
+             raw standard deviations is not comparable between a 32-head pool and a
+             4-head territory. See local_kappa.
 """
 import math
 import torch
@@ -28,6 +32,26 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .tasks import d_out
+
+
+def zmax(n):
+    """Largest z-score attainable within a group of n values. No member of a group can
+    exceed mean + kappa*std once kappa >= this, so a threshold set above it always
+    empties the perfused set and falls back to argmax."""
+    return (n - 1) / math.sqrt(n) if n > 1 else 0.0
+
+
+def local_kappa(kappa, n, H):
+    """kappa expressed as a FRACTION OF WHAT IS ATTAINABLE at this group size, so the
+    same kappa means the same thing to a 32-head pool and a 4-head territory.
+
+    Without this the territory mechanism is untestable: at H=32 a territory of H/T
+    heads caps out at zmax(H/T), which is 1.50 at T=8 and 0.71 at T=16, so the default
+    kappa_end of 1.5 guarantees an empty perfused set and the fallback pins B to
+    exactly T for every T >= 8. The measured 'emergent' count was then just T.
+    """
+    ref = zmax(H)
+    return kappa if ref == 0 else kappa * zmax(n) / ref
 
 
 def standardize(s, dim=-1):
@@ -167,8 +191,9 @@ class HemoAttn(CrossAttn):
                     kt = max(1, round(B_active / self.n_territories))
                     g[m] = self.gate_topk(sub, min(kt, sub.numel()), total=share)
                 else:                                          # local threshold
-                    theta = sub.mean() + (0.0 if kappa is None else kappa) * \
-                        sub.std().clamp_min(1e-6)
+                    kl = local_kappa(0.0 if kappa is None else kappa,
+                                     sub.numel(), self.H)
+                    theta = sub.mean() + kl * sub.std().clamp_min(1e-6)
                     act = sub > theta
                     if act.sum() == 0:
                         act = torch.zeros_like(sub, dtype=torch.bool)
