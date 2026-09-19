@@ -31,13 +31,13 @@ Computed from 88 runs in `results/`. Every number here and in the figures is rea
 
 ## 3 delay
 
-- tau=0 (n=5): converged loss=0.00066+/-0.00051, flips/step=0.00, role_coverage=0.80
-- tau=1 (n=3): converged loss=0.00073+/-0.00092, flips/step=0.00, role_coverage=0.75
-- tau=5 (n=3): converged loss=0.00073+/-0.00091, flips/step=0.00, role_coverage=0.75
-- tau=20 (n=3): converged loss=0.00064+/-0.00074, flips/step=0.00, role_coverage=0.75
-- tau=100 (n=3): converged loss=0.04918+/-0.09588, flips/step=0.00, role_coverage=0.75
+- tau=0 (n=5): converged loss=0.00066+/-0.00051, flips/step=0.0004, role_coverage=0.80
+- tau=1 (n=3): converged loss=0.00073+/-0.00092, flips/step=0.0000, role_coverage=0.75
+- tau=5 (n=3): converged loss=0.00073+/-0.00091, flips/step=0.0000, role_coverage=0.75
+- tau=20 (n=3): converged loss=0.00064+/-0.00074, flips/step=0.0000, role_coverage=0.75
+- tau=100 (n=3): converged loss=0.04918+/-0.09588, flips/step=0.0037, role_coverage=0.75
 - VERDICT prediction 'an optimal tau exists': NOT SUPPORTED. tau 0 to 20 spans only 0.00010 in loss with overlapping CIs; only tau=100 is worse.
-- VERDICT prediction 'long tau causes gate oscillation': NOT SUPPORTED. max perfused-set changes per step over the held phase is 0.00 at any tau, so there is no oscillation to trade against.
+- VERDICT prediction 'long tau causes gate oscillation': NOT SUPPORTED. max perfused-set changes per step over the held phase is 0.0037 at any tau (one set change per ~272 steps at worst), so there is no oscillation to trade against.
 
 ## 4 pool
 

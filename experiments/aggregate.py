@@ -320,7 +320,7 @@ def fig_delay(runs, out, rows):
     ax.errorbar(x, [f[0] for f in flip], yerr=[f[1] for f in flip], color=CAT[1], lw=2,
                 marker="s", ms=6, capsize=3, label="perfused-set changes per step")
     ax.set_xticks(x); ax.set_xticklabels(taus)
-    tidy(ax, "Gate oscillation in the held phase", "delay tau (steps)",
+    tidy(ax, "Perfused-set churn in the held phase", "delay tau (steps)",
          "head flips per step")
     ax.legend(loc="best", fontsize=8)
 
@@ -338,7 +338,7 @@ def fig_delay(runs, out, rows):
 
     for t, l, f, c, n in zip(taus, loss, flip, cov, ns):
         rows.append(("3 delay", f"tau={t} (n={n}): converged loss={l[0]:.5f}+/-{l[1]:.5f}, "
-                     f"flips/step={f[0]:.2f}, role_coverage={c[0]:.2f}"))
+                     f"flips/step={f[0]:.4f}, role_coverage={c[0]:.2f}"))
     mx = max(f[0] for f in flip)
     lo_t = [l for t, l in zip(taus, loss) if t <= 20]
     spread = max(l[0] for l in lo_t) - min(l[0] for l in lo_t)
@@ -347,7 +347,8 @@ def fig_delay(runs, out, rows):
                  f"only tau={taus[-1]} is worse."))
     rows.append(("3 delay", f"VERDICT prediction 'long tau causes gate oscillation': "
                  f"NOT SUPPORTED. max perfused-set changes per step over the held phase "
-                 f"is {mx:.2f} at any tau, so there is no oscillation to trade against."))
+                 f"is {mx:.4f} at any tau (one set change per ~{1/mx:.0f} steps at "
+                 f"worst), so there is no oscillation to trade against."))
 
 
 def fig_pool(runs, out, rows):
