@@ -99,4 +99,6 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
                       f"perfused {nper}/{H}")
     h["ledger"] = np.array(h["ledger"]) if hemo else None
     h["final_perfused"] = prev if hemo else H
+    h["final_gate"] = g[0].detach().cpu().numpy()
+    h["final_kappa"], h["final_budget"] = kappa, B
     return model, h

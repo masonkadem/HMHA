@@ -22,7 +22,7 @@ def main():
         ap.add_argument(f"--{f}", type=t, default=None)
     for f in ["supply", "demand", "task", "device"]:
         ap.add_argument(f"--{f}", type=str, default=None)
-    for f in ["pool_beta", "kappa_end", "leak", "lr"]:
+    for f in ["pool_beta", "kappa_start", "kappa_end", "leak", "lr", "ema"]:
         ap.add_argument(f"--{f}", type=float, default=None)
     ap.add_argument("--out", default="results")
     ap.add_argument("--skip-redundancy", action="store_true")
@@ -49,7 +49,16 @@ def main():
     out["hist"] = hist
     out["final_loss"] = hist["val_loss"][-1]
     out["ablation"] = head_ablation(model, val)               # at FULL perfusion
-    out["recovery"] = circuit_recovery(model, val, cfg, device)
+    final_gate = torch.tensor(hist["final_gate"], device=device)
+    out["recovery"] = circuit_recovery(model, val, cfg, device, gate=final_gate)
+    # loss at B = k*, read off DURING annealing (never by re-gating a converged model,
+    # which is already adapted to its own final budget and so flatters small B)
+    kstar = predicted_kstar(cfg)
+    rec = list(zip(hist["n_perfused"], hist["val_loss"]))
+    # B does not always land exactly on k* during annealing, so take the closest
+    # recorded perfusion level and report which level it actually was.
+    b_at, l_at = min(rec, key=lambda bl: (abs(bl[0] - kstar), -rec.index(bl)))
+    out["loss_at_kstar"], out["B_at_kstar"], out["kstar"] = l_at, b_at, kstar
     # circuit recovery as a function of perfusion, using the converged demand field
     out["recovery_vs_kappa"] = {}
     for kap in [-3, -2, -1, -0.5, 0, 0.5, 1, 1.5, 2]:
@@ -62,10 +71,15 @@ def main():
                         "n_distinct_roles", "territory_span")}}
 
     os.makedirs(a.out, exist_ok=True)
-    tag = f"{cfg.task}_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}_tau{cfg.delay}_s{cfg.seed}"
+    tag = (f"{cfg.task}_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}"
+           f"_tau{cfg.delay}_k{cfg.kappa_end:g}_b{cfg.pool_beta:g}_lk{cfg.leak:g}"
+           f"_s{cfg.seed}")
     with open(os.path.join(a.out, tag + ".pkl"), "wb") as f:
         pickle.dump(out, f)
-    print(f"  final loss {out['final_loss']:.5f}  perfused {out['recovery']['n_perfused']}"
+    lk = out["loss_at_kstar"]
+    print(f"  final loss {out['final_loss']:.5f}  loss@B={out['B_at_kstar']}"
+          f"(k*={out['kstar']}) {lk:.5f}"
+          f"  perfused {out['recovery']['n_perfused']}"
           f"  role_coverage {out['recovery']['role_coverage']:.2f}"
           f"  territory_span {out['recovery']['territory_span']}")
     for n in ["qnorm", "neg_entropy", "outnorm", "demand"]:
