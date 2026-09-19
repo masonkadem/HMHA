@@ -16,9 +16,9 @@ from hemo.config import Cfg
 
 
 def tag(**kw):
-    c = Cfg(**{k: v for k, v in kw.items() if hasattr(Cfg, "__dataclass_fields__")
-               and k in Cfg.__dataclass_fields__})
-    return (f"{c.task}_{c.supply}_{c.demand}_T{c.n_territories}"
+    c = Cfg(**{k: v for k, v in kw.items() if k in Cfg.__dataclass_fields__})
+    return (f"{c.task}_R{c.n_rel}_N{c.seq_len}_dk{c.d_k}"
+            f"_{c.supply}_{c.demand}_T{c.n_territories}"
             f"_tau{c.delay}_k{c.kappa_end:g}_b{c.pool_beta:g}_lk{c.leak:g}_s{c.seed}")
 
 
@@ -60,6 +60,15 @@ def jobs():
         for s in range(3):
             add("pool", seed=s, supply="territory", demand="outnorm_ema",
                 n_territories=8, pool_beta=b)
+
+    # 6. does emergent B TRACK k*, or did kappa_end merely happen to print 4? Sweep the
+    #    task's true circuit size at FIXED kappa_end. Seed 0 of each R also runs the
+    #    dense-from-scratch check, so B is compared against a MEASURED k*, not a
+    #    predicted one. This is the experiment the headline claim rests on.
+    for R in [2, 3, 4, 6, 8]:
+        for s_ in range(3):
+            add("kstar_track", seed=s_, supply="threshold", demand="outnorm_ema",
+                n_rel=R, kappa_end=1.5, **({"redundancy": True} if s_ == 0 else {}))
 
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since

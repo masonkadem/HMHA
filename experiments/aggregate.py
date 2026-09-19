@@ -119,8 +119,274 @@ def gate_flips(r):
 
 # ---------------------------------------------------------------- figures
 
+def _panel_schematic(ax, ex, offs):
+    """What the task asks for, drawn from one real batch element."""
+    N = ex["N"]
+    y0, h = 0.0, 0.62
+    for j in range(N):
+        ax.add_patch(plt.Rectangle((j, y0), 0.86, h, facecolor="#eceae5",
+                                   edgecolor=INK3, lw=0.6))
+        ax.text(j + 0.43, y0 + h / 2, str(j), ha="center", va="center", fontsize=6.5,
+                color=INK2)
+    ax.text(-0.9, y0 + h / 2, "memory Y\nposition", ha="right", va="center",
+            fontsize=8, color=INK)
+
+    p = ex["p"]
+    ax.add_patch(plt.Rectangle((p, 2.25), 0.86, h, facecolor=CAT[0], edgecolor="none"))
+    ax.text(p + 0.43, 2.25 + h / 2, str(p), ha="center", va="center", fontsize=7,
+            color="white", fontweight="bold")
+    ax.text(-0.9, 2.25 + h / 2, f"query token\ncarries p = {p}", ha="right",
+            va="center", fontsize=8, color=INK)
+
+    for r, off in enumerate(offs):
+        j = (p + off) % N
+        col = CAT[(r + 1) % len(CAT)]
+        ax.annotate("", xy=(j + 0.43, y0 + h + 0.04), xytext=(p + 0.43, 2.22),
+                    arrowprops=dict(arrowstyle="-|>", color=col, lw=1.4,
+                                    connectionstyle="arc3,rad=-0.25",
+                                    shrinkA=0, shrinkB=1))
+        ax.add_patch(plt.Rectangle((j, y0), 0.86, h, facecolor="none", edgecolor=col,
+                                   lw=1.8))
+        bx = 1.0 + r * (N - 2.0) / len(offs)
+        ax.add_patch(plt.Rectangle((bx, 1.25), (N - 2.0) / len(offs) - 0.18, h,
+                                   facecolor=col, edgecolor="none", alpha=0.85))
+        ax.text(bx + ((N - 2.0) / len(offs) - 0.18) / 2, 1.25 + h / 2,
+                f"+{off}", ha="center", va="center", fontsize=8, color="white",
+                fontweight="bold")
+    ax.text(-0.9, 1.25 + h / 2, "target\nR blocks", ha="right", va="center",
+            fontsize=8, color=INK)
+    ax.set_xlim(-6.2, N + 0.4); ax.set_ylim(-0.35, 3.15)
+    ax.axis("off")
+    ax.set_title("a  Each query reads R fixed offsets from memory", loc="left",
+                 color=INK, fontweight="bold")
+
+
+def _panel_roles(ax, prof, offs, title, active=None):
+    """Measured attention-offset profile. A head's ROLE is the offset it peaks at."""
+    keep = np.arange(prof.shape[0]) if active is None else np.where(active)[0]
+    P = prof[keep]
+    order = np.argsort(P.argmax(1))
+    P, keep = P[order], keep[order]
+    im = ax.imshow(P, aspect="auto", cmap="Blues", vmin=0,
+                   extent=(-0.5, prof.shape[1] - 0.5, len(keep) - 0.5, -0.5))
+    for off in offs:
+        ax.axvline(off, color=CAT[1], lw=1.1, ls="--", alpha=0.9)
+    ax.set_yticks(range(len(keep)))
+    ax.set_yticklabels([f"h{h}" for h in keep], fontsize=7)
+    ax.set_xticks(offs); ax.set_xticklabels([f"+{o}" for o in offs], fontsize=8)
+    ax.set_xlabel("attention offset from p")
+    ax.set_title(title, loc="left", color=INK, fontweight="bold")
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    return im
+
+
+def fig_task(runs, out, rows):
+    cache = os.path.join(out, "task_panel.pkl")
+    gt = [r for r in runs if "redundancy" in r and r["cfg"]["n_rel"] == 4]
+    if not os.path.exists(cache) or not gt:
+        print("  fig_task: skipped (run experiments/task_panel.py first)")
+        return
+    with open(cache, "rb") as f:
+        tp = pickle.load(f)
+    offs = tp["offsets"]
+
+    fig = plt.figure(figsize=(12, 6.4))
+    gs = fig.add_gridspec(2, 3, height_ratios=[0.92, 1.0], hspace=0.42, wspace=0.34)
+    _panel_schematic(fig.add_subplot(gs[0, :]), tp["example"], offs)
+
+    ax = fig.add_subplot(gs[1, 0])
+    _panel_roles(ax, tp["dense_profile"], offs,
+                 f"b  A dense {len(offs)}-head model: one head per offset")
+
+    ax = fig.add_subplot(gs[1, 1])
+    im = _panel_roles(ax, tp["hemo_profile"], offs,
+                      f"c  Surviving heads under supply ({tp['n_perfused']} perfused "
+                      f"of {tp['cfg']['num_heads']})", active=tp["hemo_active"])
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+    cb.set_label("mean attention", fontsize=7)
+    cb.ax.tick_params(labelsize=6)
+
+    ax = fig.add_subplot(gs[1, 2])
+    ks = gt[0]["redundancy"]["ks"]
+    curves = np.array([r["redundancy"]["curve"] for r in gt])
+    m, ci = mean_ci(curves)
+    triv = float(np.mean([r["redundancy"]["trivial"] for r in gt]))
+    th = float(np.mean([r["redundancy"]["thresh"] for r in gt]))
+    ax.errorbar(ks, m, yerr=ci, color=CAT[0], lw=2, marker="o", ms=5, capsize=3,
+                label=f"dense, k heads (n={len(gt)})")
+    ax.axhline(triv, color=INK3, lw=1.2, ls=":")
+    ax.text(ks[0], triv, f" trivial {triv:.3f}", color=INK2, fontsize=7.5, va="bottom")
+    ax.axhline(th, color=CRIT, lw=1.2, ls="--")
+    ax.text(ks[0], th, f" solved threshold {th:.4f}", color=CRIT, fontsize=7.5,
+            va="bottom")
+    ax.axvline(len(offs), color=GOOD, lw=1.4)
+    ax.text(len(offs), m.max(), f" k* = {len(offs)} ", color=GOOD, fontsize=7.5,
+            rotation=90, va="top", ha="right")
+    ax.set_xscale("log", base=2); ax.set_yscale("log")
+    ax.set_xticks(ks); ax.set_xticklabels(ks)
+    tidy(ax, "d  Ground truth: k* is exactly R", "dense heads k", "val MSE (log)")
+    ax.legend(loc="lower left", fontsize=7.5)
+
+    fig.suptitle(f"Figure 1  The multi_relation benchmark: the true circuit is known "
+                 f"by construction (N={tp['cfg']['seq_len']}, R={len(offs)}, "
+                 f"offsets {offs})", x=0.006, ha="left", fontsize=11.5)
+    fig.savefig(os.path.join(out, "fig1_task.png"), bbox_inches="tight")
+    plt.close(fig)
+
+    dense_roles = sorted(set(tp["dense_profile"].argmax(1).tolist()))
+    rows.append(("1 task", f"true offsets {offs}; a dense {len(offs)}-head model "
+                 f"implements {dense_roles}"))
+    rows.append(("1 task", f"under supply, {tp['n_perfused']} of "
+                 f"{tp['cfg']['num_heads']} heads survive and cover "
+                 f"{tp['role_coverage']:.0%} of the true offsets, final loss "
+                 f"{tp['final_loss']:.5f} against trivial {tp['trivial']:.3f}"))
+
+
+def fig_kstar_tracking(runs, out, rows):
+    """The experiment the headline claim rests on. Experiment 1 showed B = 4 when k* = 4,
+    which a reader can dismiss as kappa_end tuned until it printed the right number. Here
+    kappa_end is FIXED and the task's true circuit size is swept instead."""
+    rs = sel(runs, supply="threshold", demand="outnorm_ema", delay=0, pool_beta=0.0,
+             leak=0.0, kappa_end=1.5)
+    g = by(rs, "n_rel")
+    if len(g) < 3:
+        return
+    Rs = list(g)
+    B = [agg(v, lambda r: r["recovery"]["n_perfused"]) for v in g.values()]
+    cov = [agg(v, lambda r: r["recovery"]["role_coverage"]) for v in g.values()]
+    frac = [agg(v, frac_at_kstar) for v in g.values()]
+    ns = [len(v) for v in g.values()]
+    # measured k*, from the dense-from-scratch check, wherever a seed ran it
+    meas = {}
+    for R, v in g.items():
+        ms = [r["redundancy"]["kstar"] for r in v if "redundancy" in r]
+        if ms:
+            meas[R] = ms
+
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.6))
+
+    ax = axes[0]
+    lim = [min(Rs) - 0.6, max(Rs) + 0.6]
+    ax.plot(lim, lim, color=INK3, lw=1.2, ls=":", label="B = k* (identity)")
+    ax.errorbar(Rs, [b[0] for b in B], yerr=[b[1] for b in B], color=CAT[0], lw=2,
+                marker="o", ms=7, capsize=3, label="emergent perfused count B")
+    if meas:
+        ax.scatter(list(meas), [np.mean(v) for v in meas.values()], marker="x", s=55,
+                   color=GOOD, zorder=5, label="measured k* (dense from scratch)")
+    for R, b in zip(Rs, B):
+        ax.annotate(f"{b[0]:.1f}", (R, b[0]), textcoords="offset points",
+                    xytext=(0, 9), ha="center", fontsize=8, color=INK2)
+    ax.set_xlim(*lim); ax.set_xticks(Rs)
+    tidy(ax, "a  Does B track the true circuit size?", "true k* = R",
+         "perfused heads B")
+    ax.legend(loc="upper left", fontsize=7.5)
+
+    ax = axes[1]
+    err = [b[0] - R for R, b in zip(Rs, B)]
+    ax.axhline(0, color=INK3, lw=1.2)
+    ax.bar(Rs, err, width=0.55, color=[DIV_POS if e >= 0 else DIV_NEG for e in err],
+           edgecolor=SURFACE, linewidth=2)
+    for R, e in zip(Rs, err):
+        ax.annotate(f"{e:+.1f}", (R, e), textcoords="offset points",
+                    xytext=(0, 5 if e >= 0 else -12), ha="center", fontsize=8,
+                    color=INK2)
+    ax.set_xticks(Rs)
+    tidy(ax, "b  Signed error B - k*", "true k* = R", "heads (blue over, red under)")
+
+    ax = axes[2]
+    ax.errorbar(Rs, [c[0] for c in cov], yerr=[c[1] for c in cov], color=CAT[2], lw=2,
+                marker="^", ms=7, capsize=3, label="role coverage")
+    ax.errorbar(Rs, [f[0] for f in frac], yerr=[f[1] for f in frac], color=CAT[3],
+                lw=2, marker="s", ms=6, capsize=3,
+                label="fraction of held phase at exactly k*")
+    ax.set_ylim(-0.05, 1.15); ax.set_xticks(Rs)
+    tidy(ax, "c  Does it also find the right roles?", "true k* = R", "fraction")
+    ax.legend(loc="lower left", fontsize=7.5)
+
+    fig.suptitle(f"Figure 2  Emergent head count vs true circuit size, kappa_end fixed "
+                 f"at 1.5  ({nlab(ns)} seeds per point)", x=0.006, ha="left",
+                 fontsize=11.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    fig.savefig(os.path.join(out, "fig2_kstar_tracking.png"), bbox_inches="tight")
+    plt.close(fig)
+
+    for R, b, c, f_, n in zip(Rs, B, cov, frac, ns):
+        extra = f", measured k*={meas[R]}" if R in meas else ""
+        rows.append(("2 k* tracking", f"R=k*={R} (n={n}): B={b[0]:.2f}+/-{b[1]:.2f}, "
+                     f"error {b[0]-R:+.2f}, role_coverage={c[0]:.2f}, "
+                     f"held phase at exactly k* = {f_[0]:.2f}{extra}"))
+    mae = float(np.mean([abs(b[0] - R) for R, b in zip(Rs, B)]))
+    rho = spearman(np.array(Rs, dtype=float), np.array([b[0] for b in B]))
+    exact = sum(abs(b[0] - R) < 0.5 for R, b in zip(Rs, B))
+    rows.append(("2 k* tracking", f"VERDICT B tracks k* with mean absolute error "
+                 f"{mae:.2f} heads over k* = {min(Rs)} to {max(Rs)}, Spearman "
+                 f"rho(k*, B) = {rho:+.3f}, exact on {exact} of {len(Rs)} settings, "
+                 f"at a single fixed kappa_end. "
+                 f"{'B tracks k* rather than kappa_end printing one number.' if mae < 1.5 and rho > 0.8 else 'B does NOT track k*; experiment 1 does not generalise.'}"))
+
+
+def fig_nulls(runs, out, rows):
+    """The three null results in one place. Each panel carries the reference line that
+    the prediction said the data would depart from, and the data does not depart."""
+    terr = sel(runs, supply="territory", demand="outnorm_ema", pool_beta=0.0, n_rel=4)
+    dly = sel(runs, supply="threshold", demand="outnorm_ema", pool_beta=0.0, leak=0.0,
+              kappa_end=1.5, n_rel=4)
+    pl = sel(runs, supply="territory", demand="outnorm_ema", n_territories=8, n_rel=4)
+    gt_, gd, gp = by(terr, "n_territories"), by(dly, "delay"), by(pl, "pool_beta")
+    if len(gt_) < 2 or len(gd) < 2 or len(gp) < 2:
+        return
+    R = terr[0]["cfg"]["n_rel"]
+
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.6))
+
+    ax, Ts = axes[0], list(gt_)
+    spn = [agg(v, lambda r: r["recovery"]["territory_span"]) for v in gt_.values()]
+    ax.plot(Ts, Ts, color=INK3, lw=1.3, ls=":", label="span = T (no compaction)")
+    ax.errorbar(Ts, [x[0] for x in spn], yerr=[x[1] for x in spn], color=CAT[1], lw=2,
+                marker="s", ms=6, capsize=3, label="measured territory span")
+    ax.set_xscale("log", base=2); ax.set_yscale("log", base=2)
+    ax.set_xticks(Ts); ax.set_xticklabels(Ts)
+    tidy(ax, "a  Territory: predicted compaction absent", "n_territories",
+         "territories occupied")
+    ax.legend(loc="upper left", fontsize=7.5)
+
+    ax, taus = axes[1], list(gd)
+    flip = [agg(v, gate_flips) for v in gd.values()]
+    x = np.arange(len(taus))
+    ax.errorbar(x, [f[0] for f in flip], yerr=[f[1] for f in flip], color=CAT[2], lw=2,
+                marker="o", ms=6, capsize=3, label="perfused-set changes per step")
+    ax.set_xticks(x); ax.set_xticklabels(taus)
+    mx = max(f[0] for f in flip)
+    ax.set_ylim(-0.002, max(0.02, mx * 1.6))
+    ax.annotate(f"peak {mx:.4f}/step\n= one change per {1/mx:.0f} steps",
+                (x[int(np.argmax([f[0] for f in flip]))], mx),
+                textcoords="offset points", xytext=(-8, 10), ha="right", fontsize=7.5,
+                color=INK2)
+    tidy(ax, "b  Delay: predicted oscillation absent", "delay tau (steps)",
+         "head flips per step")
+    ax.legend(loc="upper left", fontsize=7.5)
+
+    ax, bs = axes[2], list(gp)
+    cov = [agg(v, lambda r: r["recovery"]["role_coverage"]) for v in gp.values()]
+    x = np.arange(len(bs))
+    ax.errorbar(x, [c[0] for c in cov], yerr=[c[1] for c in cov], color=CAT[0], lw=2,
+                marker="^", ms=7, capsize=3, label="role coverage")
+    ax.set_xticks(x); ax.set_xticklabels([f"{b:g}" for b in bs])
+    ax.set_ylim(-0.05, 1.15)
+    tidy(ax, "c  Pooling: no effect", "pool_beta", "fraction of true offsets found")
+    ax.legend(loc="lower left", fontsize=7.5)
+
+    fig.suptitle(f"Figure 4  Three null results (R = {R}). Each panel shows the "
+                 f"quantity whose predicted departure did not occur", x=0.006,
+                 ha="left", fontsize=11.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    fig.savefig(os.path.join(out, "fig4_nulls.png"), bbox_inches="tight")
+    plt.close(fig)
+
+
 def fig_ground_truth(runs, out, rows):
-    rs = [r for r in runs if "redundancy" in r]
+    rs = [r for r in runs if "redundancy" in r and r["cfg"]["n_rel"] == 4]
     if not rs:
         return
     ks = rs[0]["redundancy"]["ks"]
@@ -145,9 +411,9 @@ def fig_ground_truth(runs, out, rows):
                 rotation=90, va="top", ha="right")
     ax.set_xscale("log", base=2); ax.set_yscale("log")
     ax.set_xticks(ks); ax.set_xticklabels(ks)
-    tidy(ax, "Ground truth: loss vs dense head count", "heads k", "val MSE (log)")
+    tidy(ax, "Supplementary 0  Ground truth: loss vs dense head count", "heads k", "val MSE (log)")
     ax.legend(loc="lower left", fontsize=8)
-    fig.tight_layout(); fig.savefig(os.path.join(out, "fig0_ground_truth.png")); plt.close(fig)
+    fig.tight_layout(); fig.savefig(os.path.join(out, "figS0_ground_truth.png")); plt.close(fig)
 
     rows.append(("0 ground truth", f"measured k* per seed = {kstars}, predicted = {pred}; "
                  f"trivial = {triv:.4f}, threshold = {th:.5f}"))
@@ -157,7 +423,7 @@ def fig_ground_truth(runs, out, rows):
 
 def fig_emergent_B(runs, out, rows):
     rs = sel(runs, supply="threshold", demand="outnorm_ema", delay=0, pool_beta=0.0,
-             leak=0.0)
+             leak=0.0, n_rel=4)
     g = by(rs, "kappa_end")
     if len(g) < 2:
         return
@@ -205,10 +471,10 @@ def fig_emergent_B(runs, out, rows):
     tidy(ax, "Role recovery", "kappa_end", "fraction of true offsets found")
     ax.legend(loc="best", fontsize=8)
 
-    fig.suptitle(f"1. Emergent B vs true k*  (threshold supply, outnorm_ema demand, "
+    fig.suptitle(f"Figure 3  Emergent B vs ischemia depth at k* = 4  (threshold supply, "
                  f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(os.path.join(out, "fig1_emergent_B.png")); plt.close(fig)
+    fig.savefig(os.path.join(out, "fig3_emergent_B.png")); plt.close(fig)
 
     for k, b, bc, l, c, n, am in zip(kaps, B_m, B_c, L_m, C_m, ns, A_m):
         rows.append(("1 emergent B", f"kappa_end={k:g} (n={n}): B={b:.2f}+/-{bc:.2f} "
@@ -226,7 +492,7 @@ def fig_emergent_B(runs, out, rows):
 
 
 def fig_territory(runs, out, rows):
-    rs = sel(runs, supply="territory", demand="outnorm_ema", pool_beta=0.0)
+    rs = sel(runs, supply="territory", demand="outnorm_ema", pool_beta=0.0, n_rel=4)
     g = by(rs, "n_territories")
     if len(g) < 2:
         return
@@ -268,10 +534,10 @@ def fig_territory(runs, out, rows):
     tidy(ax, "Perfused count", "n_territories", "heads")
     ax.legend(loc="best", fontsize=8)
 
-    fig.suptitle(f"2. Territory compaction  (territory supply, R = {R}, "
+    fig.suptitle(f"Supplementary 1  Territory compaction  (territory supply, R = {R}, "
                  f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(os.path.join(out, "fig2_territory.png")); plt.close(fig)
+    fig.savefig(os.path.join(out, "figS1_territory.png")); plt.close(fig)
 
     for T, c, sp, pf, n in zip(Ts, cov, spn, per, ns):
         rows.append(("2 territory", f"T={T} (n={n}): role_coverage={c[0]:.2f}+/-{c[1]:.2f}, "
@@ -293,7 +559,7 @@ def fig_territory(runs, out, rows):
 
 def fig_delay(runs, out, rows):
     rs = sel(runs, supply="threshold", demand="outnorm_ema", pool_beta=0.0, leak=0.0,
-             kappa_end=1.5)
+             kappa_end=1.5, n_rel=4)
     g = by(rs, "delay")
     if len(g) < 2:
         return
@@ -331,10 +597,10 @@ def fig_delay(runs, out, rows):
     tidy(ax, "Role recovery", "delay tau (steps)", "fraction of true offsets found")
     ax.legend(loc="best", fontsize=8)
 
-    fig.suptitle(f"3. Delay  (threshold supply, kappa_end = 1.5, "
+    fig.suptitle(f"Supplementary 2  Delay  (threshold supply, kappa_end = 1.5, "
                  f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(os.path.join(out, "fig3_delay.png")); plt.close(fig)
+    fig.savefig(os.path.join(out, "figS2_delay.png")); plt.close(fig)
 
     for t, l, f, c, n in zip(taus, loss, flip, cov, ns):
         rows.append(("3 delay", f"tau={t} (n={n}): converged loss={l[0]:.5f}+/-{l[1]:.5f}, "
@@ -352,7 +618,7 @@ def fig_delay(runs, out, rows):
 
 
 def fig_pool(runs, out, rows):
-    rs = sel(runs, supply="territory", demand="outnorm_ema", n_territories=8)
+    rs = sel(runs, supply="territory", demand="outnorm_ema", n_territories=8, n_rel=4)
     g = by(rs, "pool_beta")
     if len(g) < 2:
         return
@@ -379,10 +645,10 @@ def fig_pool(runs, out, rows):
     axes[0].set_ylim(-0.05, 1.05)
     axes[2].set_yscale("log")
 
-    fig.suptitle(f"4. Pooled demand  (territory supply, T = 8, "
+    fig.suptitle(f"Supplementary 3  Pooled demand  (territory supply, T = 8, "
                  f"{nlab(ns)} seeds)", x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
-    fig.savefig(os.path.join(out, "fig4_pool.png")); plt.close(fig)
+    fig.savefig(os.path.join(out, "figS3_pool.png")); plt.close(fig)
 
     for b, c, sp, l, n in zip(bs, cov, spn, loss, ns):
         rows.append(("4 pool", f"pool_beta={b:g} (n={n}): role_coverage={c[0]:.2f}, "
@@ -396,7 +662,7 @@ def fig_pool(runs, out, rows):
 
 
 def fig_demand_arms(runs, out, rows):
-    rs = sel(runs, supply="topk")
+    rs = sel(runs, supply="topk", n_rel=4)
     if not rs:
         return
     arms = [a for a in ["outnorm_ema", "outnorm_inst", "qnorm", "random"]
@@ -444,7 +710,7 @@ def fig_demand_arms(runs, out, rows):
     ax.set_xlim(-1.05, 1.05)
     tidy(ax, f"rho(score, ablation delta) at full perfusion, n = {len(runs)} runs",
          "Spearman rho (blue positive, red negative)", None, grid="x")
-    fig.suptitle("5. Demand arms and what the scores actually predict",
+    fig.suptitle("Figure 5  Demand arms, and what the scores actually predict",
                  x=0.005, ha="left", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     fig.savefig(os.path.join(out, "fig5_demand_arms.png"))
@@ -507,8 +773,8 @@ def main():
         return
     print(f"{len(runs)} runs loaded")
     rows = []
-    for f in (fig_ground_truth, fig_emergent_B, fig_territory, fig_delay, fig_pool,
-              fig_demand_arms):
+    for f in (fig_task, fig_kstar_tracking, fig_emergent_B, fig_nulls,
+              fig_demand_arms, fig_ground_truth):
         try:
             f(runs, a.out, rows)
         except Exception as e:                       # a missing sweep must not kill the rest

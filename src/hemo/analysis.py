@@ -83,7 +83,9 @@ def circuit_recovery(model, val, cfg, device, gate=None, bs=256):
     real = [h for h in surv if purity[h] > 2.0 / cfg.seq_len]
     found = {int(role[h]) for h in real}
     terr = model.territory.cpu().numpy()
-    return dict(active=act, head_role=role, head_purity=purity,
+    # the per-head attention-offset profile is what makes a head's ROLE readable, so
+    # keep it rather than only the argmax the metrics reduce it to
+    return dict(active=act, head_role=role, head_purity=purity, offset_profile=prof,
                 n_perfused=int(act.sum()),
                 role_coverage=len(found & true_offs) / len(true_offs),
                 role_purity=float(purity[surv].mean()) if len(surv) else 0.0,

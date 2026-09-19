@@ -71,7 +71,10 @@ def main():
                         "n_distinct_roles", "territory_span")}}
 
     os.makedirs(a.out, exist_ok=True)
-    tag = (f"{cfg.task}_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}"
+    # R, N and d_k belong in the tag for the same reason kappa_end and leak do: they are
+    # swept, and a tag that omits a swept field silently overwrites the other arm.
+    tag = (f"{cfg.task}_R{cfg.n_rel}_N{cfg.seq_len}_dk{cfg.d_k}"
+           f"_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}"
            f"_tau{cfg.delay}_k{cfg.kappa_end:g}_b{cfg.pool_beta:g}_lk{cfg.leak:g}"
            f"_s{cfg.seed}")
     with open(os.path.join(a.out, tag + ".pkl"), "wb") as f:
