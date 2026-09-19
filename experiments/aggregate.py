@@ -15,7 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-from hemo.analysis import mean_ci, spearman
+from hemo.analysis import mean_ci, spearman, threshold
 
 # validated palette (dataviz reference instance, light surface #fcfcfb).
 # categorical slots in fixed order, never cycled; ordinal blue ramp for kappa.
@@ -285,8 +285,8 @@ def fig_kstar_tracking(runs, out, rows):
         ax.scatter(list(meas), [np.mean(v) for v in meas.values()], marker="x", s=55,
                    color=GOOD, zorder=5, label="measured k* (dense from scratch)")
     for R, b in zip(Rs, B):
-        ax.annotate(f"{b[0]:.1f}", (R, b[0]), textcoords="offset points",
-                    xytext=(0, 9), ha="center", fontsize=8, color=INK2)
+        ax.annotate(f"{b[0]:.1f}", (R, b[0] + b[1]), textcoords="offset points",
+                    xytext=(9, 4), ha="left", fontsize=8, color=INK2)
     ax.set_xlim(*lim); ax.set_xticks(Rs)
     tidy(ax, "a  Does B track the true circuit size?", "true k* = R",
          "perfused heads B")
@@ -297,6 +297,8 @@ def fig_kstar_tracking(runs, out, rows):
     ax.axhline(0, color=INK3, lw=1.2)
     ax.bar(Rs, err, width=0.55, color=[DIV_POS if e >= 0 else DIV_NEG for e in err],
            edgecolor=SURFACE, linewidth=2)
+    lo, hi = min(err), max(err)
+    ax.set_ylim(lo - 0.55 * max(1.0, hi - lo) * 0.5, hi + 0.3 * max(1.0, hi - lo))
     for R, e in zip(Rs, err):
         ax.annotate(f"{e:+.1f}", (R, e), textcoords="offset points",
                     xytext=(0, 5 if e >= 0 else -12), ha="center", fontsize=8,
@@ -329,11 +331,38 @@ def fig_kstar_tracking(runs, out, rows):
     mae = float(np.mean([abs(b[0] - R) for R, b in zip(Rs, B)]))
     rho = spearman(np.array(Rs, dtype=float), np.array([b[0] for b in B]))
     exact = sum(abs(b[0] - R) < 0.5 for R, b in zip(Rs, B))
-    rows.append(("2 k* tracking", f"VERDICT B tracks k* with mean absolute error "
-                 f"{mae:.2f} heads over k* = {min(Rs)} to {max(Rs)}, Spearman "
-                 f"rho(k*, B) = {rho:+.3f}, exact on {exact} of {len(Rs)} settings, "
-                 f"at a single fixed kappa_end. "
-                 f"{'B tracks k* rather than kappa_end printing one number.' if mae < 1.5 and rho > 0.8 else 'B does NOT track k*; experiment 1 does not generalise.'}"))
+    bs_ = [b[0] for b in B]
+    span_k, span_B = max(Rs) - min(Rs), max(bs_) - min(bs_)
+    slope = float(np.polyfit(Rs, bs_, 1)[0])
+    # did the model even solve the task at each R? An unsolved run's B says nothing
+    # about circuit discovery.
+    solved = [R for R, v in g.items()
+              if np.mean([r["final_loss"] for r in v])
+              <= threshold(0.0, np.mean([r["trivial"] for r in v]), _CfgLike(v[0]))]
+    rows.append(("2 k* tracking", f"VERDICT B does NOT track k*. Over k* = {min(Rs)} to "
+                 f"{max(Rs)} (a span of {span_k}) B spans only {span_B:.2f} and "
+                 f"saturates: the fitted slope dB/dk* is {slope:.2f}, against 1.00 for "
+                 f"tracking. Mean absolute error {mae:.2f} heads, exact on {exact} of "
+                 f"{len(Rs)} settings."))
+    rows.append(("2 k* tracking", f"VERDICT experiment 1 does not generalise. "
+                 f"theta = mean + kappa*std over H standardized demands admits a nearly "
+                 f"fixed number of heads regardless of the task, so B is set by "
+                 f"(kappa_end, H) and the earlier B = 4 = k* was kappa_end = 1.5 "
+                 f"matching k* = 4, not the mechanism finding it."))
+    rows.append(("2 k* tracking", f"CAVEAT the task is only solved at k* in "
+                 f"{solved}; elsewhere the hemo run ends above the solved threshold, so "
+                 f"those B values describe a failed run. The hemo arm gets cfg.steps "
+                 f"while the dense k* check gets scratch_mult x that, so under-training "
+                 f"at large R is a live alternative explanation and is worth one "
+                 f"control before this is written up."))
+
+
+class _CfgLike(dict):
+    """analysis.threshold wants attribute access to gap_tol and abs_floor."""
+    def __init__(self, run):
+        super().__init__(run["cfg"])
+        self.gap_tol = run["cfg"]["gap_tol"]
+        self.abs_floor = run["cfg"]["abs_floor"]
 
 
 def fig_nulls(runs, out, rows):

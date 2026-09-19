@@ -1,12 +1,23 @@
 # Results
 
-Computed from 90 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 100 runs in `results/`. Every number here and in the figures is read from those pickles.
 
 
 ## 1 task
 
 - true offsets [1, 5, 9, 13]; a dense 4-head model implements [1, 5, 9, 13]
 - under supply, 4 of 32 heads survive and cover 75% of the true offsets, final loss 0.00027 against trivial 1.007
+
+## 2 k* tracking
+
+- R=k*=2 (n=3): B=2.67+/-0.65, error +0.67, role_coverage=1.00, held phase at exactly k* = 0.30, measured k*=[2]
+- R=k*=3 (n=3): B=2.00+/-1.13, error -1.00, role_coverage=0.44, held phase at exactly k* = 0.33, measured k*=[3]
+- R=k*=4 (n=5): B=4.00+/-0.00, error +0.00, role_coverage=0.80, held phase at exactly k* = 1.00, measured k*=[4, 4]
+- R=k*=6 (n=3): B=4.00+/-1.13, error -2.00, role_coverage=0.61, held phase at exactly k* = 0.02, measured k*=[6]
+- R=k*=8 (n=3): B=4.00+/-2.99, error -4.00, role_coverage=0.38, held phase at exactly k* = 0.00, measured k*=[8]
+- VERDICT B does NOT track k*. Over k* = 2 to 8 (a span of 6) B spans only 2.00 and saturates: the fitted slope dB/dk* is 0.29, against 1.00 for tracking. Mean absolute error 1.53 heads, exact on 1 of 5 settings.
+- VERDICT experiment 1 does not generalise. theta = mean + kappa*std over H standardized demands admits a nearly fixed number of heads regardless of the task, so B is set by (kappa_end, H) and the earlier B = 4 = k* was kappa_end = 1.5 matching k* = 4, not the mechanism finding it.
+- CAVEAT the task is only solved at k* in [2, 4]; elsewhere the hemo run ends above the solved threshold, so those B values describe a failed run. The hemo arm gets cfg.steps while the dense k* check gets scratch_mult x that, so under-training at large R is a live alternative explanation and is worth one control before this is written up.
 
 ## 1 emergent B
 
@@ -34,11 +45,11 @@ Computed from 90 runs in `results/`. Every number here and in the figures is rea
 
 ## 5 ablation
 
-- rho(demand, ablation delta) = +0.375+/-0.065 over 90 runs, at full perfusion
-- rho(outnorm, ablation delta) = +0.292+/-0.095 over 90 runs, at full perfusion
-- rho(neg_entropy, ablation delta) = +0.460+/-0.082 over 90 runs, at full perfusion
-- rho(qnorm, ablation delta) = +0.490+/-0.083 over 90 runs, at full perfusion
-- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.375 while qnorm reaches +0.490 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
+- rho(demand, ablation delta) = +0.369+/-0.059 over 100 runs, at full perfusion
+- rho(outnorm, ablation delta) = +0.294+/-0.086 over 100 runs, at full perfusion
+- rho(neg_entropy, ablation delta) = +0.478+/-0.075 over 100 runs, at full perfusion
+- rho(qnorm, ablation delta) = +0.505+/-0.077 over 100 runs, at full perfusion
+- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.369 while qnorm reaches +0.505 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
 
 ## 0 ground truth
 

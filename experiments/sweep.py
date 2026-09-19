@@ -17,9 +17,9 @@ from hemo.config import Cfg
 
 def tag(**kw):
     c = Cfg(**{k: v for k, v in kw.items() if k in Cfg.__dataclass_fields__})
-    return (f"{c.task}_R{c.n_rel}_N{c.seq_len}_dk{c.d_k}"
-            f"_{c.supply}_{c.demand}_T{c.n_territories}"
-            f"_tau{c.delay}_k{c.kappa_end:g}_b{c.pool_beta:g}_lk{c.leak:g}_s{c.seed}")
+    sys.path.insert(0, HERE)
+    from run import result_tag
+    return result_tag(c)
 
 
 def jobs():
@@ -69,6 +69,14 @@ def jobs():
         for s_ in range(3):
             add("kstar_track", seed=s_, supply="threshold", demand="outnorm_ema",
                 n_rel=R, kappa_end=1.5, **({"redundancy": True} if s_ == 0 else {}))
+
+    # 7. control for experiment 6. The hemo arm gets cfg.steps while the dense k* check
+    #    gets scratch_mult x that, so B saturating at large R may be under-training
+    #    rather than the mechanism. Re-run the two worst R at the dense budget.
+    for R in [6, 8]:
+        for s_ in range(3):
+            add("kstar_control", seed=s_, supply="threshold", demand="outnorm_ema",
+                n_rel=R, kappa_end=1.5, steps=6000)
 
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since

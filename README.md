@@ -4,10 +4,22 @@ Hemodynamically constrained attention. A fixed total blood supply is allocated a
 attention heads, starving the ones that do not demand it, so the surviving circuit is
 small enough to verify mechanistically.
 
-## The one-sentence claim
+## The one-sentence claim, and its current status
 
-A metabolically constrained transformer discovers its own minimal circuit size and
-confines it spatially, verified on a benchmark where the true circuit is known.
+The intended claim was: a metabolically constrained transformer discovers its own
+minimal circuit size and confines it spatially, verified on a benchmark where the true
+circuit is known.
+
+**That claim is not currently supported.** Sweeping the task's true circuit size k* over
+2, 3, 4, 6, 8 at fixed kappa_end shows the emergent perfused count saturating: k* spans
+6 while B spans 2.00, with fitted slope dB/dk* = 0.29 against 1.00 for tracking. The
+earlier headline result, B = 4 = k* with zero variance over 5 seeds, was kappa_end = 1.5
+happening to admit about 4 of 32 heads, not the mechanism locating k*. See negative
+result 8 and `figures/fig2_kstar_tracking.png`.
+
+What does hold is the benchmark. k* = R is confirmed by dense-from-scratch training at
+every R tested, and a dense R-head model recovers exactly the true offsets, so head roles
+are scorable. `multi_relation` is the part of this repo that currently stands up.
 
 ## Evidence so far
 
@@ -24,18 +36,21 @@ python experiments/aggregate.py --readme README.md
 
 Summary of that sweep, ranked by how much it moves the claim:
 
-1. **Experiment 1 holds, and it is the strongest result here.** At kappa_end = 1.5 the
-   perfused count settles at exactly 4 = k*, zero variance over 5 seeds, for 100% of
-   the converged phase, with no budget given to the mechanism. B is monotone in
-   kappa_end from 5.60 down to 1.40, so it is selected by ischemia depth rather than
-   sitting at k* for free, and over-starving costs three orders of magnitude of loss.
-2. **Experiment 5 splits the old negative results.** Demand-ranked supply does beat
+1. **The k\* tracking test fails, and it is decisive.** At fixed kappa_end = 1.5, B is
+   2.67, 2.00, 4.00, 4.00, 4.00 for k* = 2, 3, 4, 6, 8. B saturates near 4 and never
+   exceeds 6 in any single seed. This is the experiment the headline rested on and it
+   says the threshold mechanism does not discover circuit size.
+2. **Experiment 1 still holds as stated, but means less than it looked.** At k* = 4 the
+   perfused count settles at exactly 4, zero variance over 5 seeds, for 100% of the
+   converged phase, and is monotone in kappa_end from 5.60 down to 1.40. Read alongside
+   finding 1, this is a statement about kappa_end, not about k*.
+3. **Experiment 5 splits the old negative results.** Demand-ranked supply does beat
    chance at B = k* (0.00098 to 0.00145 for the three signal arms against 0.08007 for
    random, a factor of 82). But the three signal arms are mutually inseparable: their
    spread is smaller than any one of their CIs, so EMA vs instantaneous is a tie here,
    not a loss for EMA. `--leak 0.05` did not rescue the EMA arm specifically; it helps
    random most.
-3. **Experiments 2, 3 and 4 are null.** Territory compaction does not occur, no optimal
+4. **Experiments 2, 3 and 4 are null.** Territory compaction does not occur, no optimal
    delay exists, and pooling changes nothing. Details and causes below.
 
 **Prior evidence, 5 seeds, CUDA, same configuration.**
@@ -81,7 +96,17 @@ Redundancy is real, k* is predicted correctly, and starvation does raise role pu
    1.00 and territory_span 6.67 to 7.67, while full pooling has the worst converged
    loss of the four. The non-locality this was meant to introduce has no measured
    effect.
-7. The signal the mechanism gates on is not the best available predictor of causal head
+8. **Emergent B does not track the true circuit size.** Sweeping R over 2, 3, 4, 6, 8 at
+   fixed kappa_end = 1.5 gives B = 2.67, 2.00, 4.00, 4.00, 4.00, per-seed
+   [2,3,3], [1,2,3], [4,4,4,4,4], [5,4,3], [5,1,6]. k* spans 6, B spans 2.00, fitted
+   slope 0.29. The cause is structural: theta = mean + kappa*std over H standardized
+   demands admits a nearly fixed fraction of heads whatever the task, so B is a function
+   of (kappa_end, H). The dense-from-scratch check confirms k* = R at every R, so the
+   benchmark is not at fault. One live alternative explanation remains: the hemo arm
+   trains for `steps` while the dense k* check gets `scratch_mult` times that, and the
+   task is only solved at k* in 2 and 4, so large-R runs may be under-trained rather
+   than mis-counting. The control is `--only kstar_control` in the sweep.
+9. The signal the mechanism gates on is not the best available predictor of causal head
    importance. Over all 88 runs at full perfusion, rho(demand) = +0.379 +/- 0.066 while
    rho(qnorm) = +0.484 +/- 0.085 and rho(neg_entropy) = +0.452 +/- 0.083 on the same
    runs. This is at d_k = 32, ABOVE the capacity bound, so it does not contradict
@@ -180,6 +205,12 @@ always run one seed per process.
 
 ## Experiment roadmap, ranked
 
+0. **DONE, and it failed. Emergent B vs true k\*.** Sweeping kappa_end at k* = 4 says B
+   settles at 4 (experiment 1). Sweeping k* at fixed kappa_end says B saturates near 4
+   whatever k* is (experiment 6). The second test is the one that matters and the
+   mechanism does not pass it. Any future version of this claim has to make the
+   threshold adapt to the shape of the demand distribution rather than sit at a fixed
+   number of standard deviations, which is the real open problem here.
 1. **Emergent B vs true k\*.** `--supply threshold`, sweep kappa_end, 5 seeds. Does the
    perfused count settle at 4 without being told? This is the strongest available claim
    and it is not a ranking, so magnitude pruning cannot compete on it.
@@ -211,7 +242,8 @@ always run one seed per process.
 - A figure title states what is plotted, never the prediction under test. Verdicts are
   computed in `aggregate.py` and written into the generated block.
 - Thresholds are relative to the dense-to-trivial gap, never to the dense loss alone.
-- Negative results stay in the paper. Six of the ten findings so far are negative.
+- Negative results stay in the paper. Seven of the eleven findings so far are
+  negative, including the one the headline rested on.
 
 ## Prior work to cite and differentiate
 
@@ -224,13 +256,24 @@ astrocyte-transformer correspondence but does NOT test supply-based gating, so d
 cite it as support for this mechanism).
 
 <!-- BEGIN GENERATED: experiments/aggregate.py -->
-_Generated by `python experiments/aggregate.py --readme README.md` from 88 runs in `results/`. Do not edit by hand._
+_Generated by `python experiments/aggregate.py --readme README.md` from 100 runs in `results/`. Do not edit by hand._
 
 
-**0 ground truth**
+**1 task**
 
-- measured k* per seed = [4, 4], predicted = 4; trivial = 1.0075, threshold = 0.02016
-- loss by k: k=1: 0.75511, k=2: 0.50314, k=4: 0.00002, k=8: 0.00001, k=16: 0.00001, k=32: 0.00001
+- true offsets [1, 5, 9, 13]; a dense 4-head model implements [1, 5, 9, 13]
+- under supply, 4 of 32 heads survive and cover 75% of the true offsets, final loss 0.00027 against trivial 1.007
+
+**2 k* tracking**
+
+- R=k*=2 (n=3): B=2.67+/-0.65, error +0.67, role_coverage=1.00, held phase at exactly k* = 0.30, measured k*=[2]
+- R=k*=3 (n=3): B=2.00+/-1.13, error -1.00, role_coverage=0.44, held phase at exactly k* = 0.33, measured k*=[3]
+- R=k*=4 (n=5): B=4.00+/-0.00, error +0.00, role_coverage=0.80, held phase at exactly k* = 1.00, measured k*=[4, 4]
+- R=k*=6 (n=3): B=4.00+/-1.13, error -2.00, role_coverage=0.61, held phase at exactly k* = 0.02, measured k*=[6]
+- R=k*=8 (n=3): B=4.00+/-2.99, error -4.00, role_coverage=0.38, held phase at exactly k* = 0.00, measured k*=[8]
+- VERDICT B does NOT track k*. Over k* = 2 to 8 (a span of 6) B spans only 2.00 and saturates: the fitted slope dB/dk* is 0.29, against 1.00 for tracking. Mean absolute error 1.53 heads, exact on 1 of 5 settings.
+- VERDICT experiment 1 does not generalise. theta = mean + kappa*std over H standardized demands admits a nearly fixed number of heads regardless of the task, so B is set by (kappa_end, H) and the earlier B = 4 = k* was kappa_end = 1.5 matching k* = 4, not the mechanism finding it.
+- CAVEAT the task is only solved at k* in [2, 4]; elsewhere the hemo run ends above the solved threshold, so those B values describe a failed run. The hemo arm gets cfg.steps while the dense k* check gets scratch_mult x that, so under-training at large R is a live alternative explanation and is worth one control before this is written up.
 
 **1 emergent B**
 
@@ -240,36 +283,6 @@ _Generated by `python experiments/aggregate.py --readme README.md` from 88 runs 
 - kappa_end=2 (n=5): B=3.00+/-1.24 (k*=4), converged loss=0.25297, frac of held phase at exactly k* = 0.61, role_coverage=0.60
 - kappa_end=2.5 (n=5): B=1.40+/-0.78 (k*=4), converged loss=0.65559, frac of held phase at exactly k* = 0.00, role_coverage=0.30
 - VERDICT prediction 'emergent B converges on k*': SUPPORTED. kappa_end=1.5 gives B=4.00+/-0.00 against k*=4, with 100% of the held phase at exactly k*. B is monotone in kappa_end over 1.40 to 5.60, so the mechanism does not sit at k* for free: kappa_end selects it.
-
-**2 territory**
-
-- T=1 (n=3): role_coverage=0.75+/-0.00, territory_span=1.00, perfused=4.00
-- T=2 (n=3): role_coverage=0.83+/-0.16, territory_span=2.00, perfused=4.67
-- T=4 (n=3): role_coverage=1.00+/-0.00, territory_span=3.67, perfused=6.33
-- T=8 (n=3): role_coverage=0.92+/-0.16, territory_span=6.67, perfused=9.33
-- T=16 (n=3): role_coverage=1.00+/-0.00, territory_span=13.00, perfused=16.00
-- T=32 (n=3): role_coverage=1.00+/-0.00, territory_span=32.00, perfused=32.00
-- VERDICT prediction 'coverage collapses below T=R': NOT SUPPORTED. mean coverage below T=R is 0.79 vs 0.98 at or above; a decline, not a collapse.
-- VERDICT prediction 'territory_span falls well below T': NOT SUPPORTED. span/T = 0.81 to 1.00 (mean 0.93); span tracks T.
-- CAUSE the never-fully-infarct fallback is applied per territory, so every territory keeps at least one perfused head and perfused >= T by construction. Compaction below T cannot occur for this mechanism as written.
-
-**3 delay**
-
-- tau=0 (n=5): converged loss=0.00066+/-0.00051, flips/step=0.0004, role_coverage=0.80
-- tau=1 (n=3): converged loss=0.00073+/-0.00092, flips/step=0.0000, role_coverage=0.75
-- tau=5 (n=3): converged loss=0.00073+/-0.00091, flips/step=0.0000, role_coverage=0.75
-- tau=20 (n=3): converged loss=0.00064+/-0.00074, flips/step=0.0000, role_coverage=0.75
-- tau=100 (n=3): converged loss=0.04918+/-0.09588, flips/step=0.0037, role_coverage=0.75
-- VERDICT prediction 'an optimal tau exists': NOT SUPPORTED. tau 0 to 20 spans only 0.00010 in loss with overlapping CIs; only tau=100 is worse.
-- VERDICT prediction 'long tau causes gate oscillation': NOT SUPPORTED. max perfused-set changes per step over the held phase is 0.0037 at any tau (one set change per ~272 steps at worst), so there is no oscillation to trade against.
-
-**4 pool**
-
-- pool_beta=0 (n=3): role_coverage=0.92, territory_span=6.67, converged loss=0.00007+/-0.00005
-- pool_beta=0.25 (n=3): role_coverage=1.00, territory_span=7.67, converged loss=0.00004+/-0.00001
-- pool_beta=0.5 (n=3): role_coverage=0.92, territory_span=7.33, converged loss=0.00008+/-0.00010
-- pool_beta=1 (n=3): role_coverage=1.00, territory_span=7.67, converged loss=0.00029+/-0.00007
-- VERDICT pooling changes nothing. role_coverage spans 0.92 to 1.00 and territory_span 6.67 to 7.67 across pool_beta 0 to 1; full pooling has the worst converged loss (0.00029).
 
 **5 demand arms**
 
@@ -288,10 +301,15 @@ _Generated by `python experiments/aggregate.py --readme README.md` from 88 runs 
 
 **5 ablation**
 
-- rho(demand, ablation delta) = +0.379+/-0.066 over 88 runs, at full perfusion
-- rho(outnorm, ablation delta) = +0.295+/-0.097 over 88 runs, at full perfusion
-- rho(neg_entropy, ablation delta) = +0.452+/-0.083 over 88 runs, at full perfusion
-- rho(qnorm, ablation delta) = +0.484+/-0.085 over 88 runs, at full perfusion
-- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.379 while qnorm reaches +0.484 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
+- rho(demand, ablation delta) = +0.369+/-0.059 over 100 runs, at full perfusion
+- rho(outnorm, ablation delta) = +0.294+/-0.086 over 100 runs, at full perfusion
+- rho(neg_entropy, ablation delta) = +0.478+/-0.075 over 100 runs, at full perfusion
+- rho(qnorm, ablation delta) = +0.505+/-0.077 over 100 runs, at full perfusion
+- VERDICT the gating signal is not the best predictor of causal head importance. demand is +0.369 while qnorm reaches +0.505 on the same runs. Measured at d_k=32, ABOVE the capacity bound, so this does not contradict the reported qnorm sign flip below it.
+
+**0 ground truth**
+
+- measured k* per seed = [4, 4], predicted = 4; trivial = 1.0075, threshold = 0.02016
+- loss by k: k=1: 0.75511, k=2: 0.50314, k=4: 0.00002, k=8: 0.00001, k=16: 0.00001, k=32: 0.00001
 
 <!-- END GENERATED -->

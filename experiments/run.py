@@ -14,6 +14,24 @@ from hemo.train import train, pick_device
 from hemo.analysis import (redundancy_check, circuit_recovery, head_ablation, k_list)
 
 
+# Every field a sweep varies must appear here, or that sweep silently overwrites the
+# other arm's pickle. This has already bitten kappa_end, pool_beta, leak and n_rel.
+TAG_FIELDS = ["task", "n_rel", "seq_len", "d_k", "steps", "supply", "demand",
+              "n_territories", "delay", "kappa_end", "pool_beta", "leak", "seed"]
+TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
+            "n_territories": "T", "delay": "tau", "kappa_end": "k", "pool_beta": "b",
+            "leak": "lk", "seed": "s"}
+
+
+def result_tag(cfg):
+    parts = []
+    for f in TAG_FIELDS:
+        v = getattr(cfg, f)
+        a = TAG_ABBR.get(f, "")
+        parts.append(f"{a}{v:g}" if isinstance(v, float) else f"{a}{v}")
+    return "_".join(parts)
+
+
 def main():
     ap = argparse.ArgumentParser()
     for f, t in [("seed", int), ("steps", int), ("num_heads", int), ("n_rel", int),
@@ -73,10 +91,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     # R, N and d_k belong in the tag for the same reason kappa_end and leak do: they are
     # swept, and a tag that omits a swept field silently overwrites the other arm.
-    tag = (f"{cfg.task}_R{cfg.n_rel}_N{cfg.seq_len}_dk{cfg.d_k}"
-           f"_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}"
-           f"_tau{cfg.delay}_k{cfg.kappa_end:g}_b{cfg.pool_beta:g}_lk{cfg.leak:g}"
-           f"_s{cfg.seed}")
+    tag = result_tag(cfg)
     with open(os.path.join(a.out, tag + ".pkl"), "wb") as f:
         pickle.dump(out, f)
     lk = out["loss_at_kstar"]
