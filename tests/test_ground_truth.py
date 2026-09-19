@@ -41,7 +41,7 @@ def test_supply_is_conserved():
     cfg = replace(SMALL, steps=20, num_heads=8, n_territories=4)
     dev = pick_device(cfg)
     val = make_val(cfg, dev)
-    for supply in ["topk", "threshold", "territory"]:
+    for supply in ["topk", "threshold", "territory", "gap", "otsu", "autoreg"]:
         c = replace(cfg, supply=supply)
         m, _ = train(c, val, dev, hemo=True, steps=20)
         g = m.gate(kappa=1.0, B_active=3)

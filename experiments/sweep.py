@@ -78,6 +78,22 @@ def jobs():
             add("kstar_control", seed=s_, supply="threshold", demand="outnorm_ema",
                 n_rel=R, kappa_end=1.5, steps=6000)
 
+    # 8. THE decisive test, applied to every candidate fix. Experiment 6 showed the
+    #    fixed z-cut has dB/dk* = 0.29, because theta = mean + kappa*std admits a nearly
+    #    fixed fraction of H whatever the task. Each arm below is a different way of
+    #    letting the perfused count respond to the task instead.
+    #      gap/otsu  read B off the SHAPE of the demand distribution
+    #      autoreg   close the loop on a metabolic deficit, so supply answers to how
+    #                hard the task is rather than to a fixed quantile
+    #      q2norm    the user's question: can a different SENSOR rescue the z-cut?
+    for supply, demand in [("autoreg", "outnorm_ema"), ("gap", "outnorm_ema"),
+                           ("otsu", "outnorm_ema"), ("threshold", "q2norm"),
+                           ("gap", "q2norm"), ("threshold", "entropy")]:
+        for R in [2, 3, 4, 6, 8]:
+            for s_ in range(3):
+                add("variants", seed=s_, supply=supply, demand=demand, n_rel=R,
+                    kappa_end=1.5)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.

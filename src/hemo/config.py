@@ -20,6 +20,8 @@ class Cfg:
     #   outnorm_inst  instantaneous magnitude       (standard L2 pruning baseline)
     #   qnorm         query L2 norm                 (falsified control, rho < 0)
     #   random        fixed random ranking          (lower bound)
+    #   q2norm        squared query norm            (sharper than qnorm)
+    #   entropy       attention sharpness           (rho=+0.45 vs ablation)
     demand: str = "outnorm_ema"
     ema: float = 0.99
     delay: int = 0                      # tau, steps of lag between demand and supply
@@ -29,11 +31,18 @@ class Cfg:
     #   topk        conserved budget, exactly B heads     (ranking; loses to magnitude)
     #   threshold   theta = mean + kappa*std, B EMERGES   (not a ranking)
     #   territory   shared arteriole per group of heads   (non-local; no pruning analogue)
+    #   gap         cut at the largest gap in sorted demand   (shape, not quantile)
+    #   otsu        two-cluster split of demand               (shape, not quantile)
+    #   autoreg     closed loop: kappa tracks a loss DEFICIT  (task-referenced)
     supply: str = "threshold"
     n_territories: int = 8
     kappa_start: float = -3.0           # theta far below the demand mean, all heads perfused
     kappa_end: float = 1.5              # progressive ischemia
     leak: float = 0.0                   # residual gate on starved heads
+    kappa_ceil: float = 3.0             # autoreg only, upper clamp on the control state
+    autoreg_gain: float = 0.05          # autoreg only, proportional gain
+    target_frac: float = 0.02           # autoreg only, target loss as a fraction of
+                                        # the trivial baseline. Scale-free across tasks.
 
     # --- budget schedule, topk only ---
     budget_min: int = 1

@@ -114,6 +114,9 @@ class HemoAttn(CrossAttn):
         g = torch.Generator().manual_seed(cfg.seed + 7)
         self.register_buffer("rand_score", torch.randn(H, generator=g))
         # contiguous territories, so head index is spatial
+        self.autoreg_gain = cfg.autoreg_gain
+        self.kappa_floor, self.kappa_ceil = cfg.kappa_start, cfg.kappa_ceil
+        self.register_buffer("kappa_state", torch.tensor(float(cfg.kappa_start)))
         T = max(1, min(cfg.n_territories, H))
         self.register_buffer("territory", torch.arange(H) * T // H)
         self.n_territories = T
@@ -123,6 +126,14 @@ class HemoAttn(CrossAttn):
     def instantaneous(self, Q, attn, out):
         if self.demand_kind == "qnorm":
             s = Q.norm(dim=-1).mean(dim=(0, 2))
+        elif self.demand_kind == "q2norm":
+            # squared query norm. Sharpens the demand distribution relative to qnorm,
+            # which is the only way a SENSOR can change the count a z-cut admits.
+            s = Q.pow(2).sum(-1).mean(dim=(0, 2))
+        elif self.demand_kind == "entropy":
+            # a head attending sharply is doing a job; a diffuse head is not. Scored
+            # rho=+0.45 against ablation, above the outnorm demand actually in use.
+            s = (attn * attn.clamp_min(1e-9).log()).sum(-1).mean(dim=(0, 2))
         elif self.demand_kind == "random":
             s = self.rand_score
         else:                                    # outnorm_ema | outnorm_inst
@@ -132,7 +143,7 @@ class HemoAttn(CrossAttn):
     @torch.no_grad()
     def update_demand(self, Q, attn, out):
         s = self.instantaneous(Q, attn, out)
-        if self.demand_kind in ("random", "outnorm_inst"):
+        if self.demand_kind in ("random", "outnorm_inst", "q2norm"):
             d = s
         else:
             d = self.demand * self.ema + (1 - self.ema) * s
@@ -160,11 +171,8 @@ class HemoAttn(CrossAttn):
         g[idx] = (total - self.leak * (d.numel() - B_active)) / B_active
         return g
 
-    def gate_threshold(self, d, kappa, total=None):
-        """theta = mean + kappa*std. Perfused set, and therefore B, emerges."""
-        total = total if total is not None else self.H
-        theta = d.mean() + kappa * d.std().clamp_min(1e-6)
-        active = d > theta
+    def _from_active(self, d, active, total):
+        """Equal share among the perfused set, leak to the rest. Conserves sum(gate)."""
         if active.sum() == 0:                                  # never fully infarct
             active = torch.zeros_like(d, dtype=torch.bool)
             active[d.argmax()] = True
@@ -172,12 +180,64 @@ class HemoAttn(CrossAttn):
         g[active] = (total - self.leak * (~active).sum()) / active.sum()
         return g
 
+    def gate_gap(self, d, total=None):
+        """Cut at the LARGEST GAP in the sorted demand. B is read off the shape of the
+        distribution rather than from a fixed number of standard deviations, so a task
+        that concentrates demand in more heads yields a larger perfused set."""
+        total = total if total is not None else self.H
+        s, _ = torch.sort(d, descending=True)
+        k = int(torch.argmax(s[:-1] - s[1:]).item()) + 1
+        thr = s[k - 1]
+        return self._from_active(d, d >= thr, total)
+
+    def gate_otsu(self, d, total=None):
+        """Two-cluster split maximising between-class variance (Otsu's method in 1-D).
+        Same motivation as gate_gap but robust to a single large gap in the tail."""
+        total = total if total is not None else self.H
+        s, _ = torch.sort(d, descending=True)
+        n = s.numel()
+        k = torch.arange(1, n, device=d.device, dtype=d.dtype)
+        cs = torch.cumsum(s, 0)
+        mu_a = cs[:-1] / k                                     # mean of the top k
+        mu_b = (cs[-1] - cs[:-1]) / (n - k)
+        between = k * (n - k) * (mu_a - mu_b) ** 2
+        kk = int(torch.argmax(between).item()) + 1
+        return self._from_active(d, d >= s[kk - 1], total)
+
+    def autoregulate(self, loss, target):
+        """Functional hyperemia as a closed loop. Flow responds to a metabolic DEFICIT,
+        not to a fixed quantile: above target the vessel dilates (kappa falls, more heads
+        perfuse), below target it constricts. The control error is a log ratio so the
+        loop is scale-free in the loss, and the target is a fraction of the trivial
+        baseline so it is scale-free across tasks.
+
+        This is the only variant here in which the perfused count can respond to how
+        hard the task actually is, which is what the fixed z-cut cannot do.
+        """
+        import math
+        err = math.log(max(target, 1e-12)) - math.log(max(float(loss), 1e-12))
+        self.kappa_state += self.autoreg_gain * max(-4.0, min(4.0, err))
+        self.kappa_state.clamp_(self.kappa_floor, self.kappa_ceil)
+        return float(self.kappa_state)
+
+    def gate_threshold(self, d, kappa, total=None):
+        """theta = mean + kappa*std. Perfused set, and therefore B, emerges."""
+        total = total if total is not None else self.H
+        theta = d.mean() + kappa * d.std().clamp_min(1e-6)
+        return self._from_active(d, d > theta, total)
+
     def gate(self, kappa=None, B_active=None):
         d = self.sensed()
         if self.supply_kind == "topk":
             return self.gate_topk(d, B_active if B_active is not None else self.H)
         if self.supply_kind == "threshold":
             return self.gate_threshold(d, 0.0 if kappa is None else kappa)
+        if self.supply_kind == "gap":
+            return self.gate_gap(d)
+        if self.supply_kind == "otsu":
+            return self.gate_otsu(d)
+        if self.supply_kind == "autoreg":
+            return self.gate_threshold(d, float(self.kappa_state))
         if self.supply_kind == "territory":
             # each arteriole carries an equal, fixed share. Competition is LOCAL.
             g = torch.zeros_like(d)

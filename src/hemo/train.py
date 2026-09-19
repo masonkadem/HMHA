@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
 from .model import CrossAttn, HemoAttn
-from .tasks import make_batch
+from .tasks import make_batch, trivial_loss
 
 
 def pick_device(cfg):
@@ -64,6 +64,12 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
     H = model.H
     h = dict(val_step=[], val_loss=[], budget=[], kappa=[], ledger=[], n_perfused=[])
     prev = None
+    # autoreg only: perfuse until the task is solved to within target_frac of the
+    # trivial baseline. Expressed against trivial, so the target means the same thing
+    # at every R rather than being a raw loss number tuned per task.
+    autoreg = hemo and cfg.supply == "autoreg"
+    target = cfg.target_frac * trivial_loss(val)
+    hold = int(cfg.budget_hold_frac * total)
 
     for step in range(total):
         X, Y, T, _ = make_batch(cfg.batch_size, cfg, device)
@@ -85,6 +91,8 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         opt.step()
         sched.step()
+        if autoreg and step >= hold:      # phase 1 stays fully perfused, then the loop
+            model.autoregulate(loss.item(), target)
 
         nper = int((g[0] > model.leak + 1e-9).sum()) if hemo else H
         if hemo:
@@ -100,7 +108,7 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
             h["val_step"].append(step)
             h["val_loss"].append(evaluate(model, val, **kw))
             h["budget"].append(B)
-            h["kappa"].append(kappa)
+            h["kappa"].append(float(model.kappa_state) if autoreg else kappa)
             h["n_perfused"].append(nper)
             if verbose:
                 print(f"    {desc} step {step:>5} loss {h['val_loss'][-1]:.5f} "
