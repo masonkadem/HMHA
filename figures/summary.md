@@ -1,6 +1,6 @@
 # Results
 
-Computed from 51 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 53 runs in `results/`. Every number here and in the figures is read from those pickles.
 
 
 ## 0 ground truth
@@ -31,4 +31,5 @@ Computed from 51 runs in `results/`. Every number here and in the figures is rea
 - tau=0 (n=5): converged loss=0.00066+/-0.00051, flips/step=0.00, role_coverage=0.80
 - tau=1 (n=3): converged loss=0.00073+/-0.00092, flips/step=0.00, role_coverage=0.75
 - tau=5 (n=3): converged loss=0.00073+/-0.00091, flips/step=0.00, role_coverage=0.75
-- tau=20 (n=2): converged loss=0.00083+/-0.00110, flips/step=0.00, role_coverage=0.75
+- tau=20 (n=3): converged loss=0.00064+/-0.00074, flips/step=0.00, role_coverage=0.75
+- tau=100 (n=1): converged loss=0.00028+/-0.00000, flips/step=0.00, role_coverage=0.75
