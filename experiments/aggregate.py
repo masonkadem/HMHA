@@ -364,15 +364,17 @@ def fig_pool(runs, out, rows):
     ns = [len(v) for v in g.values()]
 
     fig, axes = plt.subplots(1, 3, figsize=(11, 3.4))
-    for ax, vals, col, mk, lab, yl in [
-            (axes[0], cov, CAT[0], "o", "role coverage", "fraction of true offsets found"),
-            (axes[1], spn, CAT[1], "s", "territory span of role heads", "territories"),
+    for ax, vals, col, mk, lab, yl, ttl in [
+            (axes[0], cov, CAT[0], "o", "role coverage", "fraction of true offsets found",
+             "Role coverage"),
+            (axes[1], spn, CAT[1], "s", "territory span of role heads", "territories",
+             "Territory span of role heads"),
             (axes[2], loss, CAT[2], "^", "val MSE at the converged gate",
-             "val MSE (log)")]:
+             "val MSE (log)", "Converged loss")]:
         ax.errorbar(x, [v[0] for v in vals], yerr=[v[1] for v in vals], color=col, lw=2,
                     marker=mk, ms=6, capsize=3, label=lab)
         ax.set_xticks(x); ax.set_xticklabels([f"{b:g}" for b in bs])
-        tidy(ax, lab.capitalize(), "pool_beta", yl)
+        tidy(ax, ttl, "pool_beta", yl)
         ax.legend(loc="best", fontsize=8)
     axes[0].set_ylim(-0.05, 1.05)
     axes[2].set_yscale("log")
