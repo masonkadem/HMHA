@@ -1,6 +1,6 @@
 # Results
 
-Computed from 40 runs in `results/`. Every number here and in the figures is read from those pickles.
+Computed from 45 runs in `results/`. Every number here and in the figures is read from those pickles.
 
 
 ## 0 ground truth
@@ -19,8 +19,14 @@ Computed from 40 runs in `results/`. Every number here and in the figures is rea
 
 ## 2 territory
 
-- T=1 (n=3): role_coverage=0.25+/-0.00, territory_span=1.00, perfused=1.00
-- T=2 (n=3): role_coverage=0.50+/-0.00, territory_span=2.00, perfused=2.00
-- T=4 (n=3): role_coverage=0.75+/-0.00, territory_span=4.00, perfused=4.00
-- T=8 (n=3): role_coverage=0.92+/-0.16, territory_span=7.67, perfused=8.00
-- T=16 (n=3): role_coverage=1.00+/-0.00, territory_span=15.33, perfused=16.00
+- T=1 (n=3): role_coverage=0.75+/-0.00, territory_span=1.00, perfused=4.00
+- T=2 (n=3): role_coverage=0.83+/-0.16, territory_span=2.00, perfused=4.67
+- T=4 (n=3): role_coverage=1.00+/-0.00, territory_span=3.67, perfused=6.33
+- T=8 (n=3): role_coverage=0.92+/-0.16, territory_span=6.67, perfused=9.33
+- T=16 (n=3): role_coverage=1.00+/-0.00, territory_span=13.00, perfused=16.00
+- T=32 (n=3): role_coverage=1.00+/-0.00, territory_span=32.00, perfused=32.00
+
+## 3 delay
+
+- tau=0 (n=5): converged loss=0.00066+/-0.00051, flips/step=0.00, role_coverage=0.80
+- tau=1 (n=2): converged loss=0.00097+/-0.00137, flips/step=0.00, role_coverage=0.75
