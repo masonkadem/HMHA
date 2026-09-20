@@ -103,6 +103,21 @@ def frac_at_kstar(r):
     return float((a == r["kstar"]).mean()) if len(a) else float("nan")
 
 
+def held_perfusion(r, q=0.5):
+    """Perfused count over the HELD phase, as a quantile rather than the final step.
+
+    For a closed-loop mechanism the final gate is one sample of a limit cycle, so
+    reading B off it is a coin flip. The median over the held phase is the honest
+    summary, and the spread between quartiles says whether the loop settled at all.
+    """
+    led = r["hist"]["ledger"]
+    if led is None or len(led) < 10:
+        return float("nan")
+    hold = int((r["cfg"]["budget_hold_frac"] + r["cfg"]["budget_anneal_frac"]) * len(led))
+    a = (led[hold:] > r["cfg"]["leak"] + 1e-9).sum(axis=1)
+    return float(np.quantile(a, q)) if len(a) else float("nan")
+
+
 def gate_flips(r):
     """Mean per-step changes in the perfused SET over the held final phase. The delay
     experiment's prediction is that too long a tau makes this rise (gate oscillation)."""
@@ -263,7 +278,7 @@ def fig_kstar_tracking(runs, out, rows):
     if len(g) < 3:
         return
     Rs = list(g)
-    B = [agg(v, lambda r: r["recovery"]["n_perfused"]) for v in g.values()]
+    B = [agg(v, held_perfusion) for v in g.values()]
     cov = [agg(v, lambda r: r["recovery"]["role_coverage"]) for v in g.values()]
     frac = [agg(v, frac_at_kstar) for v in g.values()]
     ns = [len(v) for v in g.values()]
@@ -323,10 +338,13 @@ def fig_kstar_tracking(runs, out, rows):
     fig.savefig(os.path.join(out, "fig2_kstar_tracking.png"), bbox_inches="tight")
     plt.close(fig)
 
-    for R, b, c, f_, n in zip(Rs, B, cov, frac, ns):
+    for R, b, c, f_, n, v in zip(Rs, B, cov, frac, ns, g.values()):
         extra = f", measured k*={meas[R]}" if R in meas else ""
-        rows.append(("2 k* tracking", f"R=k*={R} (n={n}): B={b[0]:.2f}+/-{b[1]:.2f}, "
-                     f"error {b[0]-R:+.2f}, role_coverage={c[0]:.2f}, "
+        iqr = (agg(v, lambda r: held_perfusion(r, 0.75))[0]
+               - agg(v, lambda r: held_perfusion(r, 0.25))[0])
+        rows.append(("2 k* tracking", f"R=k*={R} (n={n}): B(median of held phase)="
+                     f"{b[0]:.2f}+/-{b[1]:.2f}, error {b[0]-R:+.2f}, IQR {iqr:.1f}, "
+                     f"role_coverage={c[0]:.2f}, "
                      f"held phase at exactly k* = {f_[0]:.2f}{extra}"))
     mae = float(np.mean([abs(b[0] - R) for R, b in zip(Rs, B)]))
     rho = spearman(np.array(Rs, dtype=float), np.array([b[0] for b in B]))
@@ -422,6 +440,83 @@ def fig_nulls(runs, out, rows):
     fig.tight_layout(rect=(0, 0, 1, 0.9))
     fig.savefig(os.path.join(out, "fig4_nulls.png"), bbox_inches="tight")
     plt.close(fig)
+
+
+def fig_variants(runs, out, rows):
+    """Every candidate supply rule and sensor, scored on the only test that matters:
+    does the perfused count move with the task's true circuit size?"""
+    arms, Rs_all = {}, set()
+    for r in runs:
+        c = r["cfg"]
+        if (c["delay"] or c["pool_beta"] or c["leak"] or c["steps"] != 4000
+                or c["supply"] in ("topk", "territory") or c["kappa_end"] != 1.5):
+            continue
+        arms.setdefault((c["supply"], c["demand"]), []).append(r)
+        Rs_all.add(c["n_rel"])
+    keep = {k: v for k, v in arms.items() if len({r["cfg"]["n_rel"] for r in v}) >= 4}
+    if len(keep) < 2:
+        return
+    order = sorted(keep, key=lambda k: (k[0] != "threshold", k))
+
+    stats = {}
+    for k in order:
+        g = by(keep[k], "n_rel")
+        Rs = list(g)
+        b = [agg(v, held_perfusion)[0] for v in g.values()]
+        cov = [agg(v, lambda r: r["recovery"]["role_coverage"])[0] for v in g.values()]
+        stats[k] = (Rs, b, float(np.polyfit(Rs, b, 1)[0]),
+                    float(np.mean([abs(x - R) for R, x in zip(Rs, b)])),
+                    float(np.mean(cov)))
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.0))
+    ax = axes[0]
+    lim = [min(Rs_all) - 0.5, max(Rs_all) + 0.5]
+    ax.plot(lim, lim, color=INK3, lw=1.4, ls=":", label="B = k* (the target)")
+    for i, k in enumerate(order):
+        Rs, b, sl, mae, _ = stats[k]
+        ax.plot(Rs, b, color=CAT[i % len(CAT)], lw=2, marker="o", ms=5,
+                label=f"{k[0]}/{k[1]}  slope {sl:.2f}")
+    ax.set_xticks(sorted(Rs_all)); ax.set_xlim(*lim)
+    tidy(ax, "a  Perfused count vs true circuit size", "true k* = R",
+         "B (median over held phase)")
+    ax.legend(loc="upper left", fontsize=7.5)
+
+    ax = axes[1]
+    names = [f"{k[0]}/{k[1]}" for k in order]
+    sl = [stats[k][2] for k in order]
+    y = np.arange(len(order))
+    ax.barh(y, sl, height=0.6, color=[DIV_POS if v >= 0 else DIV_NEG for v in sl],
+            edgecolor=SURFACE, linewidth=2)
+    ax.axvline(1.0, color=GOOD, lw=1.6, ls="--")
+    ax.text(1.0, -0.8, " ideal 1.0", color=GOOD, fontsize=8, va="top")
+    ax.axvline(0, color=INK3, lw=1)
+    for i, v in enumerate(sl):
+        ax.annotate(f"{v:.2f}", (v, i), textcoords="offset points",
+                    xytext=(7 if v >= 0 else -7, 0), va="center",
+                    ha="left" if v >= 0 else "right", fontsize=8, color=INK2)
+    ax.set_yticks(y); ax.set_yticklabels(names, fontsize=8)
+    tidy(ax, "b  Fitted dB/dk*", "slope (1.0 = tracks k*)", None, grid="x")
+
+    fig.suptitle("Figure 6  Candidate supply rules and sensors, scored on whether the "
+                 "perfused count follows the task", x=0.006, ha="left", fontsize=11.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    fig.savefig(os.path.join(out, "fig6_variants.png"), bbox_inches="tight")
+    plt.close(fig)
+
+    rows.append(("6 variants", "scored on dB/dk* over the k* sweep at fixed kappa_end; "
+                 "B is the median perfused count over the held phase"))
+    for k in sorted(stats, key=lambda k: abs(stats[k][2] - 1.0)):
+        Rs, b, slp, mae, cov = stats[k]
+        rows.append(("6 variants", f"{k[0]}/{k[1]}: slope {slp:+.2f}, MAE {mae:.2f} "
+                     f"heads, mean role_coverage {cov:.2f}, B = "
+                     + ", ".join(f"{x:.1f}" for x in b) + f" at k* = {Rs}"))
+    best = min(stats, key=lambda k: abs(stats[k][2] - 1.0))
+    bs = stats[best]
+    rows.append(("6 variants", f"VERDICT closest to tracking is {best[0]}/{best[1]} "
+                 f"with slope {bs[2]:+.2f} and MAE {bs[3]:.2f} heads, against "
+                 f"{stats[('threshold','outnorm_ema')][2]:+.2f} for the original z-cut."
+                 if ("threshold", "outnorm_ema") in stats else
+                 f"VERDICT closest to tracking is {best[0]}/{best[1]}, slope {bs[2]:+.2f}"))
 
 
 def fig_ground_truth(runs, out, rows):
@@ -812,7 +907,7 @@ def main():
         return
     print(f"{len(runs)} runs loaded")
     rows = []
-    for f in (fig_task, fig_kstar_tracking, fig_emergent_B, fig_nulls,
+    for f in (fig_task, fig_kstar_tracking, fig_variants, fig_emergent_B, fig_nulls,
               fig_demand_arms, fig_ground_truth):
         try:
             f(runs, a.out, rows)
