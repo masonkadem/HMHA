@@ -100,6 +100,16 @@ def jobs():
                 add("variants", seed=s_, supply=supply, demand=demand, n_rel=R,
                     kappa_end=1.5)
 
+    # 9. The control that decides whether experiment 8 means anything. autoreg lands on
+    #    B = k* at target_frac = 0.02. If that only holds at one target, it is
+    #    kappa_end = 1.5 all over again: a hyperparameter tuned until it printed the
+    #    right number. Sweep the target over a 20x range and see whether B still tracks.
+    for tf in [0.005, 0.05, 0.2]:
+        for R in [2, 4, 8]:
+            for s_ in range(3):
+                add("autoreg_target", seed=s_, supply="autoreg", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, target_frac=tf)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.
