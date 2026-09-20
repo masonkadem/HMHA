@@ -20,16 +20,25 @@ TAG_FIELDS = ["task", "n_rel", "seq_len", "d_k", "steps", "supply", "demand",
               "n_territories", "delay", "kappa_end", "pool_beta", "leak", "seed"]
 TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
             "n_territories": "T", "delay": "tau", "kappa_end": "k", "pool_beta": "b",
-            "leak": "lk", "seed": "s"}
+            "leak": "lk", "seed": "s", "autoreg_gain": "g", "target_frac": "tf",
+            "autoreg_every": "ae", "loss_ema": "le"}
+# Swept only occasionally. These appear in the tag ONLY when they differ from the
+# default, so adding one here does not rename every result already on disk.
+TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema"]
+
+
+def _fmt(a, v):
+    return f"{a}{v:g}" if isinstance(v, float) else f"{a}{v}"
 
 
 def result_tag(cfg):
-    parts = []
-    for f in TAG_FIELDS:
-        v = getattr(cfg, f)
-        a = TAG_ABBR.get(f, "")
-        parts.append(f"{a}{v:g}" if isinstance(v, float) else f"{a}{v}")
-    return "_".join(parts)
+    from hemo.config import Cfg
+    d = Cfg()
+    parts = [_fmt(TAG_ABBR.get(f, ""), getattr(cfg, f)) for f in TAG_FIELDS]
+    extra = [_fmt(TAG_ABBR[f], getattr(cfg, f)) for f in TAG_OPTIONAL
+             if hasattr(cfg, f) and getattr(cfg, f) != getattr(d, f)]
+    seed = parts.pop()                       # keep the seed last for readability
+    return "_".join(parts + extra + [seed])
 
 
 def main():

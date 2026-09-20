@@ -40,7 +40,11 @@ class Cfg:
     kappa_end: float = 1.5              # progressive ischemia
     leak: float = 0.0                   # residual gate on starved heads
     kappa_ceil: float = 3.0             # autoreg only, upper clamp on the control state
-    autoreg_gain: float = 0.05          # autoreg only, proportional gain
+    autoreg_gain: float = 0.003         # autoreg only, proportional gain. The loop must
+                                        # be SLOWER than the learner it steers; at 0.05
+                                        # it drove a limit cycle between 4 and 32 heads.
+    autoreg_every: int = 10             # autoreg only, controller update interval
+    loss_ema: float = 0.98              # autoreg only, smoothing on the sensed loss
     target_frac: float = 0.02           # autoreg only, target loss as a fraction of
                                         # the trivial baseline. Scale-free across tasks.
 

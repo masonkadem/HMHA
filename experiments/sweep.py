@@ -86,6 +86,12 @@ def jobs():
     #      autoreg   close the loop on a metabolic deficit, so supply answers to how
     #                hard the task is rather than to a fixed quantile
     #      q2norm    the user's question: can a different SENSOR rescue the z-cut?
+    # the gain=0.05 autoreg runs are kept, relabelled, as the limit-cycle evidence
+    for R in [2, 3]:
+        for s_ in range(3):
+            add("variants_oldgain", seed=s_, supply="autoreg", demand="outnorm_ema",
+                n_rel=R, kappa_end=1.5, autoreg_gain=0.05)
+
     for supply, demand in [("autoreg", "outnorm_ema"), ("gap", "outnorm_ema"),
                            ("otsu", "outnorm_ema"), ("threshold", "q2norm"),
                            ("gap", "q2norm"), ("threshold", "entropy")]:
