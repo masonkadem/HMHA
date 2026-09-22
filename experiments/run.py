@@ -43,14 +43,13 @@ def result_tag(cfg):
 
 def main():
     ap = argparse.ArgumentParser()
-    for f, t in [("seed", int), ("steps", int), ("num_heads", int), ("n_rel", int),
-                 ("seq_len", int), ("d_k", int), ("n_territories", int), ("delay", int),
-                 ("val_size", int)]:
-        ap.add_argument(f"--{f}", type=t, default=None)
-    for f in ["supply", "demand", "task", "device"]:
-        ap.add_argument(f"--{f}", type=str, default=None)
-    for f in ["pool_beta", "kappa_start", "kappa_end", "leak", "lr", "ema"]:
-        ap.add_argument(f"--{f}", type=float, default=None)
+    # Derived from Cfg rather than listed by hand. A hand-written list silently drops
+    # any knob added to Cfg later: --target_frac was added to the model, swept by
+    # sweep.py, and rejected by argparse, so 27 control runs failed in 0 seconds.
+    for name, fld in Cfg.__dataclass_fields__.items():
+        t = type(getattr(Cfg(), name))
+        if t in (int, float, str):
+            ap.add_argument(f"--{name}", type=t, default=None)
     ap.add_argument("--out", default="results")
     ap.add_argument("--skip-redundancy", action="store_true")
     a = ap.parse_args()
