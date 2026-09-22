@@ -93,11 +93,19 @@ def jobs():
                 n_rel=R, kappa_end=1.5, autoreg_gain=0.05)
 
     for supply, demand in [("autoreg", "outnorm_ema"), ("gap", "outnorm_ema"),
-                           ("otsu", "outnorm_ema"), ("threshold", "q2norm"),
-                           ("gap", "q2norm"), ("threshold", "entropy")]:
+                           ("otsu", "outnorm_ema")]:
         for R in [2, 3, 4, 6, 8]:
             for s_ in range(3):
                 add("variants", seed=s_, supply=supply, demand=demand, n_rel=R,
+                    kappa_end=1.5)
+
+    # Sensor arms. A different demand signal cannot fix a rule whose output is set by
+    # (kappa, H), so these are deprioritised behind the supply rules and the control.
+    for supply, demand in [("threshold", "q2norm"), ("gap", "q2norm"),
+                           ("threshold", "entropy")]:
+        for R in [2, 3, 4, 6, 8]:
+            for s_ in range(3):
+                add("sensors", seed=s_, supply=supply, demand=demand, n_rel=R,
                     kappa_end=1.5)
 
     # 9. The control that decides whether experiment 8 means anything. autoreg lands on
