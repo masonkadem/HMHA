@@ -176,6 +176,9 @@ src/hemo/tasks.py      multi_relation, qsa_cross, predicted k*
 src/hemo/model.py      CrossAttn, HemoAttn. demand and supply are separate axes
 src/hemo/train.py      schedule (progressive ischemia), train, evaluate
 src/hemo/analysis.py   redundancy_check, circuit_recovery, head_ablation
+paper/math_extension.tex  formal statement of the mechanism, the impossibility
+                       result for fixed-quantile supply, and the autoregulation
+                       theorem. Numbers in its remarks come from the generated block.
 experiments/run.py     one seed per invocation, writes results/*.pkl
 experiments/sweep.py   the ranked roadmap as a resumable job list
 experiments/aggregate.py  figures/ and the generated block in this README
