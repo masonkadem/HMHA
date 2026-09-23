@@ -92,7 +92,7 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         opt.step()
         sched.step()
         if autoreg and step >= hold:      # phase 1 stays fully perfused, then the loop
-            model.autoregulate(loss.item(), target)
+            model.autoregulate(loss.item(), target, step=step - hold)
 
         nper = int((g[0] > model.leak + 1e-9).sum()) if hemo else H
         if hemo:

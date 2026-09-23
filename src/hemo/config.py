@@ -31,6 +31,8 @@ class Cfg:
     #   topk        conserved budget, exactly B heads     (ranking; loses to magnitude)
     #   threshold   theta = mean + kappa*std, B EMERGES   (not a ranking)
     #   territory   shared arteriole per group of heads   (non-local; no pruning analogue)
+    #   poiseuille  flow ~ radius^4 within the perfused set   (graded, not equal share)
+    #   watershed   territories with a GLOBAL infarct floor   (compaction is possible)
     #   gap         cut at the largest gap in sorted demand   (shape, not quantile)
     #   otsu        two-cluster split of demand               (shape, not quantile)
     #   autoreg     closed loop: kappa tracks a loss DEFICIT  (task-referenced)
@@ -43,8 +45,19 @@ class Cfg:
     autoreg_gain: float = 0.003         # autoreg only, proportional gain. The loop must
                                         # be SLOWER than the learner it steers; at 0.05
                                         # it drove a limit cycle between 4 and 32 heads.
-    autoreg_every: int = 10             # autoreg only, controller update interval
-    loss_ema: float = 0.98              # autoreg only, smoothing on the sensed loss
+    autoreg_every: int = 1              # autoreg only, controller update interval
+    loss_ema: float = 0.0               # autoreg only, smoothing on the sensed loss.
+                                        # 0 senses the raw minibatch loss, which is what
+                                        # the reported autoreg runs used.
+    stall_gate: float = 0.0             # autoreg only. >0 dilates only when the loss is
+                                        # above target AND its relative improvement rate
+                                        # has fallen below this, i.e. chronic rather
+                                        # than acute deficit. 0 disables.
+    flow_exponent: float = 4.0          # poiseuille only. Flow ~ r^n; n=4 is Poiseuille,
+                                        # n=1 recovers a linear share.
+    watershed_penalty: float = 0.5      # watershed only. Demand multiplier for heads at
+                                        # a territory boundary, which in tissue sit
+                                        # between two arterial beds and perfuse worst.
     target_frac: float = 0.02           # autoreg only, target loss as a fraction of
                                         # the trivial baseline. Scale-free across tasks.
 

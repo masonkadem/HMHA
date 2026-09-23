@@ -115,6 +115,14 @@ class HemoAttn(CrossAttn):
         self.register_buffer("rand_score", torch.randn(H, generator=g))
         # contiguous territories, so head index is spatial
         self.autoreg_gain = cfg.autoreg_gain
+        self.autoreg_every = max(1, cfg.autoreg_every)
+        self.loss_ema_c = cfg.loss_ema
+        self.slow_c = 0.995
+        self.stall_gate = cfg.stall_gate
+        self.flow_exponent = cfg.flow_exponent
+        self.watershed_penalty = cfg.watershed_penalty
+        self.register_buffer("loss_state", torch.tensor(0.0))
+        self.register_buffer("slow_loss", torch.tensor(0.0))
         self.kappa_floor, self.kappa_ceil = cfg.kappa_start, cfg.kappa_ceil
         self.register_buffer("kappa_state", torch.tensor(float(cfg.kappa_start)))
         T = max(1, min(cfg.n_territories, H))
@@ -204,18 +212,95 @@ class HemoAttn(CrossAttn):
         kk = int(torch.argmax(between).item()) + 1
         return self._from_active(d, d >= s[kk - 1], total)
 
-    def autoregulate(self, loss, target):
+    def gate_poiseuille(self, d, kappa, total=None):
+        """Flow through a vessel scales as the FOURTH POWER of its radius.
+
+        Every other rule here hands the perfused heads an EQUAL share. This one splits
+        the same conserved supply by r^n, with r the vessel tone above threshold, so a
+        small difference in demand produces a large difference in flow. The perfused SET
+        is identical to the threshold rule's, which isolates the effect of grading from
+        the effect of selection; n = 1 is the linear-share control.
+        """
+        total = total if total is not None else self.H
+        theta = d.mean() + kappa * d.std().clamp_min(1e-6)
+        r = (d - theta).clamp_min(0.0)
+        if not bool((r > 0).any()):                        # never fully infarct
+            r = torch.zeros_like(d)
+            r[d.argmax()] = 1.0
+        w = r.pow(self.flow_exponent)
+        active = w > 0
+        g = torch.full_like(d, self.leak)
+        g[active] = (total - self.leak * (~active).sum()) * w[active] / w[active].sum()
+        return g
+
+    def gate_watershed(self, d, kappa, total=None):
+        """Territories, with the never-fully-infarct floor applied GLOBALLY.
+
+        The territory rule applies that floor per territory, so every territory keeps a
+        live head and the perfused count is at least T by construction. Compaction below
+        T is then impossible and the mechanism cannot exhibit the effect it predicts.
+        Here a territory may go completely dark and its share is redistributed to the
+        territories still perfusing, which is collateral flow. Heads on a territory
+        boundary have their demand discounted, since watershed zones between two arterial
+        beds are the first tissue to infarct.
+        """
+        total = total if total is not None else self.H
+        terr = self.territory
+        boundary = torch.zeros_like(d, dtype=torch.bool)
+        boundary[:-1] |= terr[:-1] != terr[1:]
+        boundary[1:] |= terr[1:] != terr[:-1]
+        dd = d - (1.0 - self.watershed_penalty) * d.std().clamp_min(1e-6) * boundary
+        active = torch.zeros_like(d, dtype=torch.bool)
+        for t in range(self.n_territories):
+            m = terr == t
+            if not bool(m.any()):
+                continue
+            sub = dd[m]
+            kl = local_kappa(kappa, int(sub.numel()), self.H)
+            active[m] = sub > sub.mean() + kl * sub.std().clamp_min(1e-6)
+        if int(active.sum()) == 0:                  # the floor is GLOBAL, not per region
+            active[int(dd.argmax())] = True
+        live = [t for t in range(self.n_territories) if bool(active[terr == t].any())]
+        share = total / max(1, len(live))           # dark territories give up their flow
+        g = torch.full_like(d, self.leak)
+        for t in live:
+            m = (terr == t) & active
+            dark = int(((terr == t) & ~active).sum())
+            g[m] = (share - self.leak * dark) / int(m.sum())
+        return g
+
+    def autoregulate(self, loss, target, step=0):
         """Functional hyperemia as a closed loop. Flow responds to a metabolic DEFICIT,
         not to a fixed quantile: above target the vessel dilates (kappa falls, more heads
         perfuse), below target it constricts. The control error is a log ratio so the
         loop is scale-free in the loss, and the target is a fraction of the trivial
         baseline so it is scale-free across tasks.
 
-        This is the only variant here in which the perfused count can respond to how
-        hard the task actually is, which is what the fixed z-cut cannot do.
+        With loss_ema = 0 and autoreg_every = 1 this is per-step proportional control on
+        the raw minibatch loss, which is what the reported autoreg runs used.
+
+        stall_gate > 0 adds the distinction between an ACUTE and a CHRONIC deficit.
+        Tissue dilates when a shortfall persists, not when it is merely transient.
+        Without it the loop dilates through the whole early training transient, which is
+        why a tight loss target over-perfused: at k* = 4 with target 0.005 the perfused
+        count settled at 13.3 rather than 4.
         """
         import math
-        err = math.log(max(target, 1e-12)) - math.log(max(float(loss), 1e-12))
+        l = float(loss)
+        if self.loss_ema_c > 0.0:
+            self.loss_state.mul_(self.loss_ema_c).add_((1 - self.loss_ema_c) * l)
+            sensed = float(self.loss_state) / (1 - self.loss_ema_c ** max(1, step + 1))
+        else:
+            sensed = l
+        self.slow_loss.mul_(self.slow_c).add_((1 - self.slow_c) * l)
+        if step % self.autoreg_every:
+            return float(self.kappa_state)
+        err = math.log(max(target, 1e-12)) - math.log(max(sensed, 1e-12))
+        if self.stall_gate > 0.0 and err < 0.0:
+            slow = float(self.slow_loss) / (1 - self.slow_c ** max(1, step + 1))
+            rate = (slow - sensed) / max(slow, 1e-12)      # > 0 while still improving
+            if rate > self.stall_gate:
+                return float(self.kappa_state)             # acute: hold, do not dilate
         self.kappa_state += self.autoreg_gain * max(-4.0, min(4.0, err))
         self.kappa_state.clamp_(self.kappa_floor, self.kappa_ceil)
         return float(self.kappa_state)
@@ -232,6 +317,10 @@ class HemoAttn(CrossAttn):
             return self.gate_topk(d, B_active if B_active is not None else self.H)
         if self.supply_kind == "threshold":
             return self.gate_threshold(d, 0.0 if kappa is None else kappa)
+        if self.supply_kind == "poiseuille":
+            return self.gate_poiseuille(d, 0.0 if kappa is None else kappa)
+        if self.supply_kind == "watershed":
+            return self.gate_watershed(d, 0.0 if kappa is None else kappa)
         if self.supply_kind == "gap":
             return self.gate_gap(d)
         if self.supply_kind == "otsu":

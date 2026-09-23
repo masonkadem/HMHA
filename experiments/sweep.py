@@ -118,6 +118,41 @@ def jobs():
                 add("autoreg_target", seed=s_, supply="autoreg", demand="outnorm_ema",
                     n_rel=R, kappa_end=1.5, target_frac=tf)
 
+    # 10. Step-budget calibration. Every arm below costs 15 runs at 4000 steps. If the
+    #     k* result survives a shorter budget the whole programme gets cheaper, so this
+    #     is measured rather than assumed. The controller gain is scaled with the run
+    #     length so total control authority is held constant; without that a short run
+    #     trivially fails for lack of time to move kappa.
+    for steps, gain in [(400, 0.03), (1000, 0.012)]:
+        for R in [2, 4, 8]:
+            for s_ in range(2):
+                add("steps_calib", seed=s_, supply="autoreg", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, steps=steps, autoreg_gain=gain)
+
+    # 11. Hemodynamically motivated arms, each aimed at a MEASURED failure.
+    #     stall   the loop over-perfused at tight targets because it dilates through the
+    #             early transient. Dilate only on a chronic deficit.
+    #     poiseuille  flow ~ r^4 within the perfused set, the one real vascular law the
+    #             equal-share family ignores. n = 1 is the linear control.
+    #     watershed   territory compaction with a GLOBAL infarct floor, the only version
+    #             of that experiment that can produce the predicted effect.
+    for R in [2, 4, 8]:
+        for s_ in range(3):
+            add("arm_stall", seed=s_, supply="autoreg", demand="outnorm_ema", n_rel=R,
+                kappa_end=1.5, stall_gate=0.02)
+            for n in [1.0, 4.0]:
+                add("arm_poiseuille", seed=s_, supply="poiseuille",
+                    demand="outnorm_ema", n_rel=R, kappa_end=1.5, flow_exponent=n)
+            add("arm_watershed", seed=s_, supply="watershed", demand="outnorm_ema",
+                n_rel=R, kappa_end=1.5, n_territories=8)
+
+    # the stall arm must also pass the target control that broke plain autoreg
+    for tf in [0.005, 0.05]:
+        for R in [2, 4, 8]:
+            for s_ in range(2):
+                add("arm_stall_target", seed=s_, supply="autoreg", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, stall_gate=0.02, target_frac=tf)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.
