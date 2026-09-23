@@ -185,6 +185,24 @@ def jobs():
                 add("arm_marginal", seed=s_, supply="marginal", demand="deficit",
                     n_rel=R, flow_price=price)
 
+    # 14. The two controls the stall gate must survive, both modelled on the one that
+    #     broke plain autoreg.
+    #     (a) Is the stall THRESHOLD itself a tuned knob? If B only tracks k* at
+    #         stall_gate = 0.02 we have moved the hyperparameter, not removed it.
+    for sg in [0.005, 0.08]:
+        for R in [2, 4, 8]:
+            for s_ in range(2):
+                add("stall_eps", seed=s_, supply="autoreg", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, stall_gate=sg)
+    #     (b) Is the stall gate just a SLOWER loop? A critic will say the event trigger
+    #         only buys what a smaller gain would. Plain autoreg at a tenth the gain is
+    #         the control: if it fails where stall gating succeeds, adaptivity is doing
+    #         the work rather than sluggishness.
+    for R in [2, 4, 8]:
+        for s_ in range(2):
+            add("slowgain_ctl", seed=s_, supply="autoreg", demand="outnorm_ema",
+                n_rel=R, kappa_end=1.5, autoreg_gain=0.0003)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.
