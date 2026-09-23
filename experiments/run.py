@@ -22,11 +22,13 @@ TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
             "n_territories": "T", "delay": "tau", "kappa_end": "k", "pool_beta": "b",
             "leak": "lk", "seed": "s", "autoreg_gain": "g", "target_frac": "tf",
             "autoreg_every": "ae", "loss_ema": "le", "stall_gate": "sg",
-            "flow_exponent": "fx", "watershed_penalty": "wp"}
+            "flow_exponent": "fx", "watershed_penalty": "wp",
+            "flow_price": "fp", "cvr_boost": "cb", "cvr_every": "ce"}
 # Swept only occasionally. These appear in the tag ONLY when they differ from the
 # default, so adding one here does not rename every result already on disk.
 TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
-                "stall_gate", "flow_exponent", "watershed_penalty"]
+                "stall_gate", "flow_exponent", "watershed_penalty", "flow_price",
+                "cvr_boost", "cvr_every"]
 
 
 def _fmt(a, v):

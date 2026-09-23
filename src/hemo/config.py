@@ -20,6 +20,16 @@ class Cfg:
     #   outnorm_inst  instantaneous magnitude       (standard L2 pruning baseline)
     #   qnorm         query L2 norm                 (falsified control, rho < 0)
     #   random        fixed random ranking          (lower bound)
+    #   reserve       CEREBROVASCULAR RESERVE. Loss drop when this head is given a
+    #                 large extra share of the FIXED supply, taken from the others.
+    #                 Nonlinear and supraphysiological by design, so unlike a gradient
+    #                 it separates a head at its ceiling from a starved head with a
+    #                 latent role. Every head-importance score in the literature is
+    #                 first-order or leave-one-out REMOVAL; this is addition under
+    #                 conservation, which has no analogue among them.
+    #   deficit       -dL/dg, the per-head shortfall. This is gradient head importance
+    #                 (Michel et al. 2019) once projected onto the conservation surface,
+    #                 so it is carried as a BASELINE, never as the contribution.
     #   q2norm        squared query norm            (sharper than qnorm)
     #   entropy       attention sharpness           (rho=+0.45 vs ablation)
     demand: str = "outnorm_ema"
@@ -55,6 +65,14 @@ class Cfg:
                                         # than acute deficit. 0 disables.
     flow_exponent: float = 4.0          # poiseuille only. Flow ~ r^n; n=4 is Poiseuille,
                                         # n=1 recovers a linear share.
+    cvr_boost: float = 3.0              # reserve only. Flow multiple applied to the
+                                        # probed head, paid for by the rest.
+    cvr_every: int = 100                # reserve only. Steps between reserve probes.
+    flow_price: float = 1e-4            # marginal only. Metabolic price per unit flow.
+                                        # A head is perfused while the loss reduction it
+                                        # would buy exceeds this. Units are loss per unit
+                                        # flow, not loss, so unlike target_frac it does
+                                        # not have to be calibrated to the task's scale.
     watershed_penalty: float = 0.5      # watershed only. Demand multiplier for heads at
                                         # a territory boundary, which in tissue sit
                                         # between two arterial beds and perfuse worst.

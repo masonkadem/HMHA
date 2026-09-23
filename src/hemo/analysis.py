@@ -67,6 +67,13 @@ def head_offsets(model, val, cfg, device, bs=256):
     return prof.cpu().numpy()
 
 
+def has_roles(cfg):
+    """Only multi_relation has named head roles. qsa_cross validates head COUNT, since
+    its heads are interchangeable, so role metrics are undefined there and are reported
+    as NaN rather than as zero, which would read as a failure."""
+    return cfg.task == "multi_relation"
+
+
 @torch.no_grad()
 def circuit_recovery(model, val, cfg, device, gate=None, bs=256):
     """role_coverage  fraction of true offsets implemented by some perfused head
@@ -76,6 +83,11 @@ def circuit_recovery(model, val, cfg, device, gate=None, bs=256):
     if gate is None:
         gate = model.gate()
     act = (gate > model.leak + 1e-9).cpu().numpy()
+    if not has_roles(cfg):
+        nan = float("nan")
+        return dict(active=act, n_perfused=int(act.sum()), role_coverage=nan,
+                    role_purity=nan, n_distinct_roles=nan, territory_span=nan,
+                    head_role=None, head_purity=None, offset_profile=None)
     prof = head_offsets(model, val, cfg, device, bs)
     role, purity = prof.argmax(1), prof.max(1)
     true_offs = set(offsets_for(cfg))

@@ -153,6 +153,38 @@ def jobs():
                 add("arm_stall_target", seed=s_, supply="autoreg", demand="outnorm_ema",
                     n_rel=R, kappa_end=1.5, stall_gate=0.02, target_frac=tf)
 
+    # 12. A SECOND BENCHMARK. Everything so far rests on multi_relation, where k* = R
+    #     because one head cannot implement two offsets: k* is set by FUNCTION. In
+    #     qsa_cross k* = ceil(q log2 N / d_k) is set by CAPACITY, a different reason for
+    #     a circuit to have a minimum size. Sweeping d_k over 1, 2, 4, 8 gives k* of
+    #     8, 4, 2, 1. Heads are interchangeable there, so it validates the COUNT and not
+    #     the roles, which are reported as NaN rather than zero.
+    for dk in [1, 2, 4, 8]:
+        for s_ in range(3):
+            for sup in ["autoreg", "threshold"]:
+                add("qsa_kstar", seed=s_, task="qsa_cross", d_k=dk, supply=sup,
+                    demand="outnorm_ema", kappa_end=1.5)
+
+    # 13. Local deficit instead of a global loss target. -dL/dg_h is what a head would
+    #     gain from more flow, which unlike the query norm depends on the gate and so
+    #     measures shortfall rather than drive. The marginal rule perfuses while that
+    #     gain exceeds a metabolic price, so there is no target loss to calibrate.
+    for R in [2, 4, 8]:
+        for s_ in range(3):
+            # BASELINE, not a contribution: projected -dL/dg is gradient head
+            # importance (Michel et al. 2019) under the conservation constraint.
+            add("baseline_gradient", seed=s_, supply="threshold", demand="deficit",
+                n_rel=R, kappa_end=1.5)
+            # the contribution: reserve is addition under conservation, which no
+            # head-importance score in that literature computes.
+            add("arm_reserve", seed=s_, supply="threshold", demand="reserve",
+                n_rel=R, kappa_end=1.5)
+            add("arm_reserve_auto", seed=s_, supply="autoreg", demand="reserve",
+                n_rel=R, kappa_end=1.5)
+            for price in [1e-5, 1e-3]:
+                add("arm_marginal", seed=s_, supply="marginal", demand="deficit",
+                    n_rel=R, flow_price=price)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.

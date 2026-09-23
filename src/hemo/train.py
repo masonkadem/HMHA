@@ -88,6 +88,10 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         loss = F.mse_loss(pred, T)
         opt.zero_grad(set_to_none=True)
         loss.backward()
+        if hemo and model.needs_reserve_probe() and step % model.cvr_every == 0:
+            model.probe_reserve(X, Y, T, lambda a, b: F.mse_loss(a, b))
+        if hemo and model.needs_gate_grad():
+            model.absorb_gradient()          # the deficit lags by one step, as it should
         nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         opt.step()
         sched.step()

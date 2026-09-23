@@ -123,6 +123,11 @@ class HemoAttn(CrossAttn):
         self.watershed_penalty = cfg.watershed_penalty
         self.register_buffer("loss_state", torch.tensor(0.0))
         self.register_buffer("slow_loss", torch.tensor(0.0))
+        self.register_buffer("deficit", torch.zeros(H))
+        self.register_buffer("deficit_raw", torch.zeros(H))
+        self.register_buffer("reserve", torch.zeros(H))
+        self.flow_price = cfg.flow_price
+        self.cvr_boost, self.cvr_every = cfg.cvr_boost, max(1, cfg.cvr_every)
         self.kappa_floor, self.kappa_ceil = cfg.kappa_start, cfg.kappa_ceil
         self.register_buffer("kappa_state", torch.tensor(float(cfg.kappa_start)))
         T = max(1, min(cfg.n_territories, H))
@@ -130,9 +135,84 @@ class HemoAttn(CrossAttn):
         self.n_territories = T
 
     # ---------------- demand ----------------
+    def needs_gate_grad(self):
+        return self.demand_kind == "deficit" or self.supply_kind == "marginal"
+
+    def needs_reserve_probe(self):
+        return self.demand_kind == "reserve"
+
+    @torch.no_grad()
+    def probe_reserve(self, X, Y, T, loss_fn):
+        """CEREBROVASCULAR RESERVE, the clinical CO2-challenge measurement.
+
+        For each head, give it cvr_boost times its current share of the FIXED total
+        supply, pay for that out of every other head, and record how much the loss
+        falls. A head already at its ceiling shows no reserve; a starved head holding a
+        latent role shows a lot. The two can have identical gradients, which is why a
+        first-order signal cannot tell them apart and why this is not the gradient
+        importance of Michel et al.
+
+        Every head-importance score in that literature is first-order or leave-one-out
+        REMOVAL. This is addition under conservation, and removing a head changes every
+        other head's reserve, so it is not a per-head score at all.
+        """
+        base_g = self.gate()
+        _, _, out = self.heads(X, Y)
+        base = float(loss_fn(self.combine(out, base_g.unsqueeze(0).expand(X.size(0), -1)), T))
+        H = self.H
+        r = torch.zeros_like(base_g)
+        for h in range(H):
+            g = base_g.clone()
+            extra = (self.cvr_boost - 1.0) * base_g[h]
+            if extra <= 0:                       # a fully starved head is given a share
+                extra = self.cvr_boost * float(base_g.sum()) / H
+            others = torch.ones_like(g, dtype=torch.bool)
+            others[h] = False
+            pool = float(g[others].sum())
+            if pool <= 0:
+                continue
+            g[h] = base_g[h] + extra
+            g[others] = g[others] * (1.0 - extra / pool)   # conserved: sum is unchanged
+            g.clamp_min_(0.0)
+            L = float(loss_fn(self.combine(out, g.unsqueeze(0).expand(X.size(0), -1)), T))
+            r[h] = base - L
+        self.reserve.mul_(self.ema).add_((1 - self.ema) * r)
+
+    @torch.no_grad()
+    def absorb_gradient(self):
+        """Per-head DEFICIT, -dL/dg_h: how much loss a head would shed if given more
+        flow. Unlike a demand signal such as the query norm, this depends on the gate,
+        so it is near zero for a head that is already well perfused and large for a
+        starved head that would contribute if fed. That is the difference between
+        measuring drive and measuring shortfall, and it is what lets a supply loop stop
+        without being told a target.
+
+        As a RANKING this quantity is gradient head importance (Michel et al. 2019), a
+        named baseline. Its use here is as the sensor of a conserved supply loop, not as
+        a score to prune by.
+        """
+        g = getattr(self, "_gate_leaf", None)
+        if g is None or g.grad is None:
+            return
+        v = -g.grad.detach()
+        if v.dim() > 1:
+            v = v.sum(0)
+        # Project onto the conservation surface. Supply is fixed, so the useful question
+        # is never "would this head benefit from more flow" (at a fitted solution no head
+        # would, since the output scale is already learned) but "would this head benefit
+        # MORE THAN THE OTHERS", which is the component orthogonal to the all-ones
+        # direction along which sum(g) = H is preserved.
+        v = v - v.mean()
+        self.deficit_raw.copy_(v)
+        self.deficit.copy_(standardize(v))
+
     @torch.no_grad()
     def instantaneous(self, Q, attn, out):
-        if self.demand_kind == "qnorm":
+        if self.demand_kind == "reserve":
+            s = self.reserve
+        elif self.demand_kind == "deficit":
+            s = self.deficit
+        elif self.demand_kind == "qnorm":
             s = Q.norm(dim=-1).mean(dim=(0, 2))
         elif self.demand_kind == "q2norm":
             # squared query norm. Sharpens the demand distribution relative to qnorm,
@@ -211,6 +291,18 @@ class HemoAttn(CrossAttn):
         between = k * (n - k) * (mu_a - mu_b) ** 2
         kk = int(torch.argmax(between).item()) + 1
         return self._from_active(d, d >= s[kk - 1], total)
+
+    def gate_marginal(self, total=None):
+        """Perfuse a head while the loss reduction an extra unit of flow would buy
+        exceeds the metabolic price of that flow. The perfused count is then set by where
+        marginal benefit meets marginal cost, with no target loss to calibrate. The price
+        has units of loss per unit flow rather than loss, so it does not have to be
+        rescaled per task the way target_frac does.
+        """
+        total = total if total is not None else self.H
+        v = self.deficit_raw
+        active = v > self.flow_price
+        return self._from_active(v, active, total)
 
     def gate_poiseuille(self, d, kappa, total=None):
         """Flow through a vessel scales as the FOURTH POWER of its radius.
@@ -317,6 +409,8 @@ class HemoAttn(CrossAttn):
             return self.gate_topk(d, B_active if B_active is not None else self.H)
         if self.supply_kind == "threshold":
             return self.gate_threshold(d, 0.0 if kappa is None else kappa)
+        if self.supply_kind == "marginal":
+            return self.gate_marginal()
         if self.supply_kind == "poiseuille":
             return self.gate_poiseuille(d, 0.0 if kappa is None else kappa)
         if self.supply_kind == "watershed":
@@ -361,5 +455,11 @@ class HemoAttn(CrossAttn):
                 self.update_demand(Q, attn, out)
             gate = self.gate(kappa=kappa, B_active=B_active)
         if gate.dim() == 1:
+            if self.needs_gate_grad() and torch.is_grad_enabled():
+                # a differentiable leaf, so dL/dg_h can be read after backward. The
+                # gradient is well defined even where g_h == 0, which is what lets a
+                # STARVED head still report the flow it would have used.
+                gate = gate.detach().requires_grad_(True)
+                self._gate_leaf = gate
             gate = gate.unsqueeze(0).expand(X.size(0), -1)
         return self.combine(out, gate), gate
