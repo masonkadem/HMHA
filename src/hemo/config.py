@@ -43,6 +43,10 @@ class Cfg:
     #   territory   shared arteriole per group of heads   (non-local; no pruning analogue)
     #   poiseuille  flow ~ radius^4 within the perfused set   (graded, not equal share)
     #   watershed   territories with a GLOBAL infarct floor   (compaction is possible)
+    #   watershed_auto  the same, with the local threshold driven by the autoregulated
+    #               loop instead of a fixed kappa. Territory supply is otherwise an
+    #               OPEN-loop rule and so inherits the impossibility of Theorem 1
+    #               applied per territory.
     #   gap         cut at the largest gap in sorted demand   (shape, not quantile)
     #   otsu        two-cluster split of demand               (shape, not quantile)
     #   autoreg     closed loop: kappa tracks a loss DEFICIT  (task-referenced)
@@ -73,6 +77,11 @@ class Cfg:
                                         # would buy exceeds this. Units are loss per unit
                                         # flow, not loss, so unlike target_frac it does
                                         # not have to be calibrated to the task's scale.
+    terr_kappa: float = -9.0            # watershed only. Threshold on AGGREGATE territory
+                                        # demand. Above -9 the territories compete for
+                                        # total flow and a whole territory can go dark;
+                                        # at the default they split flow equally, which
+                                        # is no competition at all.
     watershed_penalty: float = 0.5      # watershed only. Demand multiplier for heads at
                                         # a territory boundary, which in tissue sit
                                         # between two arterial beds and perfuse worst.

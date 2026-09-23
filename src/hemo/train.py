@@ -67,7 +67,7 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
     # autoreg only: perfuse until the task is solved to within target_frac of the
     # trivial baseline. Expressed against trivial, so the target means the same thing
     # at every R rather than being a raw loss number tuned per task.
-    autoreg = hemo and cfg.supply == "autoreg"
+    autoreg = hemo and cfg.supply in ("autoreg", "watershed_auto")
     target = cfg.target_frac * trivial_loss(val)
     hold = int(cfg.budget_hold_frac * total)
 

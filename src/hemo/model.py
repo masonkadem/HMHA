@@ -128,6 +128,7 @@ class HemoAttn(CrossAttn):
         self.register_buffer("reserve", torch.zeros(H))
         self.flow_price = cfg.flow_price
         self.cvr_boost, self.cvr_every = cfg.cvr_boost, max(1, cfg.cvr_every)
+        self.terr_kappa = cfg.terr_kappa
         self.kappa_floor, self.kappa_ceil = cfg.kappa_start, cfg.kappa_ceil
         self.register_buffer("kappa_state", torch.tensor(float(cfg.kappa_start)))
         T = max(1, min(cfg.n_territories, H))
@@ -339,6 +340,9 @@ class HemoAttn(CrossAttn):
         total = total if total is not None else self.H
         terr = self.territory
         boundary = torch.zeros_like(d, dtype=torch.bool)
+        # aggregate demand per territory, the quantity arterioles would compete on
+        agg = torch.stack([d[terr == t].mean() if bool((terr == t).any())
+                           else d.min() for t in range(self.n_territories)])
         boundary[:-1] |= terr[:-1] != terr[1:]
         boundary[1:] |= terr[1:] != terr[:-1]
         dd = d - (1.0 - self.watershed_penalty) * d.std().clamp_min(1e-6) * boundary
@@ -353,12 +357,32 @@ class HemoAttn(CrossAttn):
         if int(active.sum()) == 0:                  # the floor is GLOBAL, not per region
             active[int(dd.argmax())] = True
         live = [t for t in range(self.n_territories) if bool(active[terr == t].any())]
-        share = total / max(1, len(live))           # dark territories give up their flow
+        if self.terr_kappa > -8.0:
+            # INTER-TERRITORY COMPETITION. Without this every live territory takes an
+            # equal share regardless of its demand, so flow never moves between
+            # territories and vascular steal, the whole point of the mechanism, does not
+            # happen. Here a territory whose aggregate demand falls below the threshold
+            # goes dark and its flow is taken by the survivors in proportion to demand.
+            thr = agg.mean() + self.terr_kappa * agg.std().clamp_min(1e-6)
+            live = [t for t in live if float(agg[t]) > float(thr)]
+            if not live:
+                live = [int(agg.argmax())]
+            w = torch.stack([agg[t] for t in live])
+            w = (w - w.min() + 1e-6)
+            w = w / w.sum()
+            shares = {t: float(total) * float(wi) for t, wi in zip(live, w)}
+        else:
+            shares = {t: total / max(1, len(live)) for t in live}
         g = torch.full_like(d, self.leak)
         for t in live:
             m = (terr == t) & active
+            if not bool(m.any()):
+                continue
             dark = int(((terr == t) & ~active).sum())
-            g[m] = (share - self.leak * dark) / int(m.sum())
+            g[m] = (shares[t] - self.leak * dark) / int(m.sum())
+        s = float(g.sum())
+        if s > 0:                                   # conservation, exactly
+            g.mul_(total / s)
         return g
 
     def autoregulate(self, loss, target, step=0):
@@ -415,6 +439,8 @@ class HemoAttn(CrossAttn):
             return self.gate_poiseuille(d, 0.0 if kappa is None else kappa)
         if self.supply_kind == "watershed":
             return self.gate_watershed(d, 0.0 if kappa is None else kappa)
+        if self.supply_kind == "watershed_auto":
+            return self.gate_watershed(d, float(self.kappa_state))
         if self.supply_kind == "gap":
             return self.gate_gap(d)
         if self.supply_kind == "otsu":

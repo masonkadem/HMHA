@@ -209,6 +209,32 @@ def jobs():
             add("slowgain_ctl", seed=s_, supply="autoreg", demand="outnorm_ema",
                 n_rel=R, kappa_end=1.5, autoreg_gain=0.0003)
 
+    # 15. Repairing watershed. Measured, it over-perfuses at B = 11 to 14.7 with 0 to
+    #     0.7 of 8 territories ever going dark, so there is no compaction to observe.
+    #     Two causes, addressed separately so the contributions can be told apart.
+    #     (a) Every live territory took an EQUAL share regardless of demand, so flow
+    #         never moved between territories: vascular steal, the whole motivation for
+    #         the mechanism, was absent. terr_kappa makes them compete.
+    for tk in [0.0, 0.5]:
+        for R in [2, 4, 8]:
+            for s_ in range(3):
+                add("watershed_compete", seed=s_, supply="watershed",
+                    demand="outnorm_ema", n_rel=R, kappa_end=1.5, terr_kappa=tk)
+    #     (b) Territory supply is OPEN loop, so it inherits Theorem 1 applied per
+    #         territory and the count cannot track k*. Driving the local threshold from
+    #         the autoregulated loop is the only escape, and it is the one route back to
+    #         the spatial half of the claim.
+    for R in [2, 4, 8]:
+        for s_ in range(3):
+            add("watershed_auto", seed=s_, supply="watershed_auto",
+                demand="outnorm_ema", n_rel=R, kappa_end=1.5, terr_kappa=0.0)
+    #     (c) compaction needs headroom. At k* = 8 with T = 8 the best possible span IS
+    #         8, so the prediction was untestable. Sweep T at fixed k* = 4 instead.
+    for T in [4, 8, 16, 32]:
+        for s_ in range(3):
+            add("compaction", seed=s_, supply="watershed_auto", demand="outnorm_ema",
+                n_rel=4, kappa_end=1.5, terr_kappa=0.0, n_territories=T)
+
     # 5. demand arms at matched perfusion. topk supply so every arm anneals through the
     #    same budget ladder and the loss can be read at B = k*. leak 0 vs 0.05, since
     #    irreversible starvation may be penalising the EMA arm specifically.
