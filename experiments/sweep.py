@@ -140,6 +140,12 @@ def jobs():
         for s_ in range(3):
             add("arm_stall", seed=s_, supply="autoreg", demand="outnorm_ema", n_rel=R,
                 kappa_end=1.5, stall_gate=0.02)
+    # complete the stall arm's k* grid so it is compared against plain autoreg on the
+    # same five circuit sizes rather than on a subset
+    for R in [3, 6]:
+        for s_ in range(3):
+            add("arm_stall", seed=s_, supply="autoreg", demand="outnorm_ema", n_rel=R,
+                kappa_end=1.5, stall_gate=0.02)
             for n in [1.0, 4.0]:
                 add("arm_poiseuille", seed=s_, supply="poiseuille",
                     demand="outnorm_ema", n_rel=R, kappa_end=1.5, flow_exponent=n)
