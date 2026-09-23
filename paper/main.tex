@@ -257,19 +257,22 @@ to respect a rate that varies.
   \centering
   \includegraphics[width=0.96\textwidth]{../figures/fig_arms.png}
   \caption{\textbf{Only the closed loop tracks circuit size.} (a) Perfused count against
-  true circuit size, median over the converged phase. The two autoregulated arms coincide
-  and lie on the identity; the dashed line is the stall-gated arm, offset for visibility.
-  (b) Fitted $\mathrm{d}B/\mathrm{d}k^\star$. Three open-loop rules have \emph{negative}
-  slope. Poiseuille is the informative failure: its perfused set is identical to the fixed
-  threshold's by construction and only the shares differ, yet it scores worse, so
-  selection rather than allocation is the binding problem.}
+  true circuit size, median over the converged phase. Both autoregulated arms give
+  identical $B$ and are drawn as one line, which lies on the identity; the stall gate's
+  contribution is role recovery, not count. The band spans the remaining open-loop rules.
+  (b) Fitted $\mathrm{d}B/\mathrm{d}k^\star$ for every arm. Three open-loop rules have
+  \emph{negative} slope. Poiseuille is the informative failure: its perfused set is
+  identical to the fixed threshold's by construction and only the shares within it
+  differ, yet it scores worse, so selection rather than allocation is the binding
+  problem.}
   \label{fig:arms}
 \end{figure*}
 
 \begin{table}[t]
   \centering\small
   \input{results_table.tex}
-  \caption{Supply rules on \texttt{multi\_relation}, $H{=}32$, $d_k{=}32$, $N{=}16$,
+  \caption{Supply rules on \texttt{multi\_relation}, grouped by whether supply answers
+  to task performance or only to the demand distribution. $H{=}32$, $d_k{=}32$, $N{=}16$,
   $k^\star \in \{2,\dots,8\}$. $\mathrm{d}B/\mathrm{d}k^\star$ is fitted over the
   circuit sizes run; MAE is $|B - k^\star|$ in heads; role coverage is the fraction of
   true offsets recovered. Generated from the run pickles, not transcribed.}
