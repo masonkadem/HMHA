@@ -29,6 +29,8 @@
         framesep=6pt, rulecolor=\color{black!20}, xleftmargin=14pt,
         breaklines=true, showstringspaces=false, language=Python}
 
+\input{numbers.tex}
+
 \begin{document}
 \chapter{Metabolically constrained attention}
 
@@ -325,8 +327,8 @@ $\widehat L_t \gg L_\infty(B)$ for every $B$, so $e_t < 0$ persistently and
 \end{equation}
 driving $B \to H$ before the learner has revealed what $B$ was sufficient. This is a
 \emph{specification} failure rather than a tuning failure: the loop controls the wrong
-quantity. Measured, a target four times tighter than the working one drove $B$ to $13.3$
-where $4$ sufficed and to $15.3$ where $8$ did.
+quantity. Measured, a target four times tighter than the working one drove $B$ to
+\numOverPerfuseFour{} where $4$ sufficed and to \numOverPerfuseEight{} where $8$ did.
 
 In tissue the vasodilatory signal is an accumulated byproduct, so dilation requires the
 shortfall to persist. Let $\bar L_t$ be a slower average of the loss than $\widehat L_t$
@@ -498,8 +500,8 @@ derived.}
 Table~\ref{tab:target} gives the result. The stall gate converts an order-of-magnitude
 failure into an off-by-one error and turns the working band from a point into a range,
 which is the difference between a tuned setting and a mechanism. The gate's other effect
-is on interpretability rather than on counting: role coverage rises from $0.74$ to $0.81$
-and converged loss falls by roughly a factor of three, at identical tracking.
+is on interpretability rather than on counting: role coverage rises from \numCovPlain{} to \numCovStall{}
+and converged loss from \numLossPlain{} to \numLossStall{}, at identical tracking.
 
 \subsection{Negative results}
 
