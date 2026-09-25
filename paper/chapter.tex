@@ -486,20 +486,7 @@ a range spanning the staircase gap.
 
 \begin{table}[h]
 \centering\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-& \multicolumn{3}{c}{$B$ at $k^\star = 2,\,4,\,8$} \\
-\cmidrule(l){2-4}
-loss target & plain autoreg & \; & $+$ stall gate \\
-\midrule
-$0.005$ & $3.0,\;13.3,\;15.3$ & & $3.5,\;4.0,\;8.0$ \\
-$0.02$  & $2.0,\;4.0,\;8.0$   & & $2.0,\;4.0,\;8.0$ \\
-$0.05$  & $2.0,\;4.0,\;7.0$   & & $2.0,\;4.0,\;7.0$ \\
-\midrule
-MAE over the range & $2.07$ heads & & $\mathbf{0.28}$ heads \\
-exact              & $5/9$        & & $\mathbf{7/9}$ \\
-\bottomrule
-\end{tabular}
+\input{target_table.tex}
 \caption{The target control. At the tight target the plain loop dilates through the early
 transient and over-perfuses by an order of magnitude; the gate holds it to the correct
 count. Mean absolute error at that target falls from $5.89$ to $0.50$ heads, a factor of
