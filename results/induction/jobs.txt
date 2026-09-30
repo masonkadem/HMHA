@@ -1,0 +1,75 @@
+--rule collateral --seed 0
+--rule ablate --seed 0
+--rule random --seed 0
+--rule prune --seed 0
+--rule dense --seed 0
+--rule dense --heads1 1 --heads2 1 --seed 0
+--rule collateral --seed 1
+--rule ablate --seed 1
+--rule random --seed 1
+--rule prune --seed 1
+--rule dense --seed 1
+--rule dense --heads1 1 --heads2 1 --seed 1
+--rule collateral --seed 2
+--rule ablate --seed 2
+--rule random --seed 2
+--rule prune --seed 2
+--rule dense --seed 2
+--rule dense --heads1 1 --heads2 1 --seed 2
+--rule collateral --seed 3
+--rule ablate --seed 3
+--rule random --seed 3
+--rule prune --seed 3
+--rule dense --seed 3
+--rule dense --heads1 1 --heads2 1 --seed 3
+--rule collateral --seed 4
+--rule ablate --seed 4
+--rule random --seed 4
+--rule prune --seed 4
+--rule dense --seed 4
+--rule dense --heads1 1 --heads2 1 --seed 4
+--rule collateral --seed 5
+--rule ablate --seed 5
+--rule random --seed 5
+--rule prune --seed 5
+--rule dense --seed 5
+--rule dense --heads1 1 --heads2 1 --seed 5
+--rule collateral --seed 6
+--rule ablate --seed 6
+--rule random --seed 6
+--rule prune --seed 6
+--rule dense --seed 6
+--rule dense --heads1 1 --heads2 1 --seed 6
+--rule collateral --seed 7
+--rule ablate --seed 7
+--rule random --seed 7
+--rule prune --seed 7
+--rule dense --seed 7
+--rule dense --heads1 1 --heads2 1 --seed 7
+--rule collateral --seed 8
+--rule ablate --seed 8
+--rule random --seed 8
+--rule prune --seed 8
+--rule dense --seed 8
+--rule dense --heads1 1 --heads2 1 --seed 8
+--rule collateral --seed 9
+--rule ablate --seed 9
+--rule random --seed 9
+--rule prune --seed 9
+--rule dense --seed 9
+--rule dense --heads1 1 --heads2 1 --seed 9
+--rule collateral --price_frac 0.01 --seed 0
+--rule collateral --price_frac 0.01 --seed 1
+--rule collateral --price_frac 0.01 --seed 2
+--rule collateral --price_frac 0.01 --seed 3
+--rule collateral --price_frac 0.01 --seed 4
+--rule collateral --price_frac 0.1 --seed 0
+--rule collateral --price_frac 0.1 --seed 1
+--rule collateral --price_frac 0.1 --seed 2
+--rule collateral --price_frac 0.1 --seed 3
+--rule collateral --price_frac 0.1 --seed 4
+--rule collateral --price_frac 0.3 --seed 0
+--rule collateral --price_frac 0.3 --seed 1
+--rule collateral --price_frac 0.3 --seed 2
+--rule collateral --price_frac 0.3 --seed 3
+--rule collateral --price_frac 0.3 --seed 4
