@@ -166,3 +166,27 @@ def test_local_controls_pick_differently():
     r.head_value[1] = 0.01
     r.local_step(price=0.1)
     assert int(r.open_mask.sum()) == 3                           # closes exactly one
+
+
+def test_a_backup_is_worth_something_only_under_damage():
+    """With no damage a copy is worth ~0 (its twin covers it). When heads fail at random,
+    a copy is worth what it saves when its twin fails. Damage never touches the allocation
+    the ledger records."""
+    from hemo.model import HemoAttn
+    from hemo.tasks import make_batch
+    c = replace(SMALL, supply="local", num_heads=4, d_k=4, plant_copies=1)
+    torch.manual_seed(0)
+    X, Y, T, _ = make_batch(256, c, "cpu")
+    safe = HemoAttn(c)
+    safe.probe_ischemia(X, Y, T)
+    torch.manual_seed(0)
+    hurt = HemoAttn(replace(c, head_dropout=0.5, probe_masks=64))
+    hurt.probe_ischemia(X, Y, T)
+    assert float(hurt.head_value.min()) > 100 * float(safe.head_value.abs().max())
+    hurt.train()
+    y1, g = hurt(X, Y)
+    y2, _ = hurt(X, Y)
+    assert abs(float(g[0].sum()) - hurt.H) < 1e-4                # allocation untouched
+    assert not torch.allclose(y1, y2)                            # damage in training
+    hurt.eval()
+    assert torch.allclose(hurt(X, Y)[0], hurt(X, Y)[0])          # none in evaluation

@@ -71,6 +71,26 @@ Sections 5 and 6.
 - [ ] Wall-clock, with starved heads sliced out rather than multiplied by zero.
 - [ ] Global loop chatter: PI / nuPI controller (Sohrabi et al. 2024).
 
+## Confirmation batch (2026-09-30, `results/confirm/`, output in `analysis.txt`)
+
+Rule = collateral value, no fixed total, fade, early start. 10 seeds.
+
+- [x] Count: exact in 47/50 runs over k* = 2, 3, 4, 6, 8; never fell back above the bar (0/50).
+- [x] Ordinary importance: exact 2/30 (Fisher p = 6e-16). Random pick: exact 30/30 but fell
+      back 24/30 (p = 4e-15). Standard pruning: exact 34/36 but fell back 36/36 (p = 5e-25).
+- [x] Planted copies: 4 heads and 0 copy pairs in 10/10 seeds; ordinary importance 8 to 15
+      heads with 4 to 7 pairs.
+- [x] Price 0.01 to 0.1 (10x): count equals k* at every price. The price does not encode k*.
+- [x] Damage: heads kept match the binomial-reserve prediction written beforehand
+      (`predictions.md`) in 25/30 runs, mean |miss| 0.17 heads, over p = 0.05 to 0.3,
+      R = 2, 4 and two prices.
+- [ ] Caveats to address: damage-trained models have a higher clean loss (up to 0.07 of
+      trivial); the damage law is k-out-of-n redundancy from reliability theory applied to
+      heads (cite it); robustness (loss after knocking out a kept head) not yet measured;
+      one task, one layer.
+- [ ] Novelty check: literature review on reconstruction pruning, k-out-of-n redundancy in
+      neural networks, backup heads, before calling any of this novel.
+
 ## Aim 3 (headline if it holds): minimal or robust, set by vascular physics
 
 Vessel networks minimise dissipation under a cost sum(C^gamma). Below gamma = 1 the optimum

@@ -26,14 +26,16 @@ TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
             "flow_price": "fp", "cvr_boost": "cb", "cvr_every": "ce", "terr_kappa": "tk",
             "precondition": "pc", "precondition_relax": "pr", "price_frac": "pf",
             "probe_every": "pe", "prune_stop": "ps", "probe_batch": "pb", "taper": "tp",
-            "budget_hold_frac": "hf", "conserve": "cv", "local_value": "lv", "plant_copies": "cp"}
+            "budget_hold_frac": "hf", "conserve": "cv", "local_value": "lv", "plant_copies": "cp",
+            "head_dropout": "hd", "probe_masks": "pm"}
 # Swept only occasionally. These appear in the tag ONLY when they differ from the
 # default, so adding one here does not rename every result already on disk.
 TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
                 "stall_gate", "flow_exponent", "watershed_penalty", "flow_price",
                 "cvr_boost", "cvr_every", "terr_kappa", "precondition",
                 "precondition_relax", "price_frac", "probe_every", "prune_stop", "probe_batch",
-                "taper", "budget_hold_frac", "conserve", "local_value", "plant_copies"]
+                "taper", "budget_hold_frac", "conserve", "local_value", "plant_copies",
+                "head_dropout", "probe_masks"]
 
 
 def _fmt(a, v):

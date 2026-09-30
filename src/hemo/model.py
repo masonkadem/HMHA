@@ -151,6 +151,8 @@ class HemoAttn(CrossAttn):
         self.conserve, self.local_value = cfg.conserve, cfg.local_value
         self.register_buffer("head_ablate", torch.zeros(H))
         self._pick = torch.Generator().manual_seed(cfg.seed + 11)
+        self.head_dropout, self.probe_masks = cfg.head_dropout, cfg.probe_masks
+        self._damage = torch.Generator().manual_seed(cfg.seed + 13)
         if cfg.plant_copies:
             self.plant_copies()
 
@@ -502,6 +504,9 @@ class HemoAttn(CrossAttn):
 
         open_ = self.open_mask
         blk = torch.arange(H * dk, device=Z.device).view(H, dk)
+        if self.head_dropout > 0:
+            self._probe_under_damage(A, Bm, blk, d_out)
+            return
         S = blk[open_].reshape(-1)
         M = torch.linalg.inv(A[S][:, S])
         W = M @ Bm[S]                                                 # re-fitted read-out
@@ -528,6 +533,50 @@ class HemoAttn(CrossAttn):
                 J = slice(i * dk, (i + 1) * dk)
                 value[h] = torch.trace(R[J].T @ torch.linalg.solve(Sc[J, J], R[J])) / d_out
         self.head_value.copy_(value.float())
+
+    @torch.no_grad()
+    def _refit_values(self, A, Bm, blk, working, d_out):
+        """Collateral values when only `working` heads carry flow: for a working head, the
+        fit lost without it (others re-fit); for any other head, the fit gained by adding
+        it. Same algebra as probe_ischemia, allowing an empty working set."""
+        H, dk = self.H, self.d_k
+        value = torch.zeros(H, dtype=A.dtype, device=A.device)
+        on = torch.nonzero(working).flatten().tolist()
+        off = torch.nonzero(~working).flatten().tolist()
+        if not on:                                   # nothing working: gain of each head alone
+            for h in off:
+                J = blk[h]
+                value[h] = torch.trace(Bm[J].T @ torch.linalg.solve(A[J][:, J], Bm[J])) / d_out
+            return value
+        S = blk[working].reshape(-1)
+        M = torch.linalg.inv(A[S][:, S])
+        W = M @ Bm[S]
+        for i, h in enumerate(on):
+            J = slice(i * dk, (i + 1) * dk)
+            value[h] = torch.trace(W[J].T @ torch.linalg.solve(M[J, J], W[J])) / d_out
+        if off:
+            Jall = blk[off].reshape(-1)
+            C = A[Jall][:, S] @ M
+            R = Bm[Jall] - C @ Bm[S]
+            Sc = A[Jall][:, Jall] - C @ A[S][:, Jall]
+            for i, h in enumerate(off):
+                J = slice(i * dk, (i + 1) * dk)
+                value[h] = torch.trace(R[J].T @ torch.linalg.solve(Sc[J, J], R[J])) / d_out
+        return value
+
+    @torch.no_grad()
+    def _probe_under_damage(self, A, Bm, blk, d_out):
+        """COLLATERAL VALUE UNDER DAMAGE. Tissue keeps collateral vessels where occlusions
+        actually happen. Average each head's collateral value over random failure patterns
+        (each head fails with probability head_dropout): a head that has failed is worth
+        nothing in that pattern; a backup is worth what it saves when its partner fails."""
+        total = torch.zeros(self.H, dtype=A.dtype, device=A.device)
+        for _ in range(self.probe_masks):
+            alive = (torch.rand(self.H, generator=self._damage) >= self.head_dropout).to(A.device)
+            v = self._refit_values(A, Bm, blk, self.open_mask & alive, d_out)
+            total += torch.where(alive, v, torch.zeros_like(v))
+        self.head_value.copy_((total / self.probe_masks).float())
+        self.head_ablate.zero_()
 
     @torch.no_grad()
     def local_step(self, price):
@@ -665,4 +714,10 @@ class HemoAttn(CrossAttn):
                 gate = gate.detach().requires_grad_(True)
                 self._gate_leaf = gate
             gate = gate.unsqueeze(0).expand(X.size(0), -1)
-        return self.combine(out, gate), gate
+        used = gate
+        if self.head_dropout > 0 and self.training:
+            # DAMAGE: every head fails independently this step. The returned gate is the
+            # allocation (what the ledger records); only the computation sees the failure
+            keep = (torch.rand(self.H, device=gate.device) >= self.head_dropout).to(gate.dtype)
+            used = gate * keep / (1 - self.head_dropout)
+        return self.combine(out, used), gate

@@ -125,6 +125,14 @@ class Cfg:
                                         # Reopening always uses the re-fit gain.
     plant_copies: int = 0               # 1 = start with head h and head h + H/2 identical,
                                         # so every head has an exact duplicate.
+    # --- damage: when is a backup head worth keeping? (proposal Aim 3) ---
+    head_dropout: float = 0.0           # hemo only. Each training step every head fails
+                                        # independently with this probability (inverted
+                                        # scaling, as dropout). Evaluation is undamaged.
+    probe_masks: int = 32               # local only, used when head_dropout > 0. The
+                                        # collateral value is averaged over this many random
+                                        # failure patterns, so a backup is worth what it
+                                        # saves when others fail.
 
     # --- budget schedule, topk only ---
     budget_min: int = 1
