@@ -1,8 +1,8 @@
 """Main figure (publication style). Every number is read from the result pickles.
 
-  (a) task   (b) one head, one equation   (c, d) loss and heads during training, collateral
-  rule against the dense model   (e) count and stability against the baselines   (f) final
-  loss against dense   (g) duplicated heads   (h) backup heads under damage
+  (a) task  (b) one head, one equation  (c) loss and (d) heads during training for
+  k* = 2, 4, 6, 8, collateral rule against the dense model  (e) count and stability
+  (f) final loss  (g) duplicated heads  (h) backup heads under damage
 
   python experiments/figure_main.py   ->  figures/fig_main.png and figures/fig_main.pdf
 """
@@ -12,19 +12,19 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, Rectangle
+from matplotlib.patches import Rectangle
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from hemo.config import Cfg
 
-ACC = "#1f5fa8"                       # the one accent: the collateral rule
+RED = "#b2182b"                       # the collateral rule (blood)
 K, G1, G2, G3 = "#111111", "#6b6b6b", "#a8a8a8", "#e4e4e4"
 plt.rcParams.update({
     "font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
     "mathtext.fontset": "custom", "mathtext.rm": "Arial", "mathtext.it": "Arial:italic",
-    "mathtext.bf": "Arial", "mathtext.sf": "Arial",
-    "font.size": 7, "axes.titlesize": 7.5, "axes.labelsize": 7, "xtick.labelsize": 6.5,
+    "mathtext.bf": "Arial:bold", "mathtext.sf": "Arial",
+    "font.size": 7, "axes.titlesize": 7, "axes.labelsize": 7, "xtick.labelsize": 6.5,
     "ytick.labelsize": 6.5, "legend.fontsize": 6.5, "axes.titleweight": "normal",
     "axes.titlelocation": "left", "axes.spines.top": False, "axes.spines.right": False,
     "axes.linewidth": 0.6, "xtick.major.width": 0.6, "ytick.major.width": 0.6,
@@ -47,6 +47,7 @@ PINNED = dict(task="multi_relation", steps=4000, d_k=32, demand="outnorm_ema", k
 get = lambda r, k: r["cfg"].get(k, getattr(DEFAULT, k))
 runs = lambda **w: [r for r in RUNS if all(get(r, k) == v for k, v in {**PINNED, **w}.items())]
 dense = lambda R: [d for d in DENSE if d["cfg"]["n_rel"] == R]
+title = lambda ax, letter, text="": ax.set_title(rf"$\mathbf{{{letter}}}$   {text}", pad=4)
 
 
 def kept(r):
@@ -69,138 +70,130 @@ def compute(r):
 
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
-fig = plt.figure(figsize=(7.2, 8.0))
-gs = fig.add_gridspec(3, 3, height_ratios=[0.9, 1.15, 1], hspace=0.55, wspace=0.5)
+BAR = 0.02
+fig = plt.figure(figsize=(7.2, 8.6))
+gs = fig.add_gridspec(4, 4, height_ratios=[1.05, 0.85, 0.7, 1.1], hspace=0.45, wspace=0.55)
 
-# ---------------------------------------------------------------- (a) task
-ax = fig.add_subplot(gs[0, :2])
-ax.set_title("a   Task with a known circuit size", pad=4)
+# ---------------------------------------------------------------- a  task
+ax = fig.add_subplot(gs[0, :3])
+title(ax, "a", "Task")
 ax.axis("off")
 N, p, offs = 16, 8, (1, 5, 9, 13)
-ax.set(xlim=(-4.6, 16), ylim=(-4.3, 2.4))
-ax.add_patch(Rectangle((p - 0.42, 1.3), 0.84, 0.72, facecolor="white", edgecolor=K, lw=0.7))
-ax.text(p, 1.66, "$p$", ha="center", va="center")
-ax.text(-4.5, 1.66, "query", color=G1, va="center")
-ax.text(-4.5, 0, "memory", color=G1, va="center")
-targets = {(p + d) % N: d for d in offs}
+ax.set(xlim=(-3.2, 16), ylim=(-2.9, 2.4))
+ax.add_patch(Rectangle((p - 0.42, 1.45), 0.84, 0.72, facecolor="white", edgecolor=K, lw=0.7))
+ax.text(p, 1.81, "$p$", ha="center", va="center")
+ax.text(-3.1, 1.81, "query", color=G1, va="center")
+ax.text(-3.1, 0, "memory", color=G1, va="center")
+targets = [(p + d) % N for d in offs]
 for j in range(N):
     hit = j in targets
     ax.add_patch(Rectangle((j - 0.42, -0.36), 0.84, 0.72, facecolor=G3 if hit else "white",
                            edgecolor=K if hit else G2, lw=0.7))
     ax.text(j, 0, str(j), ha="center", va="center", fontsize=6, color=K if hit else G1)
-for j, d in targets.items():
-    ax.add_patch(FancyArrowPatch((p, 1.28), (j, 0.4), connectionstyle=f"arc3,rad={0.3 if j < p else -0.3}",
-                                 arrowstyle="-|>", mutation_scale=6, color=K, lw=0.6))
-ax.text(-4.5, -1.55, "target", color=G1, va="center")
-ax.text(5.8, -1.55, r"$y=(c_{p+\delta_1},\ \dots,\ c_{p+\delta_R}),\quad \delta=(1,5,9,13),\quad N=16$",
-        ha="center", va="center", fontsize=7.5)
-ax.text(5.8, -2.75, r"head $h$ returns one blend $u_h=\Sigma_r\,A_{hr}\,c_{p+\delta_r}$;  "
-        r"all $c$ recovered only if rank $A=R$", ha="center", va="center", fontsize=6.8, color=G1)
-ax.text(5.8, -3.8, r"so the task needs $k^*=R$ heads (here 4 of $H=32$)", ha="center", va="center", fontsize=7.5)
+for j in targets:
+    ax.annotate("", xy=(j, 0.42), xytext=(p, 1.42),
+                arrowprops=dict(arrowstyle="-|>", color=K, lw=0.6, mutation_scale=6, shrinkA=0, shrinkB=0))
+ax.text(-3.1, -1.5, "target", color=G1, va="center")
+ax.text(7.5, -1.5, r"$y=(c_{p+1},\ c_{p+5},\ c_{p+9},\ c_{p+13})$", ha="center", va="center", fontsize=7.5)
+ax.text(7.5, -2.5, r"needs $k^*=4$ of 32 heads", ha="center", va="center", color=G1)
 
-# ---------------------------------------------------------------- (b) rank
-ax = fig.add_subplot(gs[0, 2])
+# ---------------------------------------------------------------- b  rank
+ax = fig.add_subplot(gs[0, 3])
 E1 = pickle.load(open(os.path.join(ROOT, "results", "proposal", "equations.pkl"), "rb"))
 triv = E1["trivial"]
-ax.plot([0, 4], [1, 0], color=G2, lw=0.8, ls="--", zorder=1)
+ax.plot([0, 4], [triv, 0], color=G2, lw=0.8, ls="--", zorder=1, label="predicted")
 plain = [r for r in E1["rows"] if len(set(r["heads"])) == len(r["heads"])]
 copies = [r for r in E1["rows"] if len(set(r["heads"])) < len(r["heads"])]
-ax.plot([r["different"] for r in plain], [r["loss"] / triv for r in plain], "o", color=K, ms=3.2, label="subset of heads")
-ax.plot([r["different"] for r in copies], [r["loss"] / triv for r in copies], "o", mfc="none", mec=K,
-        ms=6.5, mew=0.7, label="with a duplicate")
-ax.text(4.2, 0.93, r"$L=(1-\mathrm{rank}\,A\,/\,R)\,L_{\mathrm{triv}}$", ha="right")
-ax.set(xlabel="distinct heads (rank $A$)", ylabel=r"loss / $L_{\mathrm{triv}}$",
-       xticks=range(5), xlim=(-0.2, 4.3), ylim=(-0.05, 1.05))
-ax.legend(loc="lower left", handletextpad=0.3)
-ax.set_title("b   One head, one equation")
+ax.plot([r["different"] for r in plain], [r["loss"] for r in plain], "o", color=K, ms=3, label="heads removed")
+ax.plot([r["different"] for r in copies], [r["loss"] for r in copies], "o", mfc="none", mec=RED,
+        ms=6.5, mew=0.8, label="one head copied")
+ax.set(xlabel="different heads", ylabel="loss", xticks=range(5), xlim=(-0.2, 4.3), ylim=(-0.05, 1.08))
+ax.legend(loc="upper right", handletextpad=0.3, borderaxespad=0)
+title(ax, "b", "One head, one equation")
 
-# ---------------------------------------------------------------- (c, d) during training
-sub = gs[1, :2].subgridspec(2, 1, height_ratios=[1.35, 1], hspace=0.35)
-axl, axh = fig.add_subplot(sub[0]), fig.add_subplot(sub[1], sharex=None)
-r = sorted(runs(**RULE, n_rel=4), key=lambda r: get(r, "seed"))[0]
-d0 = next(d for d in dense(4) if d["cfg"]["seed"] == get(r, "seed"))
-bar = 0.02 * r["trivial"]
-axl.plot(d0["hist"]["val_step"], np.array(d0["hist"]["val_loss"]) / d0["trivial"], color=K, lw=1,
-         label="dense, 32 heads")
-axl.plot(r["hist"]["val_step"], np.array(r["hist"]["val_loss"]) / r["trivial"], color=ACC, lw=1,
-         label="collateral rule")
-axl.axhline(0.02, color=G2, lw=0.6, ls=":")
-axl.text(3990, 0.011, "solved bar", ha="right", va="top", color=G1, fontsize=6.2)
-axl.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), ylabel=r"loss / $L_{\mathrm{triv}}$", xticklabels=[])
-axl.legend(loc="center right", bbox_to_anchor=(1.0, 0.45))
-axl.set_title("c   Loss during training (4-head task, one seed)")
-on = (r["hist"]["ledger"] > 0).sum(1)
-axh.plot([0, 4000], [32, 32], color=K, lw=1)
-axh.plot(np.arange(len(on)), on, color=ACC, lw=1, drawstyle="steps-post")
-axh.axhline(4, color=G2, lw=0.6, ls=":")
-axh.text(4000, 4.6, "$k^*=4$", ha="right", color=G1, fontsize=6.2)
-axh.set(yscale="log", yticks=[2, 4, 8, 16, 32], yticklabels=["2", "4", "8", "16", "32"], ylim=(2.5, 45),
-        xlim=(0, 4000), xlabel="training step", ylabel="heads")
-axh.minorticks_off()
-axh.set_title(f"d   Heads receiving supply (collateral rule used {compute(r):.2f} of the dense compute)")
+# ---------------------------------------------------------------- c, d  training, small multiples
+show = (2, 4, 6, 8)
+cd = gs[1:3, :].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.16, wspace=0.55)
+for i, k in enumerate(show):
+    r = sorted(runs(**RULE, n_rel=k), key=lambda r: get(r, "seed"))[0]
+    d0 = next(d for d in dense(k) if d["cfg"]["seed"] == get(r, "seed"))
+    axl = fig.add_subplot(cd[0, i])
+    axl.plot(d0["hist"]["val_step"], d0["hist"]["val_loss"], color=K, lw=0.9, label="dense")
+    axl.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=RED, lw=0.9, label="collateral")
+    axl.axhline(BAR, color=G2, lw=0.6, ls=":")
+    axl.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=[])
+    axl.minorticks_off()
+    axh = fig.add_subplot(cd[1, i])
+    on = (r["hist"]["ledger"] > 0).sum(1)
+    axh.plot([0, 4000], [32, 32], color=K, lw=0.9)
+    axh.plot(np.arange(len(on)), on, color=RED, lw=0.9, drawstyle="steps-post")
+    axh.axhline(k, color=G2, lw=0.6, ls=":")
+    axh.set(yscale="log", ylim=(1.5, 45), yticks=[2, 4, 8, 16, 32], yticklabels=["2", "4", "8", "16", "32"],
+            xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"])
+    axh.minorticks_off()
+    axh.text(3950, 22, f"compute {compute(r):.2f}", ha="right", fontsize=6, color=RED)
+    if i == 0:
+        title(axl, "c", f"$k^*={k}$")
+        axh.text(-0.42, 1.0, r"$\mathbf{d}$", transform=axh.transAxes, fontsize=7, va="bottom")
+        axl.set_ylabel("loss")
+        axh.set_ylabel("heads")
+        axl.legend(loc="upper right", handlelength=1.2, borderaxespad=0)
+    else:
+        axl.set_title(f"$k^*={k}$", pad=4)
+        axl.set_yticklabels([])
+        axh.set_yticklabels([])
+    if i == 1:
+        axh.set_xlabel("training step", x=1.15)
 
-# ---------------------------------------------------------------- (e) count and stability
-ax = fig.add_subplot(gs[1, 2])
-arms = [("collateral rule", RULE, SIZES, ACC, "o"),
-        ("standard pruning", dict(supply="prune"), SIZES, K, "s"),
-        ("ordinary importance", {**RULE, "local_value": "ablate"}, (2, 4, 8), K, "D"),
-        ("random choice", {**RULE, "local_value": "random"}, (2, 4, 8), K, "v")]
+# ---------------------------------------------------------------- e  count and stability
+ax = fig.add_subplot(gs[3, 0])
+arms = [("collateral", RULE, SIZES, RED, "o"),
+        ("pruning", dict(supply="prune"), SIZES, K, "s"),
+        ("importance", {**RULE, "local_value": "ablate"}, (2, 4, 8), K, "D"),
+        ("random", {**RULE, "local_value": "random"}, (2, 4, 8), K, "v")]
 for name, kw, sizes, color, m in arms:
     rs = [x for k in sizes for x in runs(**kw, n_rel=k)]
     ax.plot(100 * np.mean([kept(x) == get(x, "n_rel") for x in rs]), 100 * np.mean([stayed_solved(x) for x in rs]),
-            m, color=color, ms=5, mfc=color if color == ACC else "white", mew=0.8, ls="none",
-            label=f"{name} ({len(rs)})")
-ax.set(xlim=(-5, 106), ylim=(-6, 108), xticks=[0, 25, 50, 75, 100], xlabel="runs with exact count (%)",
-       ylabel="runs that stay solved (%)")
-ax.legend(loc="center left", bbox_to_anchor=(0.0, 0.5), handletextpad=0.3, title="rule (runs)",
-          title_fontsize=6.5, alignment="left")
-ax.set_title("e   Count and stability")
+            m, color=color, ms=4.5, mfc=color if color == RED else "white", mew=0.8, ls="none", label=name)
+ax.set(xlim=(-5, 106), ylim=(-6, 108), xticks=[0, 50, 100], yticks=[0, 50, 100],
+       xlabel="exact count (% runs)", ylabel="stays solved (% runs)")
+ax.legend(loc="center left", bbox_to_anchor=(0.02, 0.5), handletextpad=0.2, borderaxespad=0)
+title(ax, "e", "Count and stability")
 
-# ---------------------------------------------------------------- (f) final loss against dense
-ax = fig.add_subplot(gs[2, 0])
+# ---------------------------------------------------------------- f  final loss
+ax = fig.add_subplot(gs[3, 1])
 rng = np.random.default_rng(1)
 for i, k in enumerate(SIZES):
-    dl = [d["hist"]["val_loss"][-1] / d["trivial"] for d in dense(k)]
-    cl = [x["final_loss"] / x["trivial"] for x in runs(**RULE, n_rel=k)]
-    ax.plot(i - 0.17 + rng.uniform(-0.06, 0.06, len(dl)), dl, "o", ms=2.6, mfc="white", mec=K, mew=0.6,
-            label="dense, 32 heads" if i == 0 else None)
-    ax.plot(i + 0.17 + rng.uniform(-0.06, 0.06, len(cl)), cl, "o", ms=2.6, color=ACC,
-            label="collateral rule" if i == 0 else None)
-    ax.text(i, 2.2e-3, f"{np.mean([compute(x) for x in runs(**RULE, n_rel=k)]):.2f}", ha="center",
-            fontsize=6, color=ACC)
-ax.text(-0.45, 5.5e-3, "compute of the collateral rule (dense = 1)", fontsize=6, color=G1)
-ax.axhline(0.02, color=G2, lw=0.6, ls=":")
-ax.text(4.45, 0.026, "solved bar", ha="right", fontsize=6, color=G1)
-ax.set(yscale="log", ylim=(1e-6, 1e-1), xticks=range(len(SIZES)), xticklabels=[str(k) for k in SIZES],
-       xlabel="true circuit size $k^*$", ylabel=r"final loss / $L_{\mathrm{triv}}$")
+    dl = [d["hist"]["val_loss"][-1] for d in dense(k)]
+    cl = [x["final_loss"] for x in runs(**RULE, n_rel=k)]
+    ax.plot(i - 0.18 + rng.uniform(-0.06, 0.06, len(dl)), dl, "o", ms=2.3, mfc="white", mec=K, mew=0.5,
+            label="dense" if i == 0 else None)
+    ax.plot(i + 0.18 + rng.uniform(-0.06, 0.06, len(cl)), cl, "o", ms=2.3, color=RED,
+            label="collateral" if i == 0 else None)
+ax.axhline(BAR, color=G2, lw=0.6, ls=":")
+ax.set(yscale="log", ylim=(3e-6, 0.1), xticks=range(len(SIZES)), xticklabels=[str(k) for k in SIZES],
+       xlabel="$k^*$", ylabel="final loss")
 ax.minorticks_off()
-ax.legend(loc="upper right", bbox_to_anchor=(1.0, 0.7), handletextpad=0.2)
-ax.set_title("f   Final loss, 10 seeds each")
+ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.55), handletextpad=0.1, borderaxespad=0)
+title(ax, "f", "Final loss")
 
-# ---------------------------------------------------------------- (g) duplicates
-ax = fig.add_subplot(gs[2, 1])
+# ---------------------------------------------------------------- g  duplicated heads
+ax = fig.add_subplot(gs[3, 2])
 res = {}
 for value in ("refit", "ablate"):
-    out = []
-    for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value):
-        o = x["hist"]["ledger"][-1] > 0
-        out.append((int(o.sum()), sum(bool(o[h] and o[h + 16]) for h in range(16))))
-    res[value] = np.array(out)
-for i, (value, face, label) in enumerate((("refit", ACC, "collateral rule"), ("ablate", "white", "ordinary importance"))):
-    for j in range(2):
-        v = res[value][:, j]
-        x0 = j * 2.6 + i * 0.95
-        ax.bar(x0, v.mean(), 0.8, color=face, edgecolor=K if face == "white" else face, lw=0.6,
-               label=label if j == 0 else None)
-        ax.plot(x0 + rng.uniform(-0.2, 0.2, len(v)), v, ".", color=G1, ms=2.5, zorder=3)
-ax.plot([-0.5, 1.45], [4, 4], color=K, lw=0.6, ls=":")
-ax.set_xticks([0.475, 3.075], ["heads kept", "duplicate pairs\nboth kept"])
-ax.set(ylim=(0, 22), yticks=[0, 4, 8, 12, 16], ylabel=f"count ({len(res['refit'])} seeds)")
-ax.legend(loc="upper right")
-ax.set_title("g   Every head duplicated at start")
+    res[value] = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16))
+                           for o in (x["hist"]["ledger"][-1] > 0
+                                     for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value))])
+for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate", "white", "importance"))):
+    v = res[value]
+    ax.bar(i, v.mean(), 0.6, color=face, edgecolor=K if face == "white" else face, lw=0.6)
+    ax.plot(i + rng.uniform(-0.15, 0.15, len(v)), v, ".", color=G1, ms=2.5, zorder=3)
+ax.set(xticks=[0, 1], ylim=(0, 8), xlim=(-0.6, 1.6), ylabel="copy pairs both kept")
+ax.set_xticklabels(["collateral", "importance"])
+title(ax, "g", "Start with every head copied")
 
-# ---------------------------------------------------------------- (h) damage
-ax = fig.add_subplot(gs[2, 2])
+# ---------------------------------------------------------------- h  damage
+ax = fig.add_subplot(gs[3, 3])
 
 
 def predict(R, p, price=0.03):
@@ -210,24 +203,17 @@ def predict(R, p, price=0.03):
 
 
 ps = [0.0, 0.05, 0.1, 0.2, 0.3]
-hit = n = 0
 for R, m in ((4, "o"), (2, "s")):
-    ax.plot(ps, [predict(R, p) for p in ps], color=G2, lw=0.8, ls="--", zorder=1)
-    for p in ps:
-        B = [kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]
-        ax.plot(p + rng.uniform(-0.007, 0.007, len(B)), B, m, color=ACC, ms=3, mfc=ACC if R == 4 else "white",
-                mew=0.7, label=f"$k^*={R}$" if p == 0 else None)
-        if p > 0:
-            hit += sum(b == predict(R, p) for b in B)
-            n += len(B)
-ax.set_xlim(-0.025, 0.335)
-ax.text(0.33, 11.8, r"$v(B)=\frac{1-p}{R}\,P[\mathrm{Bin}(B-1,1-p)<R]$" "\n"
-        r"$B^*=\max\{B:\,v(B)\geq\pi\}$" "\n" f"dashed: prediction, {hit}/{n} exact",
-        fontsize=6, ha="right", va="top", color=G1)
-ax.set(xlabel="head failure probability $p$", ylabel="heads kept", ylim=(1, 12), xticks=ps,
-       yticks=[2, 4, 6, 8], xticklabels=["0", ".05", ".1", ".2", ".3"])
-ax.legend(loc="center left", bbox_to_anchor=(0, 0.52))
-ax.set_title("h   Backups under damage")
+    ax.plot(ps, [predict(R, p) for p in ps], color=G2, lw=0.9, ls="--", zorder=1,
+            label="predicted" if R == 4 else None)
+    means = [np.mean([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) for p in ps]
+    ax.plot(ps, means, m, color=RED, ms=3.5, mfc=RED if R == 4 else "white", mew=0.8, ls="none",
+            label="measured" if R == 4 else None)
+    ax.text(0.325, predict(R, 0.3), f"$k^*={R}$", va="center", fontsize=6, color=G1)
+ax.set(xlabel="chance a head fails", ylabel="heads kept", ylim=(1, 8), xlim=(-0.02, 0.385),
+       xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[2, 4, 6, 8])
+ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0)
+title(ax, "h", "Backup heads")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
