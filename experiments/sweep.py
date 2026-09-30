@@ -209,6 +209,77 @@ def jobs():
             add("slowgain_ctl", seed=s_, supply="autoreg", demand="outnorm_ema",
                 n_rel=R, kappa_end=1.5, autoreg_gain=0.0003)
 
+    # 16. Seeds to 10 on the two closed-loop arms, the only arms the claim rests on.
+    for R in [2, 3, 4, 6, 8]:
+        for s_ in range(3, 10):
+            for sg in [0.0, 0.02]:
+                add("seeds10", seed=s_, supply="autoreg", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, stall_gate=sg)
+
+    # 17. A per-head deficit instead of a global loss target. Each head is worth what
+    #     the model would lose without it once the others re-fit; it stays open while it
+    #     is worth more than a metabolic price per head. No target loss, B not an input.
+    for R in [2, 3, 4, 6, 8]:
+        for s_ in range(3):
+            add("local_head", seed=s_, supply="local", demand="outnorm_ema", n_rel=R,
+                kappa_end=1.5)
+    #     is the price a tuned knob? 10x range
+    for pf in [0.003, 0.03]:
+        for R in [2, 4, 8]:
+            for s_ in range(2):
+                add("local_price", seed=s_, supply="local", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, price_frac=pf)
+    #     does more time to consolidate between closures remove the extra head?
+    for R in [2, 4, 8]:
+        for s_ in range(2):
+            add("local_slow", seed=s_, supply="local", demand="outnorm_ema", n_rel=R,
+                kappa_end=1.5, probe_every=100)
+
+    # 18. The wobble. Ischemic preconditioning caps kappa where a needed head was lost.
+    #     Smoke runs over-perfused, so this is recorded as a negative arm.
+    for R in [2, 4, 8]:
+        for s_ in range(2):
+            add("precondition", seed=s_, supply="autoreg", demand="outnorm_ema", n_rel=R,
+                kappa_end=1.5, stall_gate=0.08, precondition=0.05)
+
+    # 19. Switch the loop's sensor to the two signals that predict ablation damage best.
+    for dm in ["entropy", "qnorm"]:
+        for R in [2, 3, 4, 6, 8]:
+            for s_ in range(3):
+                add("sensor_loop", seed=s_, supply="autoreg", demand=dm, n_rel=R,
+                    kappa_end=1.5, stall_gate=0.02)
+
+    # 20. The real baseline: iterative head pruning, Michel et al. (2019). 0/1 masks,
+    #     no conservation, lowest |dL/dmask| out first. prune_stop = 1 finds k with the
+    #     same loss bar the loop uses; prune_stop = 0 is told k* (an oracle).
+    for stop in [1, 0]:
+        for R in [2, 3, 4, 6, 8]:
+            for s_ in range(3):
+                add("baseline_prune", seed=s_, supply="prune", demand="outnorm_ema",
+                    n_rel=R, kappa_end=1.5, prune_stop=stop)
+
+    # 21. qsa_cross, repaired. Measured, the dense 32-head model only reaches 3 to 6% of
+    #     the trivial loss, so the 2% target is unreachable and the loop rightly keeps
+    #     every head. Seed 0 measures the dense ground truth with the gap-based bar; the
+    #     local rule needs no target, and the global loop gets a reachable one.
+    for dk in [1, 2, 4, 8]:
+        for s_ in range(2):
+            add("qsa_local", seed=s_, task="qsa_cross", d_k=dk, supply="local",
+                demand="outnorm_ema", kappa_end=1.5, **({"redundancy": True} if s_ == 0 else {}))
+            add("qsa_reachable", seed=s_, task="qsa_cross", d_k=dk, supply="autoreg",
+                demand="outnorm_ema", kappa_end=1.5, stall_gate=0.02, target_frac=0.1)
+
+    # 22. Why removal hurts. Every rule spikes the loss as heads are cut, because the
+    #     dense phase spreads the solution over all 32 heads. Two fixes from the vessel:
+    #     taper, a closing head's share fades over 100 steps while the others take it up;
+    #     early, competition starts at step 400 rather than 1000, before the solution
+    #     spreads. price_frac = 0.03, the setting that tracked best.
+    for taper, hold in [(100, 0.25), (0, 0.1), (100, 0.1)]:
+        for R in [2, 4, 8]:
+            for s_ in range(2):
+                add("taper_early", seed=s_, supply="local", demand="outnorm_ema", n_rel=R,
+                    kappa_end=1.5, price_frac=0.03, taper=taper, budget_hold_frac=hold)
+
     # 15. Repairing watershed. Measured, it over-perfuses at B = 11 to 14.7 with 0 to
     #     0.7 of 8 territories ever going dark, so there is no compaction to observe.
     #     Two causes, addressed separately so the contributions can be told apart.
@@ -245,8 +316,8 @@ def jobs():
     return out
 
 
-def cmd(kw, outdir):
-    c = ["python", os.path.join(HERE, "run.py"), "--out", outdir, "--device", "cpu"]
+def cmd(kw, outdir, device="cpu"):
+    c = [sys.executable, os.path.join(HERE, "run.py"), "--out", outdir, "--device", device]
     for k, v in kw.items():
         if k == "redundancy":
             continue
@@ -264,6 +335,7 @@ def main():
     ap.add_argument("--only", default=None, help="comma-separated experiment names")
     ap.add_argument("--out", default=os.path.join(ROOT, "results"))
     ap.add_argument("--logs", default=os.path.join(ROOT, "results", "logs"))
+    ap.add_argument("--device", default="cpu", help="cpu, cuda, mps or auto")
     a = ap.parse_args()
 
     js = jobs()
@@ -292,7 +364,7 @@ def main():
         exp, kw, t = j
         log = os.path.join(a.logs, t + ".log")
         with open(log, "w") as f:
-            r = subprocess.run(cmd(kw, a.out), env=env, stdout=f, stderr=subprocess.STDOUT)
+            r = subprocess.run(cmd(kw, a.out, a.device), env=env, stdout=f, stderr=subprocess.STDOUT)
         n_done[0] += 1
         print(f"[{n_done[0]}/{len(todo)}  {(time.time()-t0)/60:.0f}m] "
               f"{'ok ' if r.returncode == 0 else 'FAIL'} {exp:<12} {t}", flush=True)

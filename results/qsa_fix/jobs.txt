@@ -1,0 +1,12 @@
+--task qsa_cross --d_k 8 --seed 0 --supply autoreg --stall_gate 0.02 --target_frac 0.05
+--task qsa_cross --d_k 8 --seed 0 --supply prune --target_frac 0.05
+--task qsa_cross --d_k 8 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1
+--task qsa_cross --d_k 8 --seed 1 --supply autoreg --stall_gate 0.02 --target_frac 0.05
+--task qsa_cross --d_k 8 --seed 1 --supply prune --target_frac 0.05
+--task qsa_cross --d_k 8 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1
+--task qsa_cross --d_k 16 --seed 0 --supply autoreg --stall_gate 0.02 --target_frac 0.05
+--task qsa_cross --d_k 16 --seed 0 --supply prune --target_frac 0.05
+--task qsa_cross --d_k 16 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1
+--task qsa_cross --d_k 16 --seed 1 --supply autoreg --stall_gate 0.02 --target_frac 0.05
+--task qsa_cross --d_k 16 --seed 1 --supply prune --target_frac 0.05
+--task qsa_cross --d_k 16 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1

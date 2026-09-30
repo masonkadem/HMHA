@@ -451,7 +451,16 @@ def fig_variants(runs, out, rows):
         if (c["delay"] or c["pool_beta"] or c["leak"] or c["steps"] != 4000
                 or c["supply"] in ("topk", "territory") or c["kappa_end"] != 1.5):
             continue
-        arms.setdefault((c["supply"], c["demand"]), []).append(r)
+        supply = c["supply"]
+        if supply == "autoreg":
+            # only the configurations the paper reports; the gain, target and stall
+            # threshold sweeps are controls, and pooling them hides what each one shows
+            sg = c.get("stall_gate", 0.0)
+            if c["autoreg_gain"] != 0.003 or c.get("target_frac", 0.02) != 0.02 \
+                    or sg not in (0.0, 0.02):
+                continue
+            supply = "autoreg+stall" if sg else "autoreg"
+        arms.setdefault((supply, c["demand"]), []).append(r)
         Rs_all.add(c["n_rel"])
     keep = {k: v for k, v in arms.items() if len({r["cfg"]["n_rel"] for r in v}) >= 4}
     if len(keep) < 2:

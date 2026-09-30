@@ -503,6 +503,33 @@ which is the difference between a tuned setting and a mechanism. The gate's othe
 is on interpretability rather than on counting: role coverage rises from \numCovPlain{} to \numCovStall{}
 and converged loss from \numLossPlain{} to \numLossStall{}, at identical tracking.
 
+\subsection{Two controls on the gate}
+
+The gate raises two objections. Its threshold $\varepsilon$ might be a tuned setting in
+place of the target, and it might work only because it makes the loop slower. Both were
+run at the default target, where the plain loop already tracks, so they test what the gate
+is rather than what it rescues.
+
+\begin{table}[h]
+\centering\small
+\input{controls_table.tex}
+\caption{Controls on the stall gate, at the default target. ``Above bar'' counts runs
+whose final loss exceeds $2\%$ of the trivial loss, the benchmark's solved threshold.}
+\label{tab:controls}
+\end{table}
+
+\emph{The threshold is not tuned for the count.} Over a sixteen-fold range of
+$\varepsilon$ the perfused count equals $k^\star$ in every run, with mean absolute error
+at most \numEpsMaeMax{} heads, as Proposition~\ref{prop:stall} predicts. It is not free
+for performance, however. At the loosest threshold \numEpsLooseBad{} of \numEpsLooseN{}
+runs ended above the bar. The loop tolerates larger rises in loss before it dilates, so it
+chatters between $k^\star$ and $k^\star - 1$ heads, and a model one head short of its
+circuit fails the task. The median count stays correct while the model does not.
+
+\emph{The gate is not a slow loop.} The plain loop at a tenth of its gain over-perfuses at
+every size, with mean absolute error \numSlowMae{} heads and slope \numSlowSlope{}.
+Slowing the loop does not reproduce the gate; it breaks the tracking the loop had.
+
 \subsection{Negative results}
 
 Four mechanisms produced nulls. They are reported because each rules something out.
@@ -538,11 +565,12 @@ recovers what otherwise requires a sweep over $B$ with a full training run at ea
 That is an efficiency result about circuit discovery, not a demonstration that metabolic
 constraint reveals circuit size from first principles.
 
-Second, the stall gate introduces $\varepsilon$, and the obvious objection is that a tuned
-target has been replaced by a tuned threshold. Proposition~\ref{prop:stall} predicts
-otherwise, since $\varepsilon$ enters only as an $O(\varepsilon)$ perturbation of the
-control error while $L^\star$ enters the fixed point directly, but that prediction
-requires its own control and is not yet settled.
+Second, the stall gate introduces $\varepsilon$. The count is insensitive to it over a
+sixteen-fold range (Table~\ref{tab:controls}), as Proposition~\ref{prop:stall} predicts,
+but performance is not: a loose threshold lets the loop dip one head below $k^\star$ and
+fail the task. So $\varepsilon$ is not a tuned setting for \emph{what} is selected, but it
+does bound how tightly the selection is held. Both controls were run at a single target
+with two seeds per size.
 
 Third, the correct head \emph{count} is weaker than the correct head \emph{roles}. Role
 coverage does not reach unity, and at one circuit size the loop selected exactly $k^\star$

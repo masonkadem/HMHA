@@ -87,6 +87,44 @@ class Cfg:
                                         # between two arterial beds and perfuse worst.
     target_frac: float = 0.02           # autoreg only, target loss as a fraction of
                                         # the trivial baseline. Scale-free across tasks.
+    precondition: float = 0.0           # autoreg only. Ischemic preconditioning. When a
+                                        # constriction has to be reversed, cap kappa this
+                                        # far below where the lost head went dark, so the
+                                        # loop stops re-testing a head it needs. 0 disables.
+    precondition_relax: float = 2e-5    # autoreg only. Per-step drift of that cap back up,
+                                        # so the memory fades if the task changes.
+
+    # --- local supply: each head regulates its own flow, no loss target ---
+    #   local   every probe_every steps, measure each head's own deficit: the loss the
+    #           model would lose if that head's flow were given to the others, or gain
+    #           if a starved head were fed. Close the cheapest open head if it is worth
+    #           less than a metabolic price per head; reopen the most valuable starved
+    #           head if it is worth more than twice that price.
+    #   prune   BASELINE, standard iterative head pruning (Michel et al. 2019): 0/1 masks,
+    #           not conserved, remove the head with the smallest |dL/dmask|, stop when the
+    #           loss bar (target_frac) breaks or, with prune_stop = 0, at the true k*.
+    price_frac: float = 0.01            # local only. Price of one head, as a fraction of
+                                        # the trivial loss.
+    probe_every: int = 25               # local and prune. Steps between decisions.
+    taper: int = 0                      # local only. Steps over which a closing head's
+                                        # share fades to zero. 0 shuts it at once.
+    probe_batch: int = 512              # local only. Fresh sequences per probe, so the
+                                        # re-fit has far more tokens than features.
+    prune_stop: int = 1                 # prune only. 1 finds k by the loss bar; 0 is
+                                        # told k* (an oracle upper bound).
+    # --- controls on the local rule (thesis proposal). Defaults reproduce the rule. ---
+    conserve: int = 1                   # local only. 0 = CONTROL: no fixed total, an open
+                                        # head keeps gain = its tone, so survivors never
+                                        # take up a closing head's share.
+    local_value: str = "refit"          # local only. Which head to close:
+                                        #   refit   collateral value, others re-fit (the rule)
+                                        #   ablate  CONTROL: standard ablation importance,
+                                        #           the loss rise with NO re-fit
+                                        #   random  CONTROL: close when the rule would, but
+                                        #           pick the open head at random
+                                        # Reopening always uses the re-fit gain.
+    plant_copies: int = 0               # 1 = start with head h and head h + H/2 identical,
+                                        # so every head has an exact duplicate.
 
     # --- budget schedule, topk only ---
     budget_min: int = 1

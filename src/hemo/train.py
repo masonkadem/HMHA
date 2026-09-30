@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 
 from .model import CrossAttn, HemoAttn
-from .tasks import make_batch, trivial_loss
+from .tasks import make_batch, trivial_loss, predicted_kstar
 
 
 def pick_device(cfg):
@@ -70,6 +70,11 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
     autoreg = hemo and cfg.supply in ("autoreg", "watershed_auto")
     target = cfg.target_frac * trivial_loss(val)
     hold = int(cfg.budget_hold_frac * total)
+    # local supply and the pruning baseline decide every probe_every steps after phase 1
+    local = hemo and cfg.supply == "local"
+    prune = hemo and cfg.supply == "prune"
+    price = cfg.price_frac * trivial_loss(val)
+    smooth, h["n_probes"] = None, 0
 
     for step in range(total):
         X, Y, T, _ = make_batch(cfg.batch_size, cfg, device)
@@ -96,7 +101,20 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         opt.step()
         sched.step()
         if autoreg and step >= hold:      # phase 1 stays fully perfused, then the loop
-            model.autoregulate(loss.item(), target, step=step - hold)
+            model.autoregulate(loss.item(), target, step=step - hold,
+                               n_perfused=int((g[0] > model.leak + 1e-9).sum()))
+        if local:
+            model.relax_tone()
+        if (local or prune) and step >= hold:
+            smooth = loss.item() if smooth is None else 0.92 * smooth + 0.08 * loss.item()
+            if (step - hold) % cfg.probe_every == 0:
+                if local:
+                    model.probe_ischemia(*make_batch(cfg.probe_batch, cfg, device)[:3])
+                    h["n_probes"] += 1
+                    model.local_step(price)
+                else:
+                    model.prune_step(smooth, target, predicted_kstar(cfg),
+                                     stop=bool(cfg.prune_stop))
 
         nper = int((g[0] > model.leak + 1e-9).sum()) if hemo else H
         if hemo:

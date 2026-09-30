@@ -2,3 +2,5 @@ results/logs/
 results_sweep.log
 __pycache__/
 *.pyc
+.venv/
+results/*/logs/

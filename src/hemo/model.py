@@ -134,10 +134,41 @@ class HemoAttn(CrossAttn):
         T = max(1, min(cfg.n_territories, H))
         self.register_buffer("territory", torch.arange(H) * T // H)
         self.n_territories = T
+        # ischemic preconditioning (autoreg): the kappa the loop may not constrict past
+        self.precondition, self.precondition_relax = cfg.precondition, cfg.precondition_relax
+        self.register_buffer("kappa_cap", torch.tensor(float(cfg.kappa_ceil)))
+        self._last_B, self._drop, self._strikes = None, None, {}
+        # local supply and the pruning baseline: which heads are open, and why
+        self.register_buffer("open_mask", torch.ones(H, dtype=torch.bool))
+        self.register_buffer("head_value", torch.zeros(H))
+        self.register_buffer("michel", torch.zeros(H))
+        # local only: each head's vessel tone in [0, 1], which follows open_mask at
+        # 1/taper per step, so a closing head fades while the survivors take up its share
+        self.register_buffer("tone", torch.ones(H))
+        self.taper = cfg.taper
+        self._removed, self._since_removal, self._prune_done = None, 0, False
+        # controls on the local rule; the defaults (1, "refit", 0) are the rule itself
+        self.conserve, self.local_value = cfg.conserve, cfg.local_value
+        self.register_buffer("head_ablate", torch.zeros(H))
+        self._pick = torch.Generator().manual_seed(cfg.seed + 11)
+        if cfg.plant_copies:
+            self.plant_copies()
+
+    @torch.no_grad()
+    def plant_copies(self):
+        """Make head h + H/2 an exact copy of head h, read-out included. Copies get equal
+        gradients, so they stay copies until one is closed."""
+        half, dk = self.H // 2, self.d_k
+        for h in range(half):
+            src, dst = slice(h * dk, (h + 1) * dk), slice((h + half) * dk, (h + half + 1) * dk)
+            for lin in (self.W_q, self.W_k, self.W_v):
+                lin.weight[dst] = lin.weight[src]
+                lin.bias[dst] = lin.bias[src]
+            self.W_o.weight[:, dst] = self.W_o.weight[:, src]
 
     # ---------------- demand ----------------
     def needs_gate_grad(self):
-        return self.demand_kind == "deficit" or self.supply_kind == "marginal"
+        return self.demand_kind == "deficit" or self.supply_kind in ("marginal", "prune")
 
     def needs_reserve_probe(self):
         return self.demand_kind == "reserve"
@@ -198,6 +229,8 @@ class HemoAttn(CrossAttn):
         v = -g.grad.detach()
         if v.dim() > 1:
             v = v.sum(0)
+        # Michel et al. (2019) head importance, |dL/dmask|, for the pruning baseline
+        self.michel.mul_(self.ema).add_((1 - self.ema) * v.abs())
         # Project onto the conservation surface. Supply is fixed, so the useful question
         # is never "would this head benefit from more flow" (at a fitted solution no head
         # would, since the output scale is already learned) but "would this head benefit
@@ -385,7 +418,7 @@ class HemoAttn(CrossAttn):
             g.mul_(total / s)
         return g
 
-    def autoregulate(self, loss, target, step=0):
+    def autoregulate(self, loss, target, step=0, n_perfused=None):
         """Functional hyperemia as a closed loop. Flow responds to a metabolic DEFICIT,
         not to a fixed quantile: above target the vessel dilates (kappa falls, more heads
         perfuse), below target it constricts. The control error is a log ratio so the
@@ -400,8 +433,20 @@ class HemoAttn(CrossAttn):
         Without it the loop dilates through the whole early training transient, which is
         why a tight loss target over-perfused: at k* = 4 with target 0.005 the perfused
         count settled at 13.3 rather than 4.
+
+        precondition > 0 adds ISCHEMIC PRECONDITIONING. Proportional control with a
+        target the model can beat always constricts until it loses a head it needs, then
+        dilates back, so it chatters between k* and k* - 1. Tissue that survives an
+        ischemic episode tolerates the next one. Here, when a constriction has to be
+        reversed, kappa is capped just below where the head was lost, and the cap
+        drifts back up slowly so the memory fades.
         """
         import math
+        if self.precondition > 0.0 and n_perfused is not None:
+            if self._last_B is not None and n_perfused < self._last_B:
+                self._drop = (self._last_B, float(self.kappa_state))
+            self._last_B = n_perfused
+            self.kappa_cap.add_(self.precondition_relax).clamp_(max=self.kappa_ceil)
         l = float(loss)
         if self.loss_ema_c > 0.0:
             self.loss_state.mul_(self.loss_ema_c).add_((1 - self.loss_ema_c) * l)
@@ -417,9 +462,135 @@ class HemoAttn(CrossAttn):
             rate = (slow - sensed) / max(slow, 1e-12)      # > 0 while still improving
             if rate > self.stall_gate:
                 return float(self.kappa_state)             # acute: hold, do not dilate
+        if err < 0.0 and self._drop is not None:           # the last constriction hurt
+            # two strikes at the same count: a transient early in training strikes once,
+            # the chatter at k* strikes again within a few hundred steps
+            B_lost, kappa_lost = self._drop
+            self._strikes[B_lost] = self._strikes.get(B_lost, 0) + 1
+            if self._strikes[B_lost] >= 2:
+                self.kappa_cap.fill_(min(float(self.kappa_cap),
+                                         kappa_lost - self.precondition))
+            self._drop = None
         self.kappa_state += self.autoreg_gain * max(-4.0, min(4.0, err))
-        self.kappa_state.clamp_(self.kappa_floor, self.kappa_ceil)
+        self.kappa_state.clamp_(self.kappa_floor, float(self.kappa_cap))
         return float(self.kappa_state)
+
+    @torch.no_grad()
+    def probe_ischemia(self, X, Y, T, ridge=1e-4):
+        """Each head's own DEFICIT, measured with collateral compensation.
+
+        For an open head: how much worse the model gets without it, once the remaining
+        open heads have re-fitted their output weights to cover for it. For a starved
+        head: how much better the model gets if it is fed and everyone re-fits. Tissue
+        survives losing a vessel when collaterals can take over its territory, so the
+        question is never 'what does this head carry' but 'what can nobody else carry'.
+        A head that duplicates another is therefore worth nothing, however much it writes.
+
+        Least squares on the heads' outputs, so both quantities are closed-form: one
+        inverse of the open heads' Gram matrix, then a block downdate per open head and a
+        Schur complement per starved head. The attention patterns, which ARE the heads'
+        roles, are held fixed; only the linear read-out is re-fitted.
+        """
+        H, dk = self.H, self.d_k
+        _, _, out = self.heads(X, Y)                                  # (b, H, n, dk)
+        Z = out.permute(0, 2, 1, 3).reshape(-1, H * dk).double()
+        t = T.reshape(-1, T.size(-1)).double()
+        Z, t = Z - Z.mean(0), t - t.mean(0)
+        n, d_out = Z.size(0), t.size(1)
+        A, Bm = Z.T @ Z / n, Z.T @ t / n
+        A += ridge * torch.diagonal(A).mean() * torch.eye(H * dk, dtype=A.dtype, device=A.device)
+
+        open_ = self.open_mask
+        blk = torch.arange(H * dk, device=Z.device).view(H, dk)
+        S = blk[open_].reshape(-1)
+        M = torch.linalg.inv(A[S][:, S])
+        W = M @ Bm[S]                                                 # re-fitted read-out
+        value = torch.zeros(H, dtype=A.dtype, device=A.device)
+
+        ablate = torch.zeros(H, dtype=A.dtype, device=A.device)
+        heads_open = torch.nonzero(open_).flatten()
+        for i, h in enumerate(heads_open.tolist()):                  # fit lost without h
+            J = slice(i * dk, (i + 1) * dk)
+            value[h] = torch.trace(W[J].T @ torch.linalg.solve(M[J, J], W[J])) / d_out
+            # CONTROL: remove h and keep everyone else's read-out as it is. At the fitted
+            # optimum the loss rises by exactly W_J' A_JJ W_J, the head's own contribution
+            Jg = blk[h]
+            ablate[h] = torch.trace(W[J].T @ A[Jg][:, Jg] @ W[J]) / d_out
+        self.head_ablate.copy_(ablate.float())
+
+        shut = torch.nonzero(~open_).flatten()
+        if len(shut):                                                 # fit gained with h
+            Jall = blk[shut].reshape(-1)
+            C = A[Jall][:, S] @ M
+            R = Bm[Jall] - C @ Bm[S]
+            Sc = A[Jall][:, Jall] - C @ A[S][:, Jall]
+            for i, h in enumerate(shut.tolist()):
+                J = slice(i * dk, (i + 1) * dk)
+                value[h] = torch.trace(R[J].T @ torch.linalg.solve(Sc[J, J], R[J])) / d_out
+        self.head_value.copy_(value.float())
+
+    @torch.no_grad()
+    def local_step(self, price):
+        """Each head must earn its keep. Close the cheapest open head if it is worth less
+        than one head's price; otherwise reopen the most valuable starved head if it is
+        worth more than twice that. The factor of two is hysteresis, so a head at the
+        margin does not flicker. One change per probe lets the circuit re-form between."""
+        v, open_ = self.head_value, self.open_mask
+        if int(open_.sum()) > 1:
+            # the controls change only WHICH value decides the closure (reopening below is
+            # always the re-fit gain): ablate swaps in the standard score, random keeps the
+            # rule's timing but picks the head blind
+            score = self.head_ablate if self.local_value == "ablate" else v
+            cheapest = torch.where(open_, score, torch.full_like(score, float("inf")))
+            h = int(cheapest.argmin())
+            if float(cheapest[h]) < price:
+                if self.local_value == "random":
+                    idx = torch.nonzero(open_).flatten().cpu()
+                    h = int(idx[torch.randint(len(idx), (1,), generator=self._pick)])
+                open_[h] = False
+                return
+        best = torch.where(~open_, v, torch.full_like(v, -float("inf")))
+        h = int(best.argmax())
+        if float(best[h]) > 2 * price:
+            open_[h] = True
+
+    @torch.no_grad()
+    def relax_tone(self):
+        """GRADED ISCHEMIA. Vessels constrict over time rather than shutting. Each step a
+        head's tone moves 1/taper toward open (1) or shut (0); taper = 0 is instantaneous.
+        Supply stays conserved throughout, so the survivors gain exactly what the closing
+        head loses, and the network can adapt while it happens instead of after."""
+        target = self.open_mask.to(self.tone.dtype)
+        if self.taper <= 0:
+            self.tone.copy_(target)
+        else:
+            self.tone.add_((target - self.tone).clamp(-1.0 / self.taper, 1.0 / self.taper))
+
+    @torch.no_grad()
+    def prune_step(self, loss, bar, kstar, stop=True, patience=4):
+        """BASELINE. Iterative head pruning as in Michel et al. (2019): remove the open head
+        with the smallest |dL/dmask|, one per call. With stop, prune only while the loss
+        meets the bar, and if a removal leaves it above the bar for `patience` calls, put
+        that head back and stop for good. Without stop, prune to the true k* (an oracle)."""
+        if self._prune_done:
+            return
+        open_ = self.open_mask
+        if stop and loss > bar:
+            if self._removed is not None:
+                self._since_removal += 1
+                if self._since_removal >= patience:
+                    open_[self._removed] = True
+                    self._prune_done = True
+            return
+        if not stop and int(open_.sum()) <= kstar:
+            self._prune_done = True
+            return
+        if int(open_.sum()) <= 1:
+            return
+        imp = torch.where(open_, self.michel, torch.full_like(self.michel, float("inf")))
+        h = int(imp.argmin())
+        open_[h] = False
+        self._removed, self._since_removal = h, 0
 
     def gate_threshold(self, d, kappa, total=None):
         """theta = mean + kappa*std. Perfused set, and therefore B, emerges."""
@@ -447,6 +618,12 @@ class HemoAttn(CrossAttn):
             return self.gate_otsu(d)
         if self.supply_kind == "autoreg":
             return self.gate_threshold(d, float(self.kappa_state))
+        if self.supply_kind == "local":
+            if not self.conserve:
+                return self.tone.clone()            # CONTROL: no fixed total
+            return self.H * self.tone / self.tone.sum()
+        if self.supply_kind == "prune":
+            return self.open_mask.to(d.dtype)       # a 0/1 mask: pruning does NOT conserve
         if self.supply_kind == "territory":
             # each arteriole carries an equal, fixed share. Competition is LOCAL.
             g = torch.zeros_like(d)
