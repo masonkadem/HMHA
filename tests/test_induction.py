@@ -9,15 +9,17 @@ from hemo.induction import ICfg, InductionNet, make_batch, predict_mask, train
 
 def test_sequences_repeat_after_a_random_gap():
     cfg = ICfg()
-    tok, second = make_batch(64, cfg, torch.Generator().manual_seed(0))
+    tok, starts = make_batch(64, cfg, torch.Generator().manual_seed(0))
     for b in range(64):
-        A = tok[b, :cfg.L]
+        f, s = int(starts[b, 0]), int(starts[b, 1])
+        A = tok[b, f:f + cfg.L]
         assert len(set(A.tolist())) == cfg.L                               # A has no repeats
-        assert torch.equal(tok[b, second[b]:second[b] + cfg.L], A)          # second copy
-        gap = tok[b, cfg.L:second[b]].tolist()
-        assert not set(gap) & set(A.tolist())                              # gap avoids A
-    assert len(set(second.tolist())) > 5                                   # the gap varies
-    m = predict_mask(second, cfg)
+        assert torch.equal(tok[b, s:s + cfg.L], A)                          # second copy
+        rest = tok[b, :f].tolist() + tok[b, f + cfg.L:s].tolist() + tok[b, s + cfg.L:].tolist()
+        assert not set(rest) & set(A.tolist())                             # filler avoids A
+    assert len(set(starts[:, 0].tolist())) > 3                             # first copy moves
+    assert len(set((starts[:, 1] - starts[:, 0]).tolist())) > 5            # the gap varies
+    m = predict_mask(starts, cfg)
     assert int(m[0].sum()) == cfg.L - 1
 
 

@@ -1,17 +1,19 @@
 """Two-layer induction: a benchmark whose circuit is known and needs heads in different
 layers to cooperate (Elhage et al. 2021; Olsson et al. 2022).
 
-Task. A sequence is a segment A of L distinct random tokens, a gap of G random tokens
-(G uniform in 0..gap_max, a new G for every sequence, gap tokens never from A), then A
-again, then random padding. Inside the second copy the next token is predictable only by
+Task. A sequence is a random prefix of P tokens, a segment A of L distinct random tokens,
+a gap of G random tokens, then A again, then random padding (P and G drawn per sequence,
+filler never from A), so neither copy sits at a fixed position. Inside the second copy the next token is predictable only by
 induction: find the earlier copy of the current token and copy the token that followed it.
 Because G changes per sequence, looking back a fixed number of positions does not work
 (without the gap one layer solves it by position alone; checked). Minimal circuit, two heads:
 
   layer 1  previous-token head   position t attends to t - 1 (tags each token with its
                                  predecessor)
-  layer 2  induction head        position t attends to t - (L + G) + 1, the token after the
-                                 earlier copy of the current token
+  layer 2  induction head        position t attends to the token after the earlier copy of
+                                 the current token
+A first layer can also serve induction as a duplicate-token head (attend to the earlier
+copy of the current token and pass on its position); role_scores measures both.
 
 Model. Attention only, as in Elhage et al.: token + learned position embedding, two causal
 self-attention layers added into the residual stream, a linear unembedding. Every head has
@@ -40,6 +42,7 @@ class ICfg:
     vocab: int = 64
     L: int = 8                      # length of the repeated segment
     gap_max: int = 16               # random gap between the copies, 0..gap_max
+    pre_max: int = 8                # random prefix before the first copy, 0..pre_max
     d_model: int = 64
     d_head: int = 16
     heads: int = 8                  # per layer
@@ -64,31 +67,31 @@ class ICfg:
 
 # ------------------------------------------------------------------ task
 def seq_len(cfg):
-    return 2 * cfg.L + cfg.gap_max
+    return cfg.pre_max + 2 * cfg.L + cfg.gap_max
 
 
 def make_batch(n, cfg, gen=None, device="cpu"):
-    """Returns tokens (n, T) and the start of the second copy for each sequence (n,).
-    Layout: A (L distinct tokens) | G gap tokens | A | padding, with G per sequence."""
+    """Returns tokens (n, T) and starts (n, 2): where the first and second copy begin.
+    Layout: P prefix tokens | A (L distinct tokens) | G gap tokens | A | padding, with P and
+    G drawn per sequence, so neither copy sits at a fixed position. Filler never uses A."""
     kw = {"generator": gen} if gen is not None else {}
     T, L = seq_len(cfg), cfg.L
     order = torch.argsort(torch.rand(n, cfg.vocab, **kw), dim=1)
     A, rest = order[:, :L], order[:, L:]                    # rest never contains a token of A
-    fill = torch.gather(rest, 1, torch.randint(0, cfg.vocab - L, (n, T), **kw))
+    tok = torch.gather(rest, 1, torch.randint(0, cfg.vocab - L, (n, T), **kw))
+    P = torch.randint(0, cfg.pre_max + 1, (n,), **kw)
     G = torch.randint(0, cfg.gap_max + 1, (n,), **kw)
-    tok = fill.clone()
-    tok[:, :L] = A
-    second = L + G
-    cols = second[:, None] + torch.arange(L)[None]
-    tok.scatter_(1, cols, A)
-    return tok.to(device), second.to(device)
+    first, second = P, P + L + G
+    for s in (first, second):
+        tok.scatter_(1, s[:, None] + torch.arange(L)[None], A)
+    return tok.to(device), torch.stack([first, second], 1).to(device)
 
 
-def predict_mask(second, cfg):
+def predict_mask(starts, cfg):
     """(n, T) True where the next token is fixed by induction: the first L - 1 positions of
     the second copy (their next token is also inside the copy)."""
-    T = seq_len(cfg)
-    t = torch.arange(T, device=second.device)[None]
+    second = starts[:, 1]
+    t = torch.arange(seq_len(cfg), device=starts.device)[None]
     return (t >= second[:, None]) & (t < second[:, None] + cfg.L - 1)
 
 
@@ -157,24 +160,28 @@ def lm_loss(logits, tokens, second, cfg):
 # ------------------------------------------------------------------ roles
 @torch.no_grad()
 def role_scores(model, cfg, device, n=256):
-    """Per layer, per head.
-    prev: mean attention from t to t - 1 over the FIRST copy (t = 1..L-1), where each token
-          must be tagged with its predecessor for the induction head to find it later.
-    ind:  mean attention from t to the token after the earlier copy of the current token,
-          over the induction positions in the second copy.
-    Also returns the uniform-attention level of each score (causal attention spread evenly),
-    so a role counts only well above chance."""
-    tok, second = make_batch(n, cfg, torch.Generator().manual_seed(4242), device)
+    """Per layer, per head, three attention scores, each with its chance level (causal
+    attention spread evenly), so a role counts only well above chance.
+    prev: from t to t - 1 over the FIRST copy (after its first token), where each token must
+          be tagged with its predecessor for the induction head to find it later.
+    dup:  from t in the second copy to the earlier copy of the SAME token (the other way a
+          first layer can serve induction: find the earlier copy, pass on its position).
+    ind:  from t in the second copy to the token AFTER the earlier copy of the current token.
+    Returns (scores, chance) with scores[name] a list over layers of per-head arrays."""
+    tok, starts = make_batch(n, cfg, torch.Generator().manual_seed(4242), device)
     _, attns = model.residual(tok, keep_attn=True)
-    tf = torch.arange(1, cfg.L, device=device)
-    b, t = torch.nonzero(predict_mask(second, cfg), as_tuple=True)
-    src = t - second[b] + 1                                  # position after the earlier copy
-    prev, ind = [], []
+    k = torch.arange(1, cfg.L, device=device)
+    bf, tf = torch.arange(n, device=device).repeat_interleave(cfg.L - 1), (starts[:, :1] + k).reshape(-1)
+    b, t = torch.nonzero(predict_mask(starts, cfg), as_tuple=True)
+    earlier = t - (starts[b, 1] - starts[b, 0])              # earlier copy of the same token
+    scores = dict(prev=[], dup=[], ind=[])
     for a in attns:                                          # a: (n, H, T, T)
-        prev.append(a[:, :, tf, tf - 1].mean(dim=(0, 2)).cpu().numpy())
-        ind.append(a[b, :, t, src].mean(0).cpu().numpy())
-    chance = dict(prev=float((1.0 / (tf + 1).float()).mean()), ind=float((1.0 / (t + 1).float()).mean()))
-    return prev, ind, chance
+        scores["prev"].append(a[bf, :, tf, tf - 1].mean(0).cpu().numpy())
+        scores["dup"].append(a[b, :, t, earlier].mean(0).cpu().numpy())
+        scores["ind"].append(a[b, :, t, earlier + 1].mean(0).cpu().numpy())
+    chance = dict(prev=float((1.0 / (tf + 1).float()).mean()),
+                  dup=float((1.0 / (t + 1).float()).mean()), ind=float((1.0 / (t + 1).float()).mean()))
+    return scores, chance
 
 
 # ------------------------------------------------------------------ collateral values
@@ -307,12 +314,12 @@ def train(cfg, verbose=False):
 
     hist["ledger"] = np.array(hist["ledger"])
     final_loss, final_acc = evaluate(model, val, cfg, None if cfg.rule == "dense" else tone)
-    prev, ind, chance = role_scores(model, cfg, dev)
+    roles, chance = role_scores(model, cfg, dev)
     kept = (hist["ledger"][-1] > 0) if cfg.rule != "dense" else np.ones(H, dtype=bool)
     heads_on = (hist["ledger"] > 0).sum(1)
     probe_cost = hist["n_probes"] * (H + 1) * cfg.probe_batch / (3 * cfg.batch)   # forward-only
     out = dict(cfg=asdict(cfg), hist=hist, final_loss=final_loss, final_acc=final_acc,
                trivial=trivial_loss(cfg), bar=bar, kept=kept, sizes=model.sizes,
-               prev_score=prev, ind_score=ind, chance=chance,
+               roles=roles, chance=chance,
                compute=float(heads_on.mean() / H + probe_cost / cfg.steps))
     return model, out
