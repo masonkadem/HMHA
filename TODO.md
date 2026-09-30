@@ -1,7 +1,8 @@
 # Thesis plan and to do
 
-Proposal notebook: `notebooks/thesis_proposal.ipynb` (being built). Plain chapter:
-`paper/thesis_chapter.tex`. Detailed walkthrough: `notebooks/walkthrough.ipynb`.
+Proposal notebook: `notebooks/thesis_proposal.ipynb` (rebuild with
+`experiments/build_proposal_notebook.py`). Plain chapter: `paper/thesis_chapter.tex`.
+Detailed walkthrough: `notebooks/walkthrough.ipynb`.
 
 ## The proposal in one paragraph
 
@@ -46,15 +47,23 @@ effect. The biology is a source of design, never evidence: say "inspired by".
 
 ## Aim 2: does each piece of biology earn its place? (local rule controls)
 
-Running now into `results/proposal/` (jobs in `results/proposal/jobs.txt`), k* = 2, 4, 8,
-seeds 0 to 2, best local rule (`price_frac=0.03, taper=100, budget_hold_frac=0.1`).
+Done, in `results/proposal/` (jobs in `results/proposal/jobs.txt`), k* = 2, 4, 8, seeds 0
+to 2, best local rule (`price_frac=0.03, taper=100, budget_hold_frac=0.1`). Notebook
+Sections 5 and 6.
 
-- [~] E3a Autoregulation: `conserve=0` (no fixed total). Same results = the total is framing.
-- [~] E3b Collateral value vs chance: `local_value=random` (same timing, blind choice).
-- [~] E3c Collateral value vs standard score: `local_value=ablate` (loss rise, no refit).
-- [~] E3d Third seed of the rule itself.
-- [~] E4 Planted copies (`plant_copies=1`, k* = 4): refit should close one of each twin
-      pair, ablate should not.
+- [x] E3a Autoregulation, `conserve=0` (no fixed total): count EXACT at 2, 4, 8 in 9/9 runs,
+      same stability, compute 0.37 vs 0.39. **The fixed total does not earn its place**; it
+      causes the over-keeping at small k*. Make `conserve=0` the default rule going forward.
+- [x] E3b `local_value=random`: count right (timing kept) but worst loss after solved 6.5x
+      the bar (median). Collateral choice earns its place for stability.
+- [x] E3c `local_value=ablate` (standard score): keeps 7.3 / 7.0 / 11.7 heads at k* = 2 / 4 / 8.
+      Collateral value earns its place for the count.
+- [x] E3d No fade (existing runs): worst 12.3x the bar. Slow fading earns its place.
+- [x] E4 Planted copies, k* = 4: collateral keeps 4 heads and 0 twin pairs (3/3 seeds);
+      standard score keeps 12 to 15 heads with 5 to 7 twin pairs.
+- [ ] Rerun the headline comparisons with `conserve=0` as the rule; update the chapter,
+      `thesis_figures.py` and the walkthrough accordingly (the autoregulation framing becomes
+      "tested and not needed").
 - [ ] 10 seeds for whichever arms separate; price over 5 values so price is shown not to
       encode k*.
 - [ ] The extra head at small k*: close once the others reconstruct most of a head's output
