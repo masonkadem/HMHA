@@ -31,11 +31,10 @@ needed for sections 1 to 8; the real-result cells read the saved runs in `result
 
 | section | what you build |
 |---|---|
-| 1 | the task: a memory, a query, and four answers |
+| 1 | the task: a memory, a query, and its answers (the real generator) |
 | 2 | one attention head |
 | 3 | why the task needs exactly $R$ heads (one head, one equation) |
-| 4 | a layer of many heads, trained from scratch |
-| 4b | the real model in the repo, every line explained |
+| 4 | the model: the real code, line by line, then trained |
 | 5 | the supply valve on each head |
 | 6 | the collateral value: what nobody else can cover |
 | 6b | everything as matrices, by hand: every shape and every number |
@@ -60,7 +59,31 @@ RED, GREY = "#b2182b", "#888888"                   # colours used in the plots
 plt.rcParams.update({"figure.dpi": 110, "axes.spines.top": False, "axes.spines.right": False,
                      "font.size": 9})              # plot style
 torch.set_num_threads(4)                           # use 4 CPU cores
-sys.path.insert(0, "../src")                       # so we can import the repo's own code later
+sys.path.insert(0, "../src")                       # so we can import the repo's own code
+import inspect                                     # lets us print a function's source code
+from dataclasses import replace                    # copy a settings object with a few changes
+from hemo.config import Cfg                        # all settings in one place (src/hemo/config.py)
+from hemo.tasks import make_batch, make_val, offsets_for, trivial_loss   # the task (src/hemo/tasks.py)
+from hemo.model import CrossAttn, HemoAttn         # the model (src/hemo/model.py)
+from hemo.train import train                       # the training loop (src/hemo/train.py)
+
+# The experiments use 16 slots, 4 offsets, 32 heads. To run in seconds on a laptop, this
+# notebook uses the SAME code with smaller settings: 8 slots, 2 offsets (so 2 heads needed),
+# 8 heads, smaller vectors. Only the numbers change, never the code.
+SMALL = replace(Cfg(), seq_len=8, n_rel=2, m_content=4, d_model=16, num_heads=8, d_k=8,
+                steps=2000, batch_size=128, val_size=512, val_every=100, device="cpu", seed=0)
+
+
+def annotated(lines, notes):                       # print code lines, adding a note where a key matches
+    for line in lines:
+        note = next((n for key, n in notes.items() if key in line), None)
+        print(f"{line}    # <- {note}" if note else line)
+
+
+def show(func, notes):                             # print one function from the repo, with notes
+    annotated(inspect.getsource(func).splitlines(), notes)
+
+
 print("ready")
 """)
 
@@ -77,36 +100,57 @@ $$\text{answer} = (c_{p+\delta_1},\ \dots,\ c_{p+\delta_R}), \qquad \text{positi
 **By hand.** $N = 8$ slots, $R = 2$ offsets $\delta = (1, 5)$, query $p = 6$:
 $(6 + 1) \bmod 8 = 7$ and $(6 + 5) \bmod 8 = 3$. The answer is $(c_7, c_3)$.
 
-**Your turn.** Write `make_batch(B)` that returns `query, memory, answer`:
-1. Draw `B` positions `p` uniformly from `0..N-1`.
-2. Draw contents `content` of shape `(B, N, m)` from a standard normal.
-3. The query is the one-hot vector of `p`: shape `(B, N)`.
-4. The memory row for slot `j` is `[one-hot of j, content of j]`: shape `(B, N, N + m)`.
-5. The answer stacks `content[(p + delta_r) mod N]` for each offset: shape `(B, R * m)`.
+**Why "mod" (wrap around)?** Without it, a query near the end would point past the last
+slot: $p = 6$ plus 5 is 11, and there is no slot 11. Wrapping round the circle means **every**
+query position has all $R$ answers inside the memory, and the rule "look 5 ahead" is the same
+for every position, so one head can learn it once and use it everywhere. Without wrapping you
+would have to throw away the queries near the end, or make the memory longer.
+
+**The real code.** This is the actual task generator from `src/hemo/tasks.py` (the part for
+this task), with a note on each line. Two things the by-hand version leaves out: every example
+has $N$ query tokens at once (one card per position, each with its own random $p$), and a
+little noise is added to every vector. Note the loop: it runs over the $R$ **offsets** (2 here,
+4 in the experiments), not over the 16 slots. All slots and all queries are handled at once as
+arrays.
 """)
 
 code(r"""
-N, R, m = 8, 2, 4                                   # N slots, R offsets (= heads needed), m numbers per item
-OFFSETS = [1 + r * N // R for r in range(R)]          # the offsets, evenly spread: (1, 5)
+show(offsets_for, {"return [(1 + r": "offsets spread evenly: 1, 1 + N/R, 1 + 2N/R, ... -> (1, 5) here"})
+print()
+src = inspect.getsource(make_batch).splitlines()   # the whole generator ...
+a = next(i for i, l in enumerate(src) if 'cfg.task == "multi_relation"' in l)
+b = next(i for i, l in enumerate(src) if 'aux = {"p": p' in l)
+annotated(src[a:b + 1], {                           # ... printed from the multi_relation part
+    'elif cfg.task == "multi_relation"': "this task",
+    "m = cfg.m_content": "m = numbers per stored item",
+    "assert d >= N + m": "each vector must have room for a slot label (N) and an item (m)",
+    "X = torch.randn(B, N, d": "query tokens: start as small noise, (B, N tokens, d)",
+    "Y = torch.randn(B, N, d": "memory slots: start as small noise, (B, N slots, d)",
+    "Y[:, :, :N] = torch.eye(N": "slot label: slot j gets the one-hot code of j",
+    "content = torch.randn(B, N, m": "the random item stored in every slot",
+    "Y[:, :, N:N + m] = content": "put the item next to the label",
+    "p = torch.randint(0, N, (B, N)": "each of the N query tokens gets its own random position p",
+    "X[:, :, :N] = F.one_hot(p, N)": "query token = the one-hot code of its p",
+    "blocks = []": "the answer, built one offset at a time",
+    "for off in offsets_for(cfg)": "loop over the R offsets (not over slots)",
+    "j = (p + off) % N": "which slot: p + offset, wrapped round (mod N)",
+    "blocks.append(torch.gather(": "take the item in that slot, for every query at once",
+    "T = torch.cat(blocks": "the correct answer: the R items side by side",
+    'aux = {"p": p': "extra information kept for checking roles later",
+})
+""")
 
-
-def make_batch(B, gen=None):                         # B = how many examples to make
-    p = torch.randint(0, N, (B,), generator=gen)     # each query's position, 0..N-1
-    content = torch.randn(B, N, m, generator=gen)    # the random item stored in every slot
-    query = F.one_hot(p, N).float()                  # the query is the one-hot code of p: (B, N)
-    memory = torch.cat([torch.eye(N).expand(B, N, N), content], 2)  # slot j = [one-hot j, item j]: (B, N, N+m)
-    idx = (p[:, None] + torch.tensor(OFFSETS)[None]) % N            # which slots to fetch: p + offset, wrapped
-    answer = torch.gather(content, 1, idx[..., None].expand(B, R, m)).reshape(B, R * m)  # those items, stacked
-    return query, memory, answer, p, content         # p and content are returned only for checking
-
-
-q, mem, ans, p, content = make_batch(1, torch.Generator().manual_seed(0))  # one example, fixed seed
-p0 = int(p[0])                                       # its query position
-print("offsets", OFFSETS, "  query position p =", p0)
-for r, d in enumerate(OFFSETS):                      # for each offset ...
-    slot = (p0 + d) % N                              # ... the slot it points to
-    print(f"  ({p0} + {d}) mod {N} = {slot}:  answer block {r} equals content of slot {slot}:",
-          torch.equal(ans[0, r * m:(r + 1) * m], content[0, slot]))  # check the answer holds that item
+code(r"""
+X, Y, T, aux = make_batch(1, SMALL, "cpu", gen=torch.Generator().manual_seed(0))   # one example, fixed seed
+N, R, m = SMALL.seq_len, SMALL.n_rel, SMALL.m_content   # 8 slots, 2 offsets, 4 numbers per item
+content = Y[0, :, N:N + m]                         # the items stored in the 8 slots
+print("shapes: X", tuple(X.shape), " Y", tuple(Y.shape), " T", tuple(T.shape))
+p0 = int(aux["p"][0, 0])                           # the position carried by query token 0
+print("offsets", offsets_for(SMALL), "  query token 0 carries p =", p0)
+for r, d in enumerate(offsets_for(SMALL)):         # for each offset ...
+    slot = (p0 + d) % N                            # ... the slot it points to
+    print(f"  ({p0} + {d}) mod {N} = {slot}:  answer block {r} equals the item in slot {slot}:",
+          torch.equal(T[0, 0, r * m:(r + 1) * m], content[slot]))   # check the answer holds that item
 """)
 
 # ------------------------------------------------------------------ 2
@@ -202,99 +246,23 @@ for row in E1["rows"]:                             # one line per combination of
 
 # ------------------------------------------------------------------ 4
 md(r"""
-## 4. A layer of many heads, trained from scratch
+## 4. The model: the real code, line by line
 
 **Idea.** Put $H$ heads side by side. Each head has its own query, key and value weights and
 its own output weights; the layer's answer is the sum of what the heads write.
 
-**Your turn.** Write a `Heads(H)` module with four weight tensors:
-`Wq (H, N, d)`, `Wk (H, N+m, d)`, `Wv (H, N+m, d)`, `Wo (H, d, R*m)`. In `outputs`, compute for
-every head $q$, $k_j$, $v_j$, the softmax weights over slots and the blend (shape
-`(B, H, d)`). In `forward`, multiply each head's blend by its output weights and by a gain
-`gate[h]`, and add over heads. Then train it with Adam on mean squared error for 1 and for
-2 heads.
+The experiments use `CrossAttn` from `src/hemo/model.py`. It stores all heads in one big
+weight matrix and then cuts it into heads, the usual way in PyTorch. Below, every line is
+printed straight from the source file, with a plain note after it (`# <-`), so what you read
+is exactly what runs.
 """)
 
 code(r"""
-class Heads(torch.nn.Module):                      # a layer of H attention heads, written from scratch
-    def __init__(self, H, d=8):                    # H heads, each of size d
-        super().__init__()                         # standard PyTorch set-up
-        self.H, self.d = H, d                      # remember the sizes
-        self.Wq = torch.nn.Parameter(torch.randn(H, N, d) * 0.5)      # query weights, one (N x d) per head
-        self.Wk = torch.nn.Parameter(torch.randn(H, N + m, d) * 0.5)  # key weights, one ((N+m) x d) per head
-        self.Wv = torch.nn.Parameter(torch.randn(H, N + m, d) * 0.5)  # value weights, same shape as keys
-        self.Wo = torch.nn.Parameter(torch.randn(H, d, R * m) * 0.3)  # output weights: head blend -> answer
-
-    def outputs(self, query, memory):              # every head's blend, before the valves
-        q = torch.einsum("bn,hnd->bhd", query, self.Wq)       # each head's query vector: (B, H, d)
-        k = torch.einsum("bjn,hnd->bhjd", memory, self.Wk)    # each head's key for every slot: (B, H, N, d)
-        v = torch.einsum("bjn,hnd->bhjd", memory, self.Wv)    # each head's value for every slot: (B, H, N, d)
-        a = torch.softmax(torch.einsum("bhd,bhjd->bhj", q, k) / self.d ** 0.5, -1)  # scores -> weights over slots
-        return torch.einsum("bhj,bhjd->bhd", a, v)            # weighted average of the values: one blend per head
-
-    def forward(self, query, memory, gate):        # gate = one valve (gain) per head
-        return torch.einsum("bhd,hdo,h->bo", self.outputs(query, memory), self.Wo, gate)  # sum over heads of gain x output weights x blend
-
-
-def train_dense(H, steps=2000, seed=0):            # train an H-head layer with every head on
-    torch.manual_seed(seed)                        # same starting weights every time
-    model = Heads(H)                               # build the layer
-    opt = torch.optim.Adam(model.parameters(), lr=1e-2)   # the optimiser that updates the weights
-    for step in range(steps):                      # each training step:
-        q, mem, ans, *_ = make_batch(128)          #   a fresh batch of 128 examples
-        loss = F.mse_loss(model(q, mem, torch.ones(H)), ans)  #   how wrong the answers are (all valves = 1)
-        opt.zero_grad(); loss.backward(); opt.step()          #   clear old gradients, compute new ones, update
-    q, mem, ans, *_ = make_batch(2000, torch.Generator().manual_seed(99))  # a fixed test batch
-    with torch.no_grad():                          # no gradients needed to evaluate
-        return model, F.mse_loss(model(q, mem, torch.ones(H)), ans).item()  # final test loss
-
-
-trivial = 1.0                                      # a model that learned nothing gets loss 1 (unit-variance items)
-for H in (1, 2):                                   # one head, then two heads
-    _, loss = train_dense(H)                       # train it and get the test loss
-    print(f"{H} head(s): loss {loss:.4f}   (formula 1 - k/R: {max(0, 1 - H / R):.2f})")
-""")
-
-md(r"""
-One head cannot solve a two-offset task; two heads can. The one-head loss (about 0.37) is
-below the formula's 0.5, and the reason is worth knowing: the formula assumes a head's
-attention depends only on positions, but here the keys also contain the stored contents, so
-the attention weights can depend on them and leak a little extra information. In the full
-task (more slots, larger contents, noisy inputs) this effect is negligible: the measured
-one-head loss there is 0.755 against a predicted 0.756 (section 3).
-""")
-
-# ------------------------------------------------------------------ 4b
-md(r"""
-## 4b. The real model, line by line
-
-Section 4 built a layer from scratch. The experiments use the repo's version in
-`src/hemo/model.py`. It is the same idea, written the usual PyTorch way: all heads share one
-big weight matrix that is then cut into heads. Below, every line of the real class is printed
-straight from the source file, with a plain comment after it (`# <-`). The comments are
-added as the code is printed, so if the file changes you still see the current code.
-""")
-
-code(r"""
-import inspect                                     # lets us print a function's source code
-from hemo.model import CrossAttn, HemoAttn         # the repo's attention layer and its supplied version
-
-
-def annotated(lines, notes):                       # print code lines, adding a note where a key matches
-    for line in lines:
-        note = next((n for key, n in notes.items() if key in line), None)
-        print(f"{line}    # <- {note}" if note else line)
-
-
-def show(func, notes):                             # print one function with notes
-    annotated(inspect.getsource(func).splitlines(), notes)
-
-
 show(CrossAttn.__init__, {
     "super().__init__()": "standard PyTorch set-up",
     "self.cfg = cfg": "keep the settings",
-    "self.H = num_heads": "number of heads H (32 in the experiments)",
-    "self.d_k, self.d_model": "d_k = size of one head, d_model = size of each input vector (128)",
+    "self.H = num_heads": "number of heads H (8 here, 32 in the experiments)",
+    "self.d_k, self.d_model": "d_k = size of one head, d_model = size of each input vector",
     "self.d_out = d_out(cfg)": "size of the answer: R items x m numbers",
     "inner = self.H * self.d_k": "all heads side by side: H x d_k numbers",
     "self.W_q = nn.Linear": "query weights for ALL heads at once: d_model -> H*d_k",
@@ -358,10 +326,25 @@ show(HemoAttn.forward, {
 """)
 
 md(r"""
-**In one sentence:** `CrossAttn` builds the heads (`W_q`, `W_k`, `W_v`, `W_o`); `heads` computes
-every head's blend; `combine` multiplies each blend by its valve and applies `W_o`; `HemoAttn`
-adds the rule that decides the valves. Section 4's `Heads` class does the same thing with
-separate weights per head instead of one big matrix.
+**Train it.** The real training function, `train` in `src/hemo/train.py`, with every head on
+(`hemo=False` means a plain layer with no supply rule). One head against two, on the small
+task that needs two:
+""")
+
+code(r"""
+val = make_val(SMALL, "cpu")                       # a fixed validation set
+triv = trivial_loss(val)                           # loss of a model that always guesses the average
+for H in (1, 2):                                   # one head, then two heads
+    _, hist = train(SMALL, val, "cpu", hemo=False, num_heads=H)   # the real training loop
+    print(f"{H} head(s): loss {hist['val_loss'][-1]:.4f}   (formula (1 - k/R) x trivial: {max(0, 1 - H / R) * triv:.3f})")
+""")
+
+md(r"""
+One head cannot solve a two-offset task; two heads can. The one-head loss lands a little below
+the formula, and the reason is worth knowing: the formula assumes a head's attention depends
+only on positions, but the memory vectors also contain the stored items, so the attention can
+lean on them and leak a little extra information. In the full-size task this effect is
+negligible: the measured one-head loss there is 0.755 against a predicted 0.756 (section 3).
 """)
 
 # ------------------------------------------------------------------ 5
@@ -375,22 +358,24 @@ ordinary layer of the remaining heads, and the starved head receives no gradient
 **By hand.** Four heads write the numbers $(3, 7, -1, 5)$. All on: $3 + 7 - 1 + 5 = 14$.
 Gains $(1, 0, 1, 0)$: $3 - 1 = 2$, which is exactly a two-head layer of heads 1 and 3.
 
-**Your turn.** With a 4-head `Heads` model, (a) check that gates `(1, 0, 1, 1)` give the same
-output whatever head 2's weights are, and (b) check that head 2 gets zero gradient.
+**Check on the real layer.** With a 4-head `CrossAttn`, (a) gates `(1, 0, 1, 1)` give the same
+output whatever head 2's weights are, and (b) head 2 gets zero gradient.
 """)
 
 code(r"""
 torch.manual_seed(0)                               # fixed starting weights
-model = Heads(4)                                   # a 4-head layer from section 4
-q, mem, ans, *_ = make_batch(64)                   # 64 examples
+layer = CrossAttn(SMALL, num_heads=4)              # the real layer, 4 heads
+X, Y, T, _ = make_batch(64, SMALL, "cpu")          # 64 examples of the real task
 gate = torch.tensor([1.0, 0.0, 1.0, 1.0])          # valves: head 2 (index 1) switched off
-before = model(q, mem, gate).detach()              # the layer's output now
+dk = SMALL.d_k                                     # rows dk..2dk of W_v belong to head 2
+before = layer(X, Y, gate=gate)[0].detach()        # the layer's output now
 with torch.no_grad():                              # change weights without tracking gradients
-    model.Wv[1] += 100.0                           # change head 2's value weights drastically
-print("output unchanged:", torch.allclose(before, model(q, mem, gate)))  # head 2 cannot affect the output
-loss = F.mse_loss(model(q, mem, gate), ans)        # a loss to differentiate
+    layer.W_v.weight[dk:2 * dk] += 100.0           # change head 2's value weights drastically
+print("output unchanged:", torch.allclose(before, layer(X, Y, gate=gate)[0]))  # head 2 cannot affect it
+loss = F.mse_loss(layer(X, Y, gate=gate)[0], T)    # a loss to differentiate
 loss.backward()                                    # compute gradients
-print("gradient reaching each head's query weights:", model.Wq.grad.abs().sum((1, 2)).numpy().round(4))  # head 2 gets 0
+per_head = layer.W_q.weight.grad.abs().view(4, dk, -1).sum((1, 2))   # gradient on each head's query rows
+print("gradient reaching each head's query weights:", per_head.numpy().round(4))   # head 2 gets 0
 """)
 
 # ------------------------------------------------------------------ 6
@@ -436,6 +421,46 @@ print("collateral values:", {h: round(v, 3) for h, v in collateral_values(outs, 
 full = np.hstack([z, z, w]); coef = np.linalg.lstsq(full, z + w, rcond=None)[0]  # fit with all three heads
 print("ordinary importance of A (B does not adjust):",
       round(float(np.mean((z + w - full[:, 1:] @ coef[1:]) ** 2)), 3))  # drop A, keep B's and C's old weights
+""")
+
+md(r"""
+**The real code does exactly this, faster.** `HemoAttn.probe_ischemia` (printed in section 6c)
+computes every head's collateral value with one matrix inverse and a shortcut formula. Here it
+is on a real 4-head layer with one head closed, next to the slow way: re-fit the read-out
+without each head, one at a time. The numbers are the same.
+""")
+
+code(r"""
+torch.manual_seed(0)                               # fixed starting weights
+small_rule = replace(SMALL, supply="local", num_heads=4, d_k=4, m_content=8, d_model=32)  # a 4-head supplied layer
+m4 = HemoAttn(small_rule)                          # the real supplied layer
+X, Y, T, _ = make_batch(256, small_rule, "cpu")    # a batch of the task
+m4.open_mask[3] = False                            # close head 3
+m4.probe_ischemia(X, Y, T)                         # the real collateral values (shortcut formula)
+
+with torch.no_grad():
+    _, _, out = m4.heads(X, Y)                     # every head's blends
+Z = out.permute(0, 2, 1, 3).reshape(-1, 16).double(); Z -= Z.mean(0)   # heads side by side, centred
+t = T.reshape(-1, T.size(-1)).double(); t -= t.mean(0)                  # answers, centred
+n = Z.size(0)
+A = Z.T @ Z / n                                    # least-squares ingredients, as in the real code
+A += 1e-4 * torch.diagonal(A).mean() * torch.eye(16, dtype=A.dtype)     # the same tiny ridge
+Bm = Z.T @ t / n
+
+
+def fit_loss(hs):                                  # error of the best read-out from heads hs (slow way)
+    idx = torch.cat([torch.arange(h * 4, h * 4 + 4) for h in hs])       # the columns of those heads
+    explained = torch.trace(Bm[idx].T @ torch.linalg.solve(A[idx][:, idx], Bm[idx]))
+    return float(((t ** 2).sum() / n - explained) / t.size(1))
+
+
+open_ = [0, 1, 2]                                  # the open heads
+for h in range(4):
+    if h in open_:                                 # open head: loss rise if removed, others re-fit
+        brute, kind = fit_loss([o for o in open_ if o != h]) - fit_loss(open_), "open, loss if removed"
+    else:                                          # closed head: loss fall if fed again
+        brute, kind = fit_loss(open_) - fit_loss(open_ + [h]), "closed, gain if fed"
+    print(f"head {h} ({kind:<21}): real code {float(m4.head_value[h]):.6f}   slow way {brute:.6f}")
 """)
 
 # ------------------------------------------------------------------ 6b
@@ -581,7 +606,7 @@ is.
 """)
 
 code(r"""
-# the same function as in section 4b: steps 1 to 5 of 6b for all heads at once
+# the same function as in section 4: steps 1 to 5 of 6b for all heads at once
 show(CrossAttn.heads, HEADS_NOTES)
 """)
 
@@ -782,63 +807,57 @@ md(r"""
 ## 7. The collateral rule, running during training
 
 **Idea.** Train with all heads on for a while. Then, every 25 steps:
-1. compute every open head's collateral value on a fresh batch;
-2. if the cheapest head is worth less than a **price**, close it;
-3. a closed head **fades** out gradually (its gain falls by 1/50 per step), so the others
-   take over its job smoothly, as vessels constrict gradually.
+1. compute every open head's collateral value on a fresh batch (`probe_ischemia`);
+2. if the cheapest head is worth less than a **price**, close it (`local_step`);
+3. a closed head **fades** out gradually (`relax_tone`, its valve falls by 1/100 per step), so
+   the others take over its job smoothly, as vessels constrict gradually.
 
-**Your turn.** Extend `train_dense` into `train_rule(H=8)`:
-1. keep a list `open_` of booleans and a tensor `tone` of gains, all ones;
-2. use `tone` as the gate in the forward pass;
-3. after step 400, every 25 steps, get each head's outputs on a fixed probe batch, call
-   `collateral_values`, and close the cheapest open head if its value is below `price = 0.03`;
-4. every step, move `tone` toward the open/closed targets by at most 1/50.
-Record the loss and the number of heads with supply at every step.
+This is the real `train` function with `supply="local"`, the settings used in the experiments
+(price 0.03 of the trivial loss, fade over 100 steps, no fixed total), on the small task: 8
+heads, and the task needs 2. Here are the lines of `train` that run the rule:
 """)
 
 code(r"""
-def train_rule(H=8, steps=2000, start=400, every=25, price=0.03, taper=50, seed=0):
-    torch.manual_seed(seed)                        # fixed starting weights
-    model = Heads(H)                               # 8 heads, more than the task needs
-    opt = torch.optim.Adam(model.parameters(), lr=1e-2)   # optimiser
-    open_, tone = [True] * H, torch.ones(H)        # every head open, every valve at 1
-    pq, pmem, pans, *_ = make_batch(512, torch.Generator().manual_seed(1))  # fixed batch for valuing heads
-    history = []                                   # (loss, heads on) at every step
-    for step in range(steps):                      # each training step:
-        q, mem, ans, *_ = make_batch(128)          #   fresh training examples
-        loss = F.mse_loss(model(q, mem, tone), ans)  #   run the layer with the current valves
-        opt.zero_grad(); loss.backward(); opt.step()  #   update the weights
-        if step >= start and (step - start) % every == 0:   #   after step 400, every 25 steps:
-            with torch.no_grad():                            #     no gradients needed to value heads
-                o = model.outputs(pq, pmem).numpy()          #     every head's blends on the probe batch
-            values = collateral_values([o[:, h] for h in range(H)], pans.numpy(),
-                                       [h for h in range(H) if open_[h]])  #     what nobody else can cover
-            cheapest = min(values, key=values.get)           #     the least valuable open head
-            if sum(open_) > 1 and values[cheapest] < price:  #     worth less than the price?
-                open_[cheapest] = False                      #     close it
-        goal = torch.tensor([1.0 if o_ else 0.0 for o_ in open_])  #   1 for open, 0 for closed
-        tone += (goal - tone).clamp(-1 / taper, 1 / taper)          #   fade toward it by at most 1/50
-        history.append((loss.item(), int((tone > 0).sum())))        #   record loss and heads still on
-    return open_, np.array(history)                # which heads survived, and the history
+src = inspect.getsource(train).splitlines()
+keep = [l for l in src if any(k in l for k in (
+    "for step in range(total)", "X, Y, T, _ = make_batch(cfg.batch_size", "pred, g = model(X, Y", "loss = F.mse_loss(pred, T)",
+    "opt.step()", "model.relax_tone()", "model.probe_ischemia(*make_batch", "model.local_step(price)",
+    "price = cfg.price_frac", "if (step - hold) % cfg.probe_every == 0"))]
+annotated(keep, {
+    "price = cfg.price_frac": "the price of one head (fraction of the trivial loss)",
+    "for step in range(total)": "each training step:",
+    "X, Y, T, _ = make_batch": "a fresh batch of the task",
+    "pred, g = model(X, Y": "run the model with the current valves",
+    "loss = F.mse_loss": "how wrong it is",
+    "opt.step()": "update the weights",
+    "model.relax_tone()": "move every valve toward open (1) or closed (0) by at most 1/taper",
+    "if (step - hold) % cfg.probe_every": "every 25 steps after the start:",
+    "model.probe_ischemia(": "value every head: what nobody else can cover",
+    "model.local_step(price)": "close the cheapest head if it is worth less than the price",
+})
+""")
 
+code(r"""
+RULE_SMALL = replace(SMALL, supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.2,
+                     conserve=0, probe_batch=256)  # the collateral rule, experiment settings, small task
+results = []
+for seed in range(3):                              # three runs with different seeds
+    model, hist = train(replace(RULE_SMALL, seed=seed), val, "cpu", hemo=True)   # the real training loop
+    kept_now = int((hist["ledger"][-1] > 0).sum()) # heads whose valve is above 0 at the end
+    results.append(hist)
+    print(f"seed {seed}: heads kept {kept_now} of 8 (task needs {R});  final loss {hist['val_loss'][-1]:.4f}")
 
-runs = [train_rule(seed=s) for s in range(3)]      # three runs with different seeds
-for s, (open_, hist) in enumerate(runs):
-    print(f"seed {s}: heads kept {sum(open_)} of 8 (task needs {R});  final loss {hist[-50:, 0].mean():.4f}")
-
-hist = runs[0][1]                                  # plot the first run
+hist = results[0]                                  # plot the first run
 fig, ax = plt.subplots(2, 1, figsize=(6, 3.6), sharex=True)   # two plots stacked, same x axis
-ax[0].semilogy(hist[:, 0], color=RED, lw=0.6); ax[0].set_ylabel("loss")       # loss on a log scale
-ax[1].plot(hist[:, 1], color=RED); ax[1].axhline(R, color=GREY, ls=":"); ax[1].set_ylabel("heads on")  # heads with supply
-ax[1].set_xlabel("training step")                  # x axis label
-ax[0].set_title("The collateral rule on the small task (seed 0)", loc="left")  # title
+ax[0].semilogy(hist["val_step"], hist["val_loss"], color=RED, lw=0.8); ax[0].set_ylabel("loss")   # loss, log scale
+ax[1].plot((hist["ledger"] > 0).sum(1), color=RED); ax[1].axhline(R, color=GREY, ls=":")         # heads with supply
+ax[1].set_ylabel("heads on"); ax[1].set_xlabel("training step")
+ax[0].set_title("The real collateral rule on the small task (seed 0)", loc="left")
 plt.tight_layout(); plt.show()                     # draw it
 """)
 
 md(r"""
-That is the whole method in about 30 lines. On this small task it usually lands on the
-right number of heads and occasionally keeps one spare. The full experiments below use the
-same idea at a larger size, with more seeds and the controls.
+The same function, with 32 heads and the full task, produced every result in section 8.
 """)
 
 # ------------------------------------------------------------------ 8
