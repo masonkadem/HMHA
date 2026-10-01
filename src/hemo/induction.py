@@ -53,6 +53,14 @@ class ICfg:
     batch: int = 128
     lr: float = 1e-3
     price_frac: float = 0.03        # price of a head, fraction of the trivial readout error
+    probe: str = "mse"              # mse: linear read-out of the one-hot next token (first batch)
+                                    # logit: re-fit to reproduce the logits, value in nats
+    squeeze_at: float = 0.0         # TEST: at this fraction of training force one more layer-1
+                                    # head shut (0 = never); see train()
+    price_mode: str = "absolute"    # absolute: close if value < price_frac * trivial error
+                                    # relative: close if value < price_frac * most valuable head
+                                    # bar: close if the error without the head (others re-fit)
+                                    #      stays <= price_frac * trivial error
     taper: int = 100                # steps over which a closing head fades out
     start_frac: float = 0.25        # supply starts moving after this fraction of training
     probe_every: int = 25
@@ -219,7 +227,42 @@ def probe_values(model, tokens, second, cfg, open_mask, ridge=1e-3):
             ablate[h] = err(Z, W0) - E0
         else:
             value[h] = E0 - err(Z, fit(Z))
-    return value, ablate, float((Y ** 2).mean())
+    return value, ablate, float((Y ** 2).mean()), E0
+
+
+@torch.no_grad()
+def probe_values_logit(model, tokens, second, cfg, open_mask, ridge=1e-4, tone=None):
+    """Collateral values in real loss units (nats). For an open head h: remove it, recompute
+    everything after it, re-fit a linear read-out (least squares) so the remaining residual
+    stream reproduces the model's current logits as closely as it can, and measure the
+    cross-entropy of those re-fitted logits against the true next tokens. Value = that loss
+    minus the current loss. Ordinary importance (ablate) = the loss with the head removed and
+    the unembedding left as it is. Starved heads get value 0 here; reopening restores the
+    most recently closed head. Returns (value, ablate, trivial loss, current loss).
+    With tone given (probe="logit_tone"), the model is measured as it actually runs, with a
+    fading head at its current partial gain, instead of as if every closed head were gone."""
+    m = predict_mask(second, cfg)
+    nxt = torch.roll(tokens, -1, dims=1)[m]
+    base = open_mask.float() if tone is None else tone.clone()
+    z0 = model.residual(tokens, base)[0][m]
+    target = model.unembed(z0).double()                          # the logits to reproduce
+    E0 = float(F.cross_entropy(target, nxt))
+
+    def refit_loss(z):
+        Z = torch.cat([z.double(), torch.ones(len(z), 1, dtype=torch.float64, device=z.device)], 1)
+        A = Z.T @ Z / len(Z)
+        A += ridge * torch.diagonal(A).mean() * torch.eye(A.size(0), dtype=A.dtype, device=A.device)
+        W = torch.linalg.solve(A, Z.T @ target / len(Z))
+        return float(F.cross_entropy(Z @ W, nxt))
+
+    value, ablate = np.zeros(model.H), np.zeros(model.H)
+    for h in torch.nonzero(open_mask).flatten().tolist():
+        g = base.clone()
+        g[h] = 0.0
+        z = model.residual(tokens, g)[0][m]
+        value[h] = refit_loss(z) - E0
+        ablate[h] = float(F.cross_entropy(model.unembed(z), nxt)) - E0
+    return value, ablate, trivial_loss(cfg), E0
 
 
 # ------------------------------------------------------------------ training
@@ -252,6 +295,7 @@ def train(cfg, verbose=False):
     start = int(cfg.start_frac * cfg.steps)
     hist = dict(val_step=[], val_loss=[], val_acc=[], ledger=[], n_probes=0)
     smooth, removed, since, done = None, None, 0, False
+    closed_order, value = [], None
     gated = cfg.rule in ("collateral", "ablate", "random")
 
     for step in range(cfg.steps):
@@ -270,23 +314,48 @@ def train(cfg, verbose=False):
 
         if gated and step >= start and (step - start) % cfg.probe_every == 0:
             ptok, psec = make_batch(cfg.probe_batch, cfg, device=dev)
-            value, abl, e_triv = probe_values(model, ptok, psec, cfg, open_mask)
+            if cfg.probe == "logit_tone":
+                value, abl, e_triv, e_now = probe_values_logit(model, ptok, psec, cfg, open_mask, tone=tone)
+            else:
+                probe = probe_values_logit if cfg.probe == "logit" else probe_values
+                value, abl, e_triv, e_now = probe(model, ptok, psec, cfg, open_mask)
             hist["n_probes"] += 1
-            price = cfg.price_frac * e_triv
             score = abl if cfg.rule == "ablate" else value
             opened = open_mask.cpu().numpy()
             cheapest = np.where(opened, score, np.inf)
             h = int(cheapest.argmin())
-            if opened.sum() > 1 and cheapest[h] < price:
+            best = np.where(~opened, value, -np.inf)
+            if cfg.price_mode == "absolute":            # a fixed price per head
+                price = cfg.price_frac * e_triv
+                close, reopen = cheapest[h] < price, best.max() > 2 * price
+            elif cfg.price_mode == "relative":          # cheap relative to the most valuable head
+                price = cfg.price_frac * float(np.max(np.where(opened, value, -np.inf)))
+                close, reopen = cheapest[h] < price, best.max() > 2 * price
+            else:                                       # "bar": the others must keep it solved
+                bar_e = cfg.price_frac * e_triv
+                close, reopen = e_now + cheapest[h] <= bar_e, e_now > 2 * bar_e
+            if cfg.probe.startswith("logit"):           # starved heads are not valued: reopen the
+                reopen = e_now > 2 * bar                # last one closed if the loss is too high
+            if opened.sum() > 1 and close:
                 if cfg.rule == "random":
                     idx = np.nonzero(opened)[0]
                     h = int(idx[torch.randint(len(idx), (1,), generator=pick)])
                 open_mask[h] = False
-            else:
-                best = np.where(~opened, value, -np.inf)
-                h = int(best.argmax())
-                if best[h] > 2 * price:
-                    open_mask[h] = True
+                closed_order.append(h)
+            elif reopen and (~opened).any():
+                back = closed_order.pop() if (cfg.probe.startswith("logit") and closed_order) else int(best.argmax())
+                open_mask[back] = True
+        if cfg.squeeze_at > 0 and step == int(cfg.squeeze_at * cfg.steps):
+            # TEST, not part of the rule: force one more layer-1 head shut (the one the last
+            # probe valued least) and let training continue, to see whether the network can
+            # re-route through the remaining head. Bar-mode reopening can still undo it.
+            h1 = model.sizes[0]
+            on1 = [i for i in range(h1) if open_mask[i]]
+            if len(on1) > 1 and value is not None:
+                h = min(on1, key=lambda i: value[i])
+                open_mask[h] = False
+                closed_order.append(h)
+                hist["squeezed"] = int(h)
         if cfg.rule == "prune" and step >= start and not done and (step - start) % cfg.probe_every == 0:
             if smooth > bar:
                 if removed is not None:

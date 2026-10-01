@@ -20,7 +20,8 @@ t0 = time.time()
 _, out = train(cfg)
 h1, h2 = out["sizes"]
 kept = out["kept"]
-tag = (f"ind_{cfg.rule}_h{h1}-{h2}_pf{cfg.price_frac:g}_tp{cfg.taper}_sf{cfg.start_frac:g}"
+mode = ("" if cfg.price_mode == "absolute" else f"_{cfg.price_mode}") + ("" if cfg.probe == "mse" else f"_{cfg.probe}") + ("" if cfg.squeeze_at == 0 else f"_sq{cfg.squeeze_at:g}")
+tag = (f"ind_{cfg.rule}{mode}_h{h1}-{h2}_pf{cfg.price_frac:g}_tp{cfg.taper}_sf{cfg.start_frac:g}"
        f"_L{cfg.L}_g{cfg.gap_max}_p{cfg.pre_max}_st{cfg.steps}_s{cfg.seed}")
 os.makedirs(a.out, exist_ok=True)
 with open(os.path.join(a.out, tag + ".pkl"), "wb") as f:

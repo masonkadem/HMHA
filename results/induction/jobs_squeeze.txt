@@ -1,0 +1,10 @@
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --squeeze_at 0.6 --seed 0
+--probe logit --price_mode bar --price_frac 0.2 --steps 6000 --squeeze_at 0.6 --seed 0
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --squeeze_at 0.6 --seed 1
+--probe logit --price_mode bar --price_frac 0.2 --steps 6000 --squeeze_at 0.6 --seed 1
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --squeeze_at 0.6 --seed 2
+--probe logit --price_mode bar --price_frac 0.2 --steps 6000 --squeeze_at 0.6 --seed 2
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --squeeze_at 0.6 --seed 3
+--probe logit --price_mode bar --price_frac 0.2 --steps 6000 --squeeze_at 0.6 --seed 3
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --squeeze_at 0.6 --seed 4
+--probe logit --price_mode bar --price_frac 0.2 --steps 6000 --squeeze_at 0.6 --seed 4
