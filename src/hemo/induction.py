@@ -55,6 +55,15 @@ class ICfg:
     price_frac: float = 0.03        # price of a head, fraction of the trivial readout error
     probe: str = "mse"              # mse: linear read-out of the one-hot next token (first batch)
                                     # logit: re-fit to reproduce the logits, value in nats
+    trial: int = 0                  # 1 = TRIAL CLOSURE: once the rule has been quiet for trial_wait
+                                    # probes, close the cheapest open head even if it looks
+                                    # essential, fading it over trial_taper steps; reopen it at
+                                    # once if the real loss leaves the solved bar, keep it shut if
+                                    # the task stays solved for trial_settle more steps
+    trial_taper: int = 300
+    trial_settle: int = 200
+    trial_wait: int = 4
+    trial_cooldown: int = 20        # probes before a head whose trial failed is tried again
     squeeze_at: float = 0.0         # TEST: at this fraction of training force one more layer-1
                                     # head shut (0 = never); see train()
     price_mode: str = "absolute"    # absolute: close if value < price_frac * trivial error
@@ -296,6 +305,9 @@ def train(cfg, verbose=False):
     hist = dict(val_step=[], val_loss=[], val_acc=[], ledger=[], n_probes=0)
     smooth, removed, since, done = None, None, 0, False
     closed_order, value = [], None
+    trial, quiet, cooldown = None, 0, {}
+    hist["trials"] = []
+    assert not cfg.trial or cfg.probe.startswith("logit"), "trial closure needs the loss-based probe"
     gated = cfg.rule in ("collateral", "ablate", "random")
 
     for step in range(cfg.steps):
@@ -320,31 +332,56 @@ def train(cfg, verbose=False):
                 probe = probe_values_logit if cfg.probe == "logit" else probe_values
                 value, abl, e_triv, e_now = probe(model, ptok, psec, cfg, open_mask)
             hist["n_probes"] += 1
-            score = abl if cfg.rule == "ablate" else value
-            opened = open_mask.cpu().numpy()
-            cheapest = np.where(opened, score, np.inf)
-            h = int(cheapest.argmin())
-            best = np.where(~opened, value, -np.inf)
-            if cfg.price_mode == "absolute":            # a fixed price per head
-                price = cfg.price_frac * e_triv
-                close, reopen = cheapest[h] < price, best.max() > 2 * price
-            elif cfg.price_mode == "relative":          # cheap relative to the most valuable head
-                price = cfg.price_frac * float(np.max(np.where(opened, value, -np.inf)))
-                close, reopen = cheapest[h] < price, best.max() > 2 * price
-            else:                                       # "bar": the others must keep it solved
-                bar_e = cfg.price_frac * e_triv
-                close, reopen = e_now + cheapest[h] <= bar_e, e_now > 2 * bar_e
-            if cfg.probe.startswith("logit"):           # starved heads are not valued: reopen the
-                reopen = e_now > 2 * bar                # last one closed if the loss is too high
-            if opened.sum() > 1 and close:
-                if cfg.rule == "random":
-                    idx = np.nonzero(opened)[0]
-                    h = int(idx[torch.randint(len(idx), (1,), generator=pick)])
-                open_mask[h] = False
-                closed_order.append(h)
-            elif reopen and (~opened).any():
-                back = closed_order.pop() if (cfg.probe.startswith("logit") and closed_order) else int(best.argmax())
-                open_mask[back] = True
+            n_probe = hist["n_probes"]
+            if trial is not None:
+                # TRIAL CLOSURE under way (collaterals need time to take over a territory):
+                # undo at once if the real loss leaves the solved bar; keep it shut if the task
+                # stays solved through the slow fade and a settling period
+                h_t, t0 = trial
+                if e_now > bar:
+                    open_mask[h_t] = True
+                    tone[h_t] = 1.0
+                    cooldown[h_t] = n_probe + cfg.trial_cooldown
+                    hist["trials"].append((h_t, t0, step, False))
+                    trial, quiet = None, 0
+                elif step - t0 >= cfg.trial_taper + cfg.trial_settle:
+                    hist["trials"].append((h_t, t0, step, True))
+                    trial, quiet = None, 0
+            else:
+                score = abl if cfg.rule == "ablate" else value
+                opened = open_mask.cpu().numpy()
+                cheapest = np.where(opened, score, np.inf)
+                h = int(cheapest.argmin())
+                best = np.where(~opened, value, -np.inf)
+                if cfg.price_mode == "absolute":            # a fixed price per head
+                    price = cfg.price_frac * e_triv
+                    close, reopen = cheapest[h] < price, best.max() > 2 * price
+                elif cfg.price_mode == "relative":          # cheap relative to the most valuable head
+                    price = cfg.price_frac * float(np.max(np.where(opened, value, -np.inf)))
+                    close, reopen = cheapest[h] < price, best.max() > 2 * price
+                else:                                       # "bar": the others must keep it solved
+                    bar_e = cfg.price_frac * e_triv
+                    close, reopen = e_now + cheapest[h] <= bar_e, e_now > 2 * bar_e
+                if cfg.probe.startswith("logit"):           # starved heads are not valued: reopen the
+                    reopen = e_now > 2 * bar                # last one closed if the loss is too high
+                quiet += 1
+                if opened.sum() > 1 and close:
+                    if cfg.rule == "random":
+                        idx = np.nonzero(opened)[0]
+                        h = int(idx[torch.randint(len(idx), (1,), generator=pick)])
+                    open_mask[h] = False
+                    closed_order.append(h)
+                    quiet = 0
+                elif reopen and (~opened).any():
+                    back = closed_order.pop() if (cfg.probe.startswith("logit") and closed_order) else int(best.argmax())
+                    open_mask[back] = True
+                    quiet = 0
+                if cfg.trial and quiet >= cfg.trial_wait and int(open_mask.sum()) > 1:
+                    cand = [i for i in range(H) if open_mask[i] and cooldown.get(i, 0) <= n_probe]
+                    if cand:
+                        h_t = min(cand, key=lambda i: value[i])
+                        open_mask[h_t] = False
+                        trial, quiet = (h_t, step), 0
         if cfg.squeeze_at > 0 and step == int(cfg.squeeze_at * cfg.steps):
             # TEST, not part of the rule: force one more layer-1 head shut (the one the last
             # probe valued least) and let training continue, to see whether the network can
@@ -368,8 +405,10 @@ def train(cfg, verbose=False):
                 removed, since = int(imp.argmin()), 0
                 open_mask[removed] = False
         if gated:
-            step_size = 1.0 / cfg.taper if cfg.taper > 0 else 1.0
-            tone.add_((open_mask.float() - tone).clamp(-step_size, step_size))
+            speed = torch.full((H,), 1.0 / cfg.taper if cfg.taper > 0 else 1.0, device=dev)
+            if trial is not None:
+                speed[trial[0]] = 1.0 / cfg.trial_taper           # a trial head fades slowly
+            tone.add_(torch.maximum(torch.minimum(open_mask.float() - tone, speed), -speed))
         if cfg.rule == "prune":
             tone = open_mask.float()
 

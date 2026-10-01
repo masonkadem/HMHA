@@ -1,0 +1,20 @@
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 0
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 0
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 1
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 1
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 2
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 2
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 3
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 3
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 4
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 4
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 5
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 5
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 6
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 6
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 7
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 7
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 8
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 8
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --trial 1 --seed 9
+--probe logit_tone --price_mode bar --price_frac 0.02 --steps 6000 --seed 9

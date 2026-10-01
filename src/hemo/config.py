@@ -125,6 +125,15 @@ class Cfg:
                                         # Reopening always uses the re-fit gain.
     plant_copies: int = 0               # 1 = start with head h and head h + H/2 identical,
                                         # so every head has an exact duplicate.
+    # --- trial closure (local only): once the rule has been quiet for trial_wait probes,
+    # close the cheapest open head even if it looks essential, fade it over trial_taper
+    # steps, reopen it at once if the smoothed loss leaves the solved bar (target_frac), keep
+    # it shut if the task stays solved for trial_settle more steps. 0 = off. ---
+    trial: int = 0
+    trial_taper: int = 300
+    trial_settle: int = 200
+    trial_wait: int = 4
+    trial_cooldown: int = 20
     # --- damage: when is a backup head worth keeping? (proposal Aim 3) ---
     head_dropout: float = 0.0           # hemo only. Each training step every head fails
                                         # independently with this probability (inverted

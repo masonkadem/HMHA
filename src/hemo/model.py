@@ -153,6 +153,7 @@ class HemoAttn(CrossAttn):
         self._pick = torch.Generator().manual_seed(cfg.seed + 11)
         self.head_dropout, self.probe_masks = cfg.head_dropout, cfg.probe_masks
         self._damage = torch.Generator().manual_seed(cfg.seed + 13)
+        self.trial_head, self.trial_taper = None, cfg.trial_taper
         if cfg.plant_copies:
             self.plant_copies()
 
@@ -613,7 +614,10 @@ class HemoAttn(CrossAttn):
         if self.taper <= 0:
             self.tone.copy_(target)
         else:
-            self.tone.add_((target - self.tone).clamp(-1.0 / self.taper, 1.0 / self.taper))
+            speed = torch.full_like(self.tone, 1.0 / self.taper)
+            if self.trial_head is not None:                # a trial closure fades slowly
+                speed[self.trial_head] = 1.0 / max(1, self.trial_taper)
+            self.tone.add_(torch.maximum(torch.minimum(target - self.tone, speed), -speed))
 
     @torch.no_grad()
     def prune_step(self, loss, bar, kstar, stop=True, patience=4):

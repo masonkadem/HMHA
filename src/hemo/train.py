@@ -75,6 +75,7 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
     prune = hemo and cfg.supply == "prune"
     price = cfg.price_frac * trivial_loss(val)
     smooth, h["n_probes"] = None, 0
+    quiet, cooldown, trial_start, h["trials"] = 0, {}, 0, []
 
     for step in range(total):
         X, Y, T, _ = make_batch(cfg.batch_size, cfg, device)
@@ -108,10 +109,32 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
         if (local or prune) and step >= hold:
             smooth = loss.item() if smooth is None else 0.92 * smooth + 0.08 * loss.item()
             if (step - hold) % cfg.probe_every == 0:
-                if local:
+                if local and model.trial_head is not None:
+                    # TRIAL CLOSURE under way: undo at once if the loss leaves the solved bar,
+                    # keep the head shut if the task stays solved through fade and settling
+                    h_t, t0 = model.trial_head, trial_start
+                    if smooth > target:
+                        model.open_mask[h_t] = True
+                        model.tone[h_t] = 1.0
+                        cooldown[h_t] = h["n_probes"] + cfg.trial_cooldown
+                        h["trials"].append((h_t, t0, step, False))
+                        model.trial_head, quiet = None, 0
+                    elif step - t0 >= cfg.trial_taper + cfg.trial_settle:
+                        h["trials"].append((h_t, t0, step, True))
+                        model.trial_head, quiet = None, 0
+                elif local:
+                    before = model.open_mask.clone()
                     model.probe_ischemia(*make_batch(cfg.probe_batch, cfg, device)[:3])
                     h["n_probes"] += 1
                     model.local_step(price)
+                    quiet = quiet + 1 if torch.equal(before, model.open_mask) else 0
+                    if cfg.trial and quiet >= cfg.trial_wait and int(model.open_mask.sum()) > 1:
+                        cand = [i for i in range(H) if model.open_mask[i]
+                                and cooldown.get(i, 0) <= h["n_probes"]]
+                        if cand:
+                            h_t = min(cand, key=lambda i: float(model.head_value[i]))
+                            model.open_mask[h_t] = False
+                            model.trial_head, trial_start, quiet = h_t, step, 0
                 else:
                     model.prune_step(smooth, target, predicted_kstar(cfg),
                                      stop=bool(cfg.prune_stop))
