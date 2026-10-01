@@ -141,19 +141,24 @@ ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.55), handletextpad=0.1, bor
 title(ax, "d", "Final loss")
 
 # ---------------------------------------------------------------- g  duplicated heads
+# every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its
+# copy, so it should be removed. Bars: heads kept, split into distinct heads and extra twins.
 ax = fig.add_subplot(gs[2, 2])
-res = {}
-for value in ("refit", "ablate"):
-    res[value] = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16))
-                           for o in (x["hist"]["ledger"][-1] > 0
-                                     for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value))])
 for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate", "white", "importance"))):
-    v = res[value]
-    ax.bar(i, v.mean(), 0.6, color=face, edgecolor=K if face == "white" else face, lw=0.6)
-    ax.plot(i + rng.uniform(-0.15, 0.15, len(v)), v, ".", color=G1, ms=2.5, zorder=3)
-ax.set(xticks=[0, 1], ylim=(0, 8), xlim=(-0.6, 1.6), ylabel="copy pairs both kept")
-ax.set_xticklabels(["collateral", "importance"])
-title(ax, "e", "Start with every head copied")
+    L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
+    n_kept = np.array([o.sum() for o in L])
+    twins = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16)) for o in L])
+    distinct = (n_kept - twins).mean()
+    ax.bar(i, distinct, 0.6, color=face, edgecolor=RED if face == RED else K, lw=0.6)
+    ax.bar(i, twins.mean(), 0.6, bottom=distinct, color="white", edgecolor=K, lw=0.6, hatch="//////")
+    ax.plot(i + rng.uniform(-0.15, 0.15, len(n_kept)), n_kept, ".", color=G1, ms=2.5, zorder=3)
+ax.axhline(4, color=G2, lw=0.6, ls=":", zorder=0)
+ax.text(-0.57, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="left")
+ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin also kept")
+ax.legend(loc="upper left", handlelength=1.2, handletextpad=0.4, borderaxespad=0)
+ax.set(xticks=[0, 1], ylim=(0, 18), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
+ax.set_xticklabels(["collateral\nrule", "ordinary\nimportance"])
+title(ax, "e", "Every head given a twin")
 
 # ---------------------------------------------------------------- h  damage
 ax = fig.add_subplot(gs[2, 3])
