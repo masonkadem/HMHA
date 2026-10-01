@@ -37,6 +37,8 @@ needed for sections 1 to 8; the real-result cells read the saved runs in `result
 | 4 | a layer of many heads, trained from scratch |
 | 5 | the supply valve on each head |
 | 6 | the collateral value: what nobody else can cover |
+| 6b | everything as matrices, by hand: every shape and every number |
+| 6c | where the valve and the collateral value live in the real code |
 | 7 | the collateral rule, running during training |
 | 8 | what the full experiments found |
 | 9 | backup heads when heads can fail |
@@ -331,6 +333,238 @@ print("collateral values:", {h: round(v, 3) for h, v in collateral_values(outs, 
 full = np.hstack([z, z, w]); coef = np.linalg.lstsq(full, z + w, rcond=None)[0]
 print("ordinary importance of A (B does not adjust):",
       round(float(np.mean((z + w - full[:, 1:] @ coef[1:]) ** 2)), 3))
+""")
+
+# ------------------------------------------------------------------ 6b
+md(r"""
+## 6b. Everything as matrices, by hand
+
+This section puts every piece together with real matrices small enough to compute with a
+pencil: **one query, 3 memory slots, 2 heads, head size $d_k = 1$, one output number.** The
+numbers are chosen so the softmax comes out in quarters and halves.
+
+### The shapes
+
+In the real model ($N$ slots, $H$ heads) and in this example ($N = 3$, $H = 2$, $d_k = 1$):
+
+| object | meaning | real shape | here |
+|---|---|---|---|
+| $x$ | the query: one-hot of its position $p$ | $1 \times N$ (plus content) | $1 \times 3$ |
+| $Y$ | the memory: one row per slot | $N \times d_\text{model}$ | $3 \times 3$ (identity: slot $j$ is $e_j$) |
+| $W_Q^{(h)}, W_K^{(h)}, W_V^{(h)}$ | head $h$'s query, key, value weights | $d_\text{model} \times d_k$ | $3 \times 1$ |
+| $q_h = x\,W_Q^{(h)}$ | head $h$'s query | $1 \times d_k$ | $1 \times 1$ |
+| $K_h = Y W_K^{(h)}$, $V_h = Y W_V^{(h)}$ | keys and values, one row per slot | $N \times d_k$ | $3 \times 1$ |
+| $s_h = K_h\, q_h^{\top}$ | score of each slot | $N \times 1$ | $3 \times 1$ |
+| $a_h = \mathrm{softmax}(s_h)$ | attention weights, sum to 1 | $N \times 1$ | $3 \times 1$ |
+| $o_h = a_h^{\top} V_h$ | the head's blend | $1 \times d_k$ | $1 \times 1$ |
+| $W_O^{(h)}$ | head $h$'s output weights | $d_k \times d_\text{out}$ | $1 \times 1$ |
+| $g_h$ | head $h$'s supply valve | number | number |
+| $y = \sum_h g_h\, o_h W_O^{(h)}$ | the layer's output | $1 \times d_\text{out}$ | $1 \times 1$ |
+
+(The real code scales the scores by $1/\sqrt{d_k}$; with $d_k = 1$ that is 1.)
+
+### The numbers
+
+Query at position 0, so $x = (1, 0, 0)$. Memory $Y = I_3$.
+
+| | $W_Q$ | $W_K$ | $W_V$ | $W_O$ |
+|---|---|---|---|---|
+| head 1 | $(\ln 2,\ 0,\ 0)^\top$ | $(0,\ 0,\ 1)^\top$ | $(4,\ 8,\ 2)^\top$ | $0.5$ |
+| head 2 | $(\ln 2,\ 0,\ 0)^\top$ | $(1,\ 0,\ 0)^\top$ | $(6,\ 2,\ 2)^\top$ | $0.25$ |
+
+**Your turn, with a pencil (head 1).**
+1. $q_1 = x W_Q^{(1)}$: the query picks row 0 of $W_Q$, so $q_1 = \ln 2$.
+2. $K_1 = Y W_K^{(1)} = (0, 0, 1)^\top$, because $Y$ is the identity.
+3. Scores $s_1 = K_1 q_1 = (0,\ 0,\ \ln 2)$.
+4. $e^{s} = (1,\ 1,\ 2)$, total 4, so $a_1 = (\tfrac14,\ \tfrac14,\ \tfrac12)$.
+5. $V_1 = (4, 8, 2)^\top$, so $o_1 = \tfrac14\cdot 4 + \tfrac14 \cdot 8 + \tfrac12 \cdot 2 = 1 + 2 + 1 = 4$.
+
+**Head 2:** scores $(\ln 2, 0, 0)$, $e^s = (2, 1, 1)$, $a_2 = (\tfrac12, \tfrac14, \tfrac14)$,
+$o_2 = 3 + 0.5 + 0.5 = 4$.
+
+**Output with the valves.** $y = g_1 \cdot 4 \cdot 0.5 + g_2 \cdot 4 \cdot 0.25 = 2g_1 + g_2$.
+Both on, $g = (1, 1)$: $y = 3$. Head 2 off, $g = (1, 0)$: $y = 2$, exactly what a one-head
+layer of head 1 gives. The valve is just a number multiplying the head's contribution.
+
+(Notice that the score of slot $j$ for a query at $p$ is $W_Q[p] \cdot W_K[j]$, one entry of
+the matrix $W_Q W_K^{\top}$. That matrix is what draws the stripes in the attention maps of
+the setup figure.)
+""")
+
+code(r"""
+x = np.array([[1.0, 0, 0]])                      # (1, 3): the query at position 0
+Y = np.eye(3)                                    # (3, 3): memory, slot j = e_j
+heads = {1: dict(WQ=[[np.log(2)], [0], [0]], WK=[[0], [0], [1]], WV=[[4], [8], [2]], WO=0.5),
+         2: dict(WQ=[[np.log(2)], [0], [0]], WK=[[1], [0], [0]], WV=[[6], [2], [2]], WO=0.25)}
+outs = {}
+for h, w in heads.items():
+    q = x @ np.array(w["WQ"])                    # (1, 1)
+    K, V = Y @ np.array(w["WK"]), Y @ np.array(w["WV"])   # (3, 1) each
+    s = (K @ q.T).ravel()                        # (3,)  scores
+    a = np.exp(s) / np.exp(s).sum()              # (3,)  attention weights
+    outs[h] = float(a @ V.ravel())               # the blend (V is 3 x 1; ravel makes it 3)
+    print(f"head {h}: scores {s.round(3)}  weights {a.round(3)}  output {outs[h]:.3f}")
+for g in ((1, 1), (1, 0)):
+    y = sum(g[i] * outs[h] * heads[h]["WO"] for i, h in enumerate(heads))
+    print(f"valves g = {g}: y = {y:.3f}")
+assert np.isclose(outs[1], 4) and np.isclose(outs[2], 4)
+""")
+
+md(r"""
+### The collateral value, by hand
+
+Now three heads observed on **three examples** (one number per head per example), and a
+target the layer must produce:
+
+| example | head 1 | head 2 | head 3 | target $t$ |
+|---|---|---|---|---|
+| 1 | 1 | 2 | 1 | 2 |
+| 2 | 2 | 4 | 0 | 2 |
+| 3 | 3 | 6 | 1 | 4 |
+
+Head 2 is exactly twice head 1 (a copy, scaled). The target is head 1 + head 3.
+
+**All three heads on.** The fit $t = w_1 h_1 + w_2 h_2 + w_3 h_3$ is perfect whenever
+$w_1 + 2w_2 = 1$ and $w_3 = 1$; least squares picks the smallest such weights,
+$(w_1, w_2, w_3) = (0.2,\ 0.4,\ 1)$. Error 0.
+
+**Collateral value of head 1** (remove it, let the others re-fit). Heads 2 and 3 can still
+make the target: $w_2 = 0.5$, $w_3 = 1$. Error stays 0, so **value = 0**. Head 2 covers for it.
+
+**Collateral value of head 3.** Only heads 1 and 2 remain, and both point along $(1, 2, 3)$.
+The best single weight on $u = (1, 2, 3)$ is
+$w = \dfrac{t \cdot u}{u \cdot u} = \dfrac{2 + 4 + 12}{1 + 4 + 9} = \dfrac{18}{14} = \dfrac97.$
+The leftover is $t - \tfrac97 u = (\tfrac57,\ -\tfrac47,\ \tfrac17)$, whose mean square is
+$\tfrac13 \cdot \tfrac{25 + 16 + 1}{49} = \tfrac{2}{7} \approx 0.286$. **Value = 0.286**:
+nobody can cover head 3.
+
+**Ordinary importance of head 1** (remove it, nobody adjusts). The fit loses $0.2 \times$
+head 1, so the error is the mean of $(0.2 \cdot (1, 2, 3))^2 = 0.04 \cdot \tfrac{14}{3}
+\approx 0.187$. Ordinary importance calls head 1 important; the collateral value correctly
+says it is covered.
+
+**Your turn.** Redo these four numbers with `np.linalg.lstsq` (no intercept column here).
+""")
+
+code(r"""
+h1, h2, h3 = np.array([1, 2, 3.]), np.array([2, 4, 6.]), np.array([1, 0, 1.])
+t = np.array([2, 2, 4.])
+cols = {1: h1, 2: h2, 3: h3}
+
+
+def fit_error(names):
+    Z = np.stack([cols[n] for n in names], 1)
+    w = np.linalg.lstsq(Z, t, rcond=None)[0]
+    return w, float(np.mean((t - Z @ w) ** 2))
+
+
+w_all, e_all = fit_error([1, 2, 3])
+print("all heads: weights", w_all.round(3), " error", round(e_all, 4))
+print("collateral value of head 1:", round(fit_error([2, 3])[1] - e_all, 4))
+print("collateral value of head 3:", round(fit_error([1, 2])[1] - e_all, 4), "  (2/7 =", round(2 / 7, 4), ")")
+no_refit = np.stack([h2, h3], 1) @ w_all[1:]
+print("ordinary importance of head 1:", round(float(np.mean((t - no_refit) ** 2)) - e_all, 4))
+""")
+
+# ------------------------------------------------------------------ 6c
+md(r"""
+## 6c. Where this lives in the real code
+
+Below are the actual functions from `src/hemo/model.py`, printed straight from the source so
+they can never go out of date. Under each one: what every part does, and which step of 6b it
+is.
+
+### (1) The heads: `CrossAttn.heads`
+""")
+
+code(r"""
+import inspect
+sys.path.insert(0, "../src")                       # the repo's own code
+from hemo.model import CrossAttn, HemoAttn
+print(inspect.getsource(CrossAttn.heads))
+""")
+
+md(r"""
+- `self.W_q(X)`, `self.W_k(Y)`, `self.W_v(Y)` compute $q$, $K$, $V$ for **all heads at once**
+  (one big matrix), and `_split` cuts the result into $H$ heads of size $d_k$. Shapes:
+  `(batch, H, N, d_k)`.
+- `Q @ K.transpose(-2, -1) / sqrt(d_k)` is the score of every query against every slot
+  (step 3 of 6b), and `softmax` turns scores into weights (step 4).
+- `attn @ V` is each head's blend (step 5). The function returns the query vectors, the
+  attention weights and the blends.
+
+### (2) The valve: `CrossAttn.combine`
+""")
+
+code(r"""
+print(inspect.getsource(CrossAttn.combine))
+""")
+
+md(r"""
+- `out * gate[:, :, None, None]` multiplies **each head's blend by its valve $g_h$**. This one
+  multiplication is where the supply attaches to the heads.
+- `.transpose(1, 2).reshape(...)` lays the $H$ blends side by side, and `self.W_o(...)` applies
+  the output weights. Together that is $y = \sum_h g_h\, o_h W_O^{(h)}$ from 6b.
+
+### (3) Where the valve values come from: the `local` branch of `HemoAttn.gate`
+""")
+
+code(r"""
+src = inspect.getsource(HemoAttn.gate).splitlines()
+start = next(i for i, l in enumerate(src) if 'supply_kind == "local"' in l)
+print("\n".join(src[start:start + 4]))
+""")
+
+md(r"""
+- `self.tone` holds one number per head between 0 and 1: 1 is fully on, 0 is off, values in
+  between mean the head is fading.
+- With `conserve = 0` (the version we use, since the fixed total did not earn its place), the
+  valve **is** the tone. With `conserve = 1` the tones are rescaled so they always add up to
+  $H$ (the original "fixed total blood supply").
+
+### (4) The collateral value: `HemoAttn.probe_ischemia`
+""")
+
+code(r"""
+print(inspect.getsource(HemoAttn.probe_ischemia))
+""")
+
+md(r"""
+This is section 6 and the second half of 6b, done for 32 heads at once and fast:
+- `_, _, out = self.heads(X, Y)` runs every head on a fresh batch and keeps the blends.
+- `Z` puts all the heads' blends side by side (one row per token); `t` is the target. Both are
+  centred, which plays the role of the intercept.
+- `A = Z.T @ Z / n` and `Bm = Z.T @ t / n` are the pieces of the least-squares fit, and
+  `W = M @ Bm[S]` is the best read-out using the open heads (the "all heads on" fit of 6b).
+- For each open head, `trace(W[J].T @ solve(M[J, J], W[J]))` is **the rise in error when
+  that head is removed and the others re-fit**. It is a shortcut formula: refitting
+  once per head would give the same number (the older walkthrough checks this numerically),
+  but this needs only one matrix inverse.
+- For each starved head (the `shut` block), the same algebra gives how much the error would
+  *fall* if the head were fed again; that is what reopening uses.
+- `ablate[h]` is the ordinary importance (removed, nobody re-fits), kept for the control.
+
+### (5) The decision and the fade: `local_step` and `relax_tone`
+""")
+
+code(r"""
+print(inspect.getsource(HemoAttn.local_step))
+print(inspect.getsource(HemoAttn.relax_tone))
+""")
+
+md(r"""
+- `local_step`: find the cheapest open head; if it is worth less than the price, close it
+  (set `open_mask[h] = False`). Otherwise, if some closed head would now be worth more than
+  twice the price, reopen it. One change per check. The `ablate` and `random` lines are the
+  two controls.
+- `relax_tone`: every training step, move each head's tone toward 1 (open) or 0 (closed) by
+  at most `1/taper`. A closing head fades out over `taper` steps (100 in the experiments), so
+  the others take over its job gradually.
+
+**How the pieces connect during training** (in `src/hemo/train.py`): every step runs the
+model with the current valves and updates the weights, then calls `relax_tone`; every
+`probe_every = 25` steps after the start, it calls `probe_ischemia` on a fresh batch and then
+`local_step` with the price. Section 7 below is exactly this loop, written from scratch.
 """)
 
 # ------------------------------------------------------------------ 7
