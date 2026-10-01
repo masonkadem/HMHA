@@ -134,6 +134,13 @@ class Cfg:
     trial_settle: int = 200
     trial_wait: int = 4
     trial_cooldown: int = 20
+    trial_undo: float = 1.0             # undo when the smoothed loss passes trial_undo x bar
+    trial_max_fail: int = 1000          # stop trying after this many failed trials
+    trial_stop: float = 1.0             # no new trials after this fraction of training
+    # --- BASELINE l0 (supply="l0"): learned hard-concrete head gates with an L0 penalty
+    # (Louizos et al. 2018; Voita et al. 2019), penalty switched on at budget_hold_frac ---
+    l0_lambda: float = 0.01
+    l0_init: float = 3.0
     # --- damage: when is a backup head worth keeping? (proposal Aim 3) ---
     head_dropout: float = 0.0           # hemo only. Each training step every head fails
                                         # independently with this probability (inverted

@@ -154,6 +154,11 @@ class HemoAttn(CrossAttn):
         self.head_dropout, self.probe_masks = cfg.head_dropout, cfg.probe_masks
         self._damage = torch.Generator().manual_seed(cfg.seed + 13)
         self.trial_head, self.trial_taper = None, cfg.trial_taper
+        # BASELINE l0: learned hard-concrete gates (Louizos et al. 2018) as used for head
+        # pruning by Voita et al. (2019). Only created for supply="l0".
+        if cfg.supply == "l0":
+            self.log_alpha = nn.Parameter(torch.full((H,), float(cfg.l0_init)))
+        self._l0 = (2.0 / 3.0, -0.1, 1.1)                      # beta, gamma, zeta
         if cfg.plant_copies:
             self.plant_copies()
 
@@ -579,6 +584,22 @@ class HemoAttn(CrossAttn):
         self.head_value.copy_((total / self.probe_masks).float())
         self.head_ablate.zero_()
 
+    def l0_gate(self, sample=True):
+        """Hard-concrete gate per head: stochastic in training, deterministic otherwise.
+        A head whose deterministic gate is exactly 0 is pruned."""
+        beta, gamma, zeta = self._l0
+        if sample:
+            u = torch.rand_like(self.log_alpha).clamp(1e-6, 1 - 1e-6)
+            s = torch.sigmoid((torch.log(u) - torch.log(1 - u) + self.log_alpha) / beta)
+        else:
+            s = torch.sigmoid(self.log_alpha)
+        return (s * (zeta - gamma) + gamma).clamp(0.0, 1.0)
+
+    def l0_penalty(self):
+        """Expected number of heads with a nonzero gate."""
+        beta, gamma, zeta = self._l0
+        return torch.sigmoid(self.log_alpha - beta * math.log(-gamma / zeta)).sum()
+
     @torch.no_grad()
     def local_step(self, price):
         """Each head must earn its keep. Close the cheapest open head if it is worth less
@@ -677,6 +698,8 @@ class HemoAttn(CrossAttn):
             return self.H * self.tone / self.tone.sum()
         if self.supply_kind == "prune":
             return self.open_mask.to(d.dtype)       # a 0/1 mask: pruning does NOT conserve
+        if self.supply_kind == "l0":
+            return self.l0_gate(sample=self.training)
         if self.supply_kind == "territory":
             # each arteriole carries an equal, fixed share. Competition is LOCAL.
             g = torch.zeros_like(d)

@@ -1,0 +1,23 @@
+A. Do backup heads protect the model? (k* = 4; knock out one kept head after training,
+   nobody re-fits; loss in units of the solved bar)
+ p fail   n       heads kept   intact  worst knockout  mean knockout
+    0.0   3        [4, 4, 4]     0.00           31.09          29.02
+    0.1   3        [6, 5, 5]     0.47           13.00           9.57
+    0.2   3        [6, 6, 6]     1.99           14.00           8.82
+    0.3   3        [7, 8, 7]     3.48           13.36           8.13
+
+B. Gentler trial closure (undo at half the bar, at most 3 failures, none in the last quarter)
+  induction, no trials                n=10  exact 1+1  0/10  solved 10/10  stays solved  9/10  kept [(2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1)]
+  induction, trials, first version    n=10  exact 1+1  8/10  solved  7/10  stays solved  0/10  kept [(1, 1), (1, 1), (1, 1), (3, 1), (1, 1), (1, 1), (1, 1), (2, 1), (1, 1), (1, 1)]
+  induction, trials, gentle version   n=10  exact 1+1  0/10  solved 10/10  stays solved  2/10  kept [(2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1), (2, 1)]
+  main task k*=2, gentle trials: n=5  exact 5/5  solved 5/5  stays solved 0/5
+  main task k*=4, gentle trials: n=5  exact 5/5  solved 5/5  stays solved 0/5
+  main task k*=8, gentle trials: n=5  exact 5/5  solved 5/5  stays solved 0/5
+
+C. Learned hard-concrete gates (Voita et al. 2019) by penalty strength; heads kept per seed
+  lambda 0.05  k*=2: [15, 11, 11]  k*=4: [13, 16, 9]  k*=8: [10, 11, 13]    exact 0/9  stays solved 1/9
+  lambda 0.1   k*=2: [10, 7, 8]  k*=4: [10, 12, 8]  k*=8: [10, 10, 10]      exact 0/9  stays solved 1/9
+  lambda 0.2   k*=2: [7, 4, 6]  k*=4: [6, 6, 7]  k*=8: [9, 9, 9]            exact 0/9  stays solved 1/9
+  lambda 0.5   k*=2: [4, 3, 6]  k*=4: [3, 5, 3]  k*=8: [6, 6, 6]            exact 0/9  stays solved 0/9
+  lambda 1.0   k*=2: [2, 2, 2]  k*=4: [3, 3, 3]  k*=8: [1, 0, 2]            exact 3/9  stays solved 0/9
+  (collateral rule for comparison: exact 47/50, stays solved 50/50)

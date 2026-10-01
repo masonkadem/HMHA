@@ -39,6 +39,7 @@ needed for sections 1 to 8; the real-result cells read the saved runs in `result
 | 6 | the collateral value: what nobody else can cover |
 | 6b | everything as matrices, by hand: every shape and every number |
 | 6c | where the valve and the collateral value live in the real code |
+| 6d | the whole task in L-shapes, spreadsheet style |
 | 7 | the collateral rule, running during training |
 | 8 | what the full experiments found |
 | 9 | backup heads when heads can fail |
@@ -464,6 +465,51 @@ print("collateral value of head 1:", round(fit_error([2, 3])[1] - e_all, 4))
 print("collateral value of head 3:", round(fit_error([1, 2])[1] - e_all, 4), "  (2/7 =", round(2 / 7, 4), ")")
 no_refit = np.stack([h2, h3], 1) @ w_all[1:]
 print("ordinary importance of head 1:", round(float(np.mean((t - no_refit) ** 2)) - e_all, 4))
+""")
+
+# ------------------------------------------------------------------ 6d
+md(r"""
+## 6d. The whole task in L-shapes (spreadsheet style)
+
+The same computation on our task, with every matrix on the page: **4 memory slots, 4 queries
+(one per position), 2 heads**. Head 1 should look 1 slot ahead, head 2 three slots ahead.
+
+**How to read an L-shape.** To multiply $A \times B$, put $B$ above and $A$ to the left; the
+result sits where they meet, and each result cell is "its row of $A$" times "its column of
+$B$". In the figure: $Q$ above, $K^\top$ to the left, the scores $S$ in the corner; then the
+softmax above, $V$ to the left, the head's output in the corner.
+
+**What to check by hand** (head 1, query at position 0):
+1. $Q = W_q X$: $W_q$ is 12 times a shift, so query $p$ becomes a 12 at row $p + 1$.
+2. $K = W_k Y$ keeps only the slot positions, so $K$ is the identity.
+3. $S = K^\top Q / \sqrt{4}$: the score of slot $j$ for query $p$ is 6 if $j = p + 1$, else 0.
+   That is the **stripe**.
+4. Softmax of a column $(0, 6, 0, 0)$: $e^6 = 403.4$, total $406.4$, so the weights are
+   $(0.002,\ 0.993,\ 0.002,\ 0.002)$.
+5. Output for query 0: $0.002 \cdot 3 + 0.993 \cdot 1 + 0.002 \cdot 4 + 0.002 \cdot 2 \approx 1.01$,
+   the content of slot 1, which is the target.
+6. Valve 2 closed: head 2's row of the combined output becomes 0, exactly.
+""")
+
+code(r"""
+from IPython.display import Image, display
+display(Image("../figures/fig_matrices.png", width=900))
+""")
+
+code(r"""
+# the same numbers, recomputed: change SCALE, the contents or the shifts and rerun
+Nn, dd, SCALE = 4, 4, 12.0
+contents = np.array([3.0, 1.0, 4.0, 2.0])
+Xq = np.eye(Nn)                                         # queries: column t = position t
+Ym = np.vstack([np.eye(Nn), contents])                  # memory: column j = [position j; content j]
+shift = lambda k: np.roll(np.eye(Nn), k, axis=0)        # moves position p to p + k
+for h, k in ((1, 1), (2, 3)):
+    Q = SCALE * shift(k) @ Xq
+    K = np.hstack([np.eye(Nn), np.zeros((Nn, 1))]) @ Ym
+    V = np.array([[0, 0, 0, 0, 1.0]]) @ Ym
+    S = K.T @ Q / np.sqrt(dd)
+    A = np.exp(S) / np.exp(S).sum(0, keepdims=True)
+    print(f"head {h}: output {np.round(V @ A, 2).ravel()}   target {contents[(np.arange(Nn) + k) % Nn]}")
 """)
 
 # ------------------------------------------------------------------ 6c

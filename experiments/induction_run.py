@@ -20,7 +20,7 @@ t0 = time.time()
 _, out = train(cfg)
 h1, h2 = out["sizes"]
 kept = out["kept"]
-mode = ("" if cfg.price_mode == "absolute" else f"_{cfg.price_mode}") + ("" if cfg.probe == "mse" else f"_{cfg.probe}") + ("" if cfg.squeeze_at == 0 else f"_sq{cfg.squeeze_at:g}") + ("" if not cfg.trial else f"_trial{cfg.trial_taper}")
+mode = ("" if cfg.price_mode == "absolute" else f"_{cfg.price_mode}") + ("" if cfg.probe == "mse" else f"_{cfg.probe}") + ("" if cfg.squeeze_at == 0 else f"_sq{cfg.squeeze_at:g}") + ("" if not cfg.trial else f"_trial{cfg.trial_taper}") + ("" if cfg.trial_undo == 1.0 else f"_tu{cfg.trial_undo:g}_tm{cfg.trial_max_fail}_tst{cfg.trial_stop:g}")
 tag = (f"ind_{cfg.rule}{mode}_h{h1}-{h2}_pf{cfg.price_frac:g}_tp{cfg.taper}_sf{cfg.start_frac:g}"
        f"_L{cfg.L}_g{cfg.gap_max}_p{cfg.pre_max}_st{cfg.steps}_s{cfg.seed}")
 os.makedirs(a.out, exist_ok=True)

@@ -93,7 +93,10 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
             pred, g = model(X, Y)
         loss = F.mse_loss(pred, T)
         opt.zero_grad(set_to_none=True)
-        loss.backward()
+        if hemo and cfg.supply == "l0" and step >= hold:
+            (loss + cfg.l0_lambda * model.l0_penalty()).backward()   # BASELINE: L0 penalty
+        else:
+            loss.backward()
         if hemo and model.needs_reserve_probe() and step % model.cvr_every == 0:
             model.probe_reserve(X, Y, T, lambda a, b: F.mse_loss(a, b))
         if hemo and model.needs_gate_grad():
@@ -108,12 +111,19 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
             model.relax_tone()
         if (local or prune) and step >= hold:
             smooth = loss.item() if smooth is None else 0.92 * smooth + 0.08 * loss.item()
+            if local and model.trial_head is not None and smooth > cfg.trial_undo * target:
+                h_t = model.trial_head                         # undo early, every step
+                model.open_mask[h_t] = True
+                model.tone[h_t] = 1.0
+                cooldown[h_t] = h["n_probes"] + cfg.trial_cooldown
+                h["trials"].append((h_t, trial_start, step, False))
+                model.trial_head, quiet = None, 0
             if (step - hold) % cfg.probe_every == 0:
                 if local and model.trial_head is not None:
                     # TRIAL CLOSURE under way: undo at once if the loss leaves the solved bar,
                     # keep the head shut if the task stays solved through fade and settling
                     h_t, t0 = model.trial_head, trial_start
-                    if smooth > target:
+                    if smooth > cfg.trial_undo * target:
                         model.open_mask[h_t] = True
                         model.tone[h_t] = 1.0
                         cooldown[h_t] = h["n_probes"] + cfg.trial_cooldown
@@ -128,7 +138,9 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
                     h["n_probes"] += 1
                     model.local_step(price)
                     quiet = quiet + 1 if torch.equal(before, model.open_mask) else 0
-                    if cfg.trial and quiet >= cfg.trial_wait and int(model.open_mask.sum()) > 1:
+                    n_fail = sum(1 for tr in h["trials"] if not tr[3])
+                    if (cfg.trial and quiet >= cfg.trial_wait and int(model.open_mask.sum()) > 1
+                            and n_fail < cfg.trial_max_fail and step < cfg.trial_stop * total):
                         cand = [i for i in range(H) if model.open_mask[i]
                                 and cooldown.get(i, 0) <= h["n_probes"]]
                         if cand:
@@ -141,7 +153,10 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
 
         nper = int((g[0] > model.leak + 1e-9).sum()) if hemo else H
         if hemo:
-            h["ledger"].append(g[0].detach().cpu().numpy())
+            if cfg.supply == "l0":                       # record the deterministic gates
+                h["ledger"].append(model.l0_gate(sample=False).detach().cpu().numpy())
+            else:
+                h["ledger"].append(g[0].detach().cpu().numpy())
         # always measure just before the perfused set changes, so every level is recorded
         nxt = schedule(step + 1, cfg, H, total)[1] if hemo else H
         if (step % cfg.val_every == 0 or step == total - 1
@@ -160,6 +175,6 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
                       f"perfused {nper}/{H}")
     h["ledger"] = np.array(h["ledger"]) if hemo else None
     h["final_perfused"] = prev if hemo else H
-    h["final_gate"] = g[0].detach().cpu().numpy()
+    h["final_gate"] = (model.l0_gate(sample=False) if hemo and cfg.supply == "l0" else g[0]).detach().cpu().numpy()
     h["final_kappa"], h["final_budget"] = kappa, B
     return model, h

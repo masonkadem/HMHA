@@ -28,7 +28,8 @@ TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
             "probe_every": "pe", "prune_stop": "ps", "probe_batch": "pb", "taper": "tp",
             "budget_hold_frac": "hf", "conserve": "cv", "local_value": "lv", "plant_copies": "cp",
             "head_dropout": "hd", "probe_masks": "pm", "trial": "tr", "trial_taper": "tt",
-            "trial_settle": "ts", "trial_wait": "tw", "trial_cooldown": "tc"}
+            "trial_settle": "ts", "trial_wait": "tw", "trial_cooldown": "tc", "trial_undo": "tu",
+            "trial_max_fail": "tm", "trial_stop": "tst", "l0_lambda": "l0l", "l0_init": "l0i"}
 # Swept only occasionally. These appear in the tag ONLY when they differ from the
 # default, so adding one here does not rename every result already on disk.
 TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
@@ -37,7 +38,7 @@ TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
                 "precondition_relax", "price_frac", "probe_every", "prune_stop", "probe_batch",
                 "taper", "budget_hold_frac", "conserve", "local_value", "plant_copies",
                 "head_dropout", "probe_masks", "trial", "trial_taper", "trial_settle",
-                "trial_wait", "trial_cooldown"]
+                "trial_wait", "trial_cooldown", "trial_undo", "trial_max_fail", "trial_stop", "l0_lambda", "l0_init"]
 
 
 def _fmt(a, v):
@@ -89,6 +90,15 @@ def main():
     out["final_loss"] = hist["val_loss"][-1]
     out["ablation"] = head_ablation(model, val)               # at FULL perfusion
     final_gate = torch.tensor(hist["final_gate"], device=device)
+    # KNOCKOUT: the loss when each kept head is switched off after training, nobody re-fits.
+    # If spare heads are real backups, losing one costs little.
+    from hemo.train import evaluate as _evaluate
+    kept_heads = torch.nonzero(final_gate > 0).flatten().tolist()
+    out["knockout"] = {"intact": _evaluate(model, val, gate=final_gate), "per_head": {}}
+    for h in kept_heads:
+        g = final_gate.clone()
+        g[h] = 0.0
+        out["knockout"]["per_head"][h] = _evaluate(model, val, gate=g)
     out["recovery"] = circuit_recovery(model, val, cfg, device, gate=final_gate)
     # loss at B = k*, read off DURING annealing (never by re-gating a converged model,
     # which is already adapted to its own final budget and so flatters small B)

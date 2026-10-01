@@ -190,3 +190,18 @@ def test_a_backup_is_worth_something_only_under_damage():
     assert not torch.allclose(y1, y2)                            # damage in training
     hurt.eval()
     assert torch.allclose(hurt(X, Y)[0], hurt(X, Y)[0])          # none in evaluation
+
+
+def test_l0_baseline_gates():
+    """Hard-concrete gates: stochastic in training, deterministic and exactly 0 or 1 at the
+    extremes in evaluation; the penalty counts expected open heads."""
+    from hemo.model import HemoAttn
+    m = HemoAttn(replace(SMALL, supply="l0", num_heads=4, l0_init=3.0))
+    with torch.no_grad():
+        m.log_alpha.copy_(torch.tensor([10.0, -10.0, 10.0, -10.0]))
+    m.eval()
+    assert m.gate().tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert abs(float(m.l0_penalty()) - 2.0) < 1e-3
+    m.train()
+    g = m.gate()
+    assert g.requires_grad and g.shape == (4,)

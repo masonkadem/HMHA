@@ -64,6 +64,10 @@ class ICfg:
     trial_settle: int = 200
     trial_wait: int = 4
     trial_cooldown: int = 20        # probes before a head whose trial failed is tried again
+    trial_undo: float = 1.0         # undo a trial when the loss passes trial_undo x solved bar
+                                    # (checked every step on the smoothed training loss too)
+    trial_max_fail: int = 1000      # stop trying after this many failed trials
+    trial_stop: float = 1.0         # no new trials after this fraction of training
     squeeze_at: float = 0.0         # TEST: at this fraction of training force one more layer-1
                                     # head shut (0 = never); see train()
     price_mode: str = "absolute"    # absolute: close if value < price_frac * trivial error
@@ -324,6 +328,13 @@ def train(cfg, verbose=False):
         hist["ledger"].append(gate.detach().cpu().numpy().copy())
         smooth = loss.item() if smooth is None else 0.92 * smooth + 0.08 * loss.item()
 
+        if trial is not None and smooth > cfg.trial_undo * bar:      # undo early, every step
+            h_t, t0 = trial
+            open_mask[h_t] = True
+            tone[h_t] = 1.0
+            cooldown[h_t] = hist["n_probes"] + cfg.trial_cooldown
+            hist["trials"].append((h_t, t0, step, False))
+            trial, quiet = None, 0
         if gated and step >= start and (step - start) % cfg.probe_every == 0:
             ptok, psec = make_batch(cfg.probe_batch, cfg, device=dev)
             if cfg.probe == "logit_tone":
@@ -338,7 +349,7 @@ def train(cfg, verbose=False):
                 # undo at once if the real loss leaves the solved bar; keep it shut if the task
                 # stays solved through the slow fade and a settling period
                 h_t, t0 = trial
-                if e_now > bar:
+                if e_now > cfg.trial_undo * bar:
                     open_mask[h_t] = True
                     tone[h_t] = 1.0
                     cooldown[h_t] = n_probe + cfg.trial_cooldown
@@ -376,7 +387,9 @@ def train(cfg, verbose=False):
                     back = closed_order.pop() if (cfg.probe.startswith("logit") and closed_order) else int(best.argmax())
                     open_mask[back] = True
                     quiet = 0
-                if cfg.trial and quiet >= cfg.trial_wait and int(open_mask.sum()) > 1:
+                n_fail = sum(1 for tr in hist["trials"] if not tr[3])
+                if (cfg.trial and quiet >= cfg.trial_wait and int(open_mask.sum()) > 1
+                        and n_fail < cfg.trial_max_fail and step < cfg.trial_stop * cfg.steps):
                     cand = [i for i in range(H) if open_mask[i] and cooldown.get(i, 0) <= n_probe]
                     if cand:
                         h_t = min(cand, key=lambda i: value[i])
