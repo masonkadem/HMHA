@@ -29,8 +29,12 @@ Every section has the same five parts:
 Everything here runs on a CPU in about two minutes. Only numpy, PyTorch and matplotlib are
 needed for sections 1 to 8; the real-result cells read the saved runs in `results/`.
 
+New to PyTorch? Section 0 shows every PyTorch function the project uses, one at a time, on
+numbers small enough to check by eye. Later cells point back to it, e.g. "(0.5)".
+
 | section | what you build |
 |---|---|
+| 0 | PyTorch, one function at a time |
 | 1 | the task: a memory, a query, and its answers (the real generator) |
 | 2 | one attention head |
 | 3 | why the task needs exactly $R$ heads (one head, one equation) |
@@ -87,6 +91,290 @@ def show(func, notes):                             # print one function from the
 print("ready")
 """)
 
+# ------------------------------------------------------------------ 0
+md(r"""
+## 0. PyTorch, one function at a time
+
+The real code is built from about twenty PyTorch functions. Each step below shows one or two
+of them on tiny numbers. Run the cell, then compare every printed line with its comment: the
+comment says what you should see and why. Nothing here is specific to this project yet.
+
+### 0.0 Python bits that appear everywhere
+""")
+
+code(r"""
+a, b = 3, 4                                        # two names at once: a = 3 and b = 4 ("unpacking")
+_, b = 3, 4                                        # "_" is a name for a value we do not need
+print(f"a is {a} and a + b is {a + b}")            # f-string: each {...} is replaced by its value
+for i, letter in enumerate(["x", "y", "z"]):       # enumerate gives (position, item) pairs: (0, x), (1, y), (2, z)
+    print(i, letter)
+print(list(range(4)))                              # range(4) counts 0, 1, 2, 3 (it stops BEFORE 4)
+squares = [k * k for k in range(4)]                # a list built by a loop, written in one line
+print(squares)                                     # [0, 1, 4, 9]
+kw = {"sep": " | "}                                # a dictionary: names -> values
+print("one", "two", **kw)                          # **kw passes the dictionary as named settings: same as sep=" | "
+""")
+
+md(r"""
+### 0.1 A tensor is a box of numbers with a shape
+
+A **tensor** is PyTorch's array. Its **shape** says how many numbers it has along each
+direction (each *dimension*). Read a shape left to right as "how many of ..., each holding
+how many of ...". In this project `X` has shape `(B, N, d)`: **B** examples, each with **N**
+tokens, each token a list of **d** numbers. Dimension `0` is the first entry of the shape;
+dimension `-1` means the last one.
+""")
+
+code(r"""
+torch.set_printoptions(precision=2, sci_mode=False, linewidth=140)   # print 2 decimals, no "1e-01" style
+v = torch.tensor([1.0, 2.0, 3.0])                  # a list of 3 numbers
+M = torch.tensor([[1.0, 2.0, 3.0],
+                  [4.0, 5.0, 6.0]])                # a table: 2 rows, 3 columns
+print(v.shape, M.shape)                            # torch.Size([3]) and torch.Size([2, 3])
+S = torch.zeros(2, 3, 4)                           # a stack of 2 tables, each 3 rows x 4 columns, all zeros
+print(S.shape, " number of dimensions:", S.dim())  # (2, 3, 4) and 3
+""")
+
+md(r"""
+### 0.2 Making tensors
+
+`torch.randn` draws random numbers from a bell curve (average 0, spread 1). A **generator**
+with a fixed seed makes the "random" numbers the same every time you run, which is how we can
+check the real code against a by-hand copy later.
+""")
+
+code(r"""
+print(torch.ones(2, 3))                            # all ones, shape (2, 3)
+print(torch.eye(3))                                # identity: 1 on the diagonal. Row j is the "one-hot" code of j
+print(torch.arange(5))                             # 0, 1, 2, 3, 4
+g = torch.Generator().manual_seed(0)               # a random-number source with a fixed seed
+print(torch.randn(2, 3, generator=g))              # 6 random numbers from the bell curve
+print(torch.randint(0, 8, (2, 4), generator=g))    # random whole numbers from 0 to 7 (8 is excluded), shape (2, 4)
+print(torch.randn(2, 3, generator=g) * 0.1)        # times 0.1: small noise
+""")
+
+md(r"""
+### 0.3 Reading and writing parts of a tensor (slicing)
+
+Inside the square brackets there is one entry per dimension. `:` means "all of them",
+`a:b` means "from a up to but **not including** b", `-1` means "the last one", and `...`
+means "all the earlier dimensions". Writing into a slice changes only those entries.
+""")
+
+code(r"""
+A = torch.arange(24).view(2, 3, 4)                 # the numbers 0..23 laid out as 2 tables of 3 rows x 4 columns
+print(A)
+print(A[0])                                        # the first table, shape (3, 4)
+print(A[0, 1])                                     # first table, second row: tensor([4, 5, 6, 7])
+print(A[:, :, :2])                                 # every table, every row, columns 0 and 1
+print(A[:, :, 2:4].shape)                          # columns 2 and 3: shape (2, 3, 2)
+print(A[..., -1])                                  # the last column of every row: shape (2, 3)
+Z = torch.zeros(2, 3)
+Z[:, :2] = 7                                       # write 7 into columns 0 and 1 of every row
+print(Z)                                           # column 2 is untouched
+""")
+
+md(r"""
+### 0.4 Arithmetic on whole tensors, mod, and one-hot
+
+`+`, `*`, `%` act on every entry at once, so no loop is needed. `%` is the remainder after
+division ("mod"): it is how positions wrap round the circle of slots (section 1).
+`F.one_hot(p, N)` turns each whole number into a row of N zeros with a single 1 at that place.
+""")
+
+code(r"""
+p = torch.tensor([6, 2, 7])                        # three query positions
+print(p + 5)                                       # 11, 7, 12: added to every entry at once
+print((p + 5) % 8)                                 # 3, 7, 4: the remainder after dividing by 8 (11 = 8 + 3)
+print(F.one_hot(p, 8))                             # row i has a single 1 in column p[i]
+""")
+
+md(r"""
+### 0.5 Picking items by index: `torch.gather`
+
+The simple version is `content[j]`: "give me rows j". `torch.gather` does the same when there
+is an extra batch dimension in front (every example has its own slots and its own indices).
+It needs the index repeated for every number in an item, which is what
+`.unsqueeze(-1).expand(-1, -1, m)` does: `unsqueeze(-1)` adds a size-1 dimension at the end,
+and `expand` repeats it `m` times (`-1` means "keep this size").
+""")
+
+code(r"""
+content = torch.tensor([[10., 11.], [20., 21.], [30., 31.], [40., 41.]])   # 4 slots, each holding an item of 2 numbers
+j = torch.tensor([3, 0, 3])                        # three queries want slots 3, 0 and 3
+print(content[j])                                  # simple version: rows 3, 0, 3 -> [40, 41], [10, 11], [40, 41]
+c = content.unsqueeze(0)                           # add an example dimension in front: (4, 2) -> (1, 4, 2)
+jj = j.unsqueeze(0)                                # (3,) -> (1, 3): one example, three queries
+idx = jj.unsqueeze(-1).expand(-1, -1, 2)           # (1, 3) -> (1, 3, 1) -> (1, 3, 2): each index written twice
+print(idx)
+print(torch.gather(c, 1, idx))                     # along dimension 1 (the slots): the same rows 3, 0, 3
+""")
+
+md(r"""
+### 0.6 Gluing: `torch.cat`
+""")
+
+code(r"""
+a = torch.tensor([[1., 2.]])                       # shape (1, 2)
+b = torch.tensor([[3., 4., 5.]])                   # shape (1, 3)
+print(torch.cat([a, b], dim=-1))                   # side by side along the last dimension: [[1, 2, 3, 4, 5]]
+print(torch.cat([a, a], dim=0))                    # on top of each other along dimension 0: shape (2, 2)
+""")
+
+md(r"""
+### 0.7 Changing shape: `view`, `transpose`, `reshape`
+
+`view` reads the same numbers with a different shape (nothing is copied or changed).
+`transpose(i, j)` swaps two dimensions. `reshape` is like `view` but also works after a
+transpose. This is exactly how the model cuts each token's $H \cdot d_k$ numbers into $H$
+heads (`_split`, section 4) and glues them back (`combine`).
+""")
+
+code(r"""
+x = torch.arange(12)                               # 12 numbers in a row
+print(x.view(3, 4))                                # the same 12 numbers read as 3 rows of 4
+y = x.view(1, 3, 4)                                # think: 1 example, 3 tokens, 4 numbers per token
+h = y.view(1, 3, 2, 2)                             # cut each token's 4 numbers into 2 heads of 2 numbers
+print(h[0, :, 0])                                  # head 0's part of every token: the first 2 numbers of each
+t = h.transpose(1, 2)                              # swap dimensions 1 and 2: (1, 3 tokens, 2 heads, 2) -> (1, 2 heads, 3 tokens, 2)
+print(t.shape)
+back = t.transpose(1, 2).reshape(1, 3, 4)          # swap back, then glue the 2 heads side by side again
+print(torch.equal(back, y))                        # True: nothing was lost
+""")
+
+md(r"""
+### 0.8 Stretching to match (broadcasting), `None` and `unsqueeze`
+
+When two tensors with different shapes are multiplied, any dimension of size 1 is copied to
+match the other. Writing `None` inside the brackets (or calling `unsqueeze`) adds a size-1
+dimension. The valve line of the model, `out * gate[:, :, None, None]`, is exactly this.
+""")
+
+code(r"""
+out = torch.ones(1, 2, 3, 2)                       # (examples, heads, tokens, numbers): every head's output, all ones
+gate = torch.tensor([[1.0, 0.0]])                  # (examples, heads): head 0 on, head 1 off
+g4 = gate[:, :, None, None]                        # (1, 2) -> (1, 2, 1, 1)
+print(g4.shape)
+print(out * g4)                                    # the size-1 dimensions stretch to (3, 2): head 1 becomes all zeros
+v1 = torch.tensor([1.0, 0.5])                      # one gain per head, shape (2,)
+print(v1.unsqueeze(0).expand(3, -1))               # (2,) -> (1, 2) -> (3, 2): the same gains for 3 examples
+""")
+
+md(r"""
+### 0.9 Matrix multiplication: `@`
+
+For two tables, `A @ B` is "row times column": each entry is a sum of products. With more
+than two dimensions, `@` multiplies the **last two** dimensions and repeats that for every
+earlier one (every example, every head) at once. `K.transpose(-2, -1)` swaps the last two
+dimensions, which is $K^\top$, so `Q @ K.transpose(-2, -1)` puts every score
+$q_i \cdot k_j$ in row $i$, column $j$.
+""")
+
+code(r"""
+A = torch.tensor([[1., 2.], [3., 4.]])
+x = torch.tensor([[5.], [6.]])
+print(A @ x)                                       # 1*5 + 2*6 = 17 and 3*5 + 4*6 = 39
+print(A.T)                                         # the transpose: rows become columns
+Qs = torch.randn(1, 2, 3, 4, generator=g)          # (examples, heads, 3 queries, 4 numbers)
+Ks = torch.randn(1, 2, 5, 4, generator=g)          # (examples, heads, 5 slots,   4 numbers)
+print((Qs @ Ks.transpose(-2, -1)).shape)           # (1, 2, 3, 5): every query against every slot, for each head
+""")
+
+md(r"""
+### 0.10 Softmax: scores to weights
+
+`F.softmax(s, dim=-1)` works along the last dimension: each **row** becomes positive weights
+that add up to 1, with the biggest score getting the biggest weight (section 2 does it by hand).
+""")
+
+code(r"""
+s = torch.tensor([[2.0, 0.0, 0.0],
+                  [0.0, 0.0, 9.0]])
+w = F.softmax(s, dim=-1)
+print(w)                                           # row 1: 0.79, 0.11, 0.11 (as in section 2); row 2: almost all on the third
+print(w.sum(-1))                                   # every row adds up to 1
+""")
+
+md(r"""
+### 0.11 A layer of weights: `nn.Linear`
+
+`nn.Linear(n_in, n_out)` holds a weight table $W$ (shape `(n_out, n_in)`) and a bias $b$, and
+computes $y = x W^\top + b$. It acts on the **last** dimension, so on a `(B, N, d)` tensor it
+transforms every token separately. Its weights start random; training changes them.
+A class that holds layers like this is an `nn.Module`; calling `layer(x)` runs its `forward`.
+""")
+
+code(r"""
+import torch.nn as nn
+torch.manual_seed(0)                               # fixed random starting weights
+lin = nn.Linear(3, 2)                              # turns 3 numbers into 2
+print(lin.weight.shape, lin.bias.shape)            # (2, 3) and (2,): one row of W per output number
+x = torch.tensor([1.0, 2.0, 3.0])
+by_hand = x @ lin.weight.T + lin.bias              # the formula written out
+print(lin(x).detach(), by_hand.detach())           # the same two numbers (.detach() hides tracking info, 0.13)
+X3 = torch.randn(1, 5, 3, generator=g)             # 1 example, 5 tokens, 3 numbers each
+print(lin(X3).shape)                               # (1, 5, 2): every token transformed on its own
+""")
+
+md(r"""
+### 0.12 Adding up
+
+`sum(dim)` and `mean(dim)` add along one dimension, which then disappears from the shape.
+""")
+
+code(r"""
+A = torch.tensor([[1., -2.], [3., 4.]])
+print(A.sum())                                     # everything: 6
+print(A.sum(0), A.sum(1))                          # down each column: [4, 2]; along each row: [-1, 7]
+print(A.abs(), A.mean(), (A ** 2).mean())          # sizes without sign; the average 1.5; average of squares 7.5
+""")
+
+md(r"""
+### 0.13 Learning: loss, gradient, one step
+
+`F.mse_loss(pred, target)` is the mean squared error. `loss.backward()` works out, for every
+weight marked `requires_grad=True`, how much the loss changes when that weight grows (the
+**gradient**), and stores it in `.grad`. An optimizer then moves each weight a little
+**against** its gradient. Training repeats these three calls thousands of times.
+`torch.no_grad()` turns tracking off (used when we only measure), `.detach()` gives a copy
+that is cut off from tracking, and `.item()` turns a one-number tensor into a plain number.
+""")
+
+code(r"""
+w = torch.tensor(3.0, requires_grad=True)          # a weight, tracked
+x, target = torch.tensor(2.0), torch.tensor(10.0)
+loss = F.mse_loss(w * x, target)                   # (3*2 - 10)^2 = 16
+loss.backward()                                    # the gradient d loss / d w
+print(loss.item(), w.grad.item())                  # by hand: 2 * (w*x - target) * x = 2 * (-4) * 2 = -16
+opt = torch.optim.SGD([w], lr=0.1)                 # an optimizer with step size 0.1 (training uses Adam, a smarter cousin)
+opt.step()                                         # w <- w - 0.1 * (-16) = 4.6
+print(round(w.item(), 4))                          # 4.6 (computers store decimals slightly inexactly, so we round)
+opt.zero_grad()                                    # clear the stored gradient before the next step
+with torch.no_grad():                              # measure only, track nothing
+    print(round(F.mse_loss(w * x, target).item(), 4))   # (4.6*2 - 10)^2 = 0.64: smaller, so the step helped
+print((w * x).detach().requires_grad)              # False: a detached copy is not tracked
+""")
+
+md(r"""
+That is all the PyTorch this project needs:
+
+| function | what it does | step |
+|---|---|---|
+| `torch.tensor`, `.shape` | a box of numbers and its sizes | 0.1 |
+| `torch.zeros/ones/eye/arange/randn/randint` | make tensors | 0.2 |
+| `x[:, :, a:b]` | read or write a part | 0.3 |
+| `%`, `F.one_hot` | wrap round; a number as a row with one 1 | 0.4 |
+| `torch.gather`, `unsqueeze`, `expand` | pick items by index, for every example | 0.5 |
+| `torch.cat` | glue side by side | 0.6 |
+| `view`, `transpose`, `reshape` | cut into heads and glue back | 0.7 |
+| `x[:, :, None, None]`, broadcasting | one gain per head, stretched over its outputs | 0.8 |
+| `@`, `.T`, `transpose(-2, -1)` | matrix multiplication; scores | 0.9 |
+| `F.softmax` | scores to weights | 0.10 |
+| `nn.Linear`, `nn.Module` | a layer of weights | 0.11 |
+| `sum`, `mean`, `abs` | adding up | 0.12 |
+| `F.mse_loss`, `backward`, `.grad`, `opt.step`, `no_grad`, `detach` | learning | 0.13 |
+""")
+
 # ------------------------------------------------------------------ 1
 md(r"""
 ## 1. The task
@@ -111,7 +399,7 @@ this task), with a note on each line. Two things the by-hand version leaves out:
 has $N$ query tokens at once (one card per position, each with its own random $p$), and a
 little noise is added to every vector. Note the loop: it runs over the $R$ **offsets** (2 here,
 4 in the experiments), not over the 16 slots. All slots and all queries are handled at once as
-arrays.
+arrays. First the whole function with notes; then we run it one line at a time.
 """)
 
 code(r"""
@@ -138,6 +426,105 @@ annotated(src[a:b + 1], {                           # ... printed from the multi
     "T = torch.cat(blocks": "the correct answer: the R items side by side",
     'aux = {"p": p': "extra information kept for checking roles later",
 })
+""")
+
+md(r"""
+### Run `make_batch` one line at a time
+
+Each cell below holds lines **copied exactly** from `make_batch`, run on one example with a
+fixed seed, and prints what the line made. The last cell calls the real function with the
+same seed and checks that we got the very same numbers.
+
+**Step 1: the settings.** `B` is the number of examples; `gen` is the fixed random source (0.2).
+""")
+
+code(r"""
+B, cfg, device = 1, SMALL, "cpu"                   # what we pass to make_batch: 1 example, the small settings
+gen = torch.Generator().manual_seed(0)             # fixed random source, so we can repeat this exactly
+# --- copied from make_batch ---
+N, d = cfg.seq_len, cfg.d_model                    # N = 8 slots; d = 16 numbers per vector
+dev = "cpu" if gen is not None else device         # a generator works on the CPU
+kw = {"generator": gen} if gen is not None else {} # use the generator in every random call (0.0, **kw)
+m = cfg.m_content                                  # m = 4 numbers per stored item
+assert d >= N + m, "d_model must hold the position block plus the content block"   # room for label (8) + item (4)
+print("N =", N, " d =", d, " m =", m)
+""")
+
+md(r"""
+**Step 2: start every vector as small noise** (0.2). `X` holds the $N$ query tokens of each
+example and `Y` the $N$ memory slots; each is a list of $d = 16$ numbers.
+""")
+
+code(r"""
+X = torch.randn(B, N, d, device=dev, **kw) * 0.1   # query tokens: (1 example, 8 tokens, 16 numbers)
+Y = torch.randn(B, N, d, device=dev, **kw) * 0.1   # memory slots: (1 example, 8 slots, 16 numbers)
+print("X", tuple(X.shape), " Y", tuple(Y.shape))
+print(Y[0])                                        # 8 rows (slots) of 16 small numbers
+""")
+
+md(r"""
+**Step 3: write a label into each slot.** Columns 0 to 7 of slot $j$ become the one-hot code
+of $j$ (`torch.eye`, 0.2; writing into a slice, 0.3). Look for the diagonal of 1s on the left.
+""")
+
+code(r"""
+Y[:, :, :N] = torch.eye(N, device=dev)             # every example, every slot, columns 0..7 <- the identity table
+print(Y[0])
+""")
+
+md(r"""
+**Step 4: store a random item in each slot**, in columns 8 to 11. Columns 12 to 15 stay noise.
+""")
+
+code(r"""
+content = torch.randn(B, N, m, device=dev, **kw)   # one item of 4 numbers per slot: (1, 8, 4)
+Y[:, :, N:N + m] = content                         # columns 8..11 <- the items
+print(Y[0])                                        # label | item | noise
+""")
+
+md(r"""
+**Step 5: give each query token a position $p$**, written as a one-hot code in its first 8
+columns (`torch.randint`, 0.2; `F.one_hot`, 0.4). `.float()` turns the whole-number 0s and 1s
+into decimals so they can be stored in `X`.
+""")
+
+code(r"""
+p = torch.randint(0, N, (B, N), device=dev, **kw)  # 8 query tokens, each with a random position 0..7: (1, 8)
+X[:, :, :N] = F.one_hot(p, N).float()              # columns 0..7 of token i <- the one-hot code of p[i]
+print("p =", p[0].tolist())
+print(X[0, :, :N])                                 # row i has its single 1 in column p[i]
+""")
+
+md(r"""
+**Step 6: build the answer.** For each offset, work out which slot every query needs
+(`+` and `%`, 0.4), fetch those items (`torch.gather`, 0.5), and finally glue the $R$ items side
+by side (`torch.cat`, 0.6). The loop runs twice here (offsets 1 and 5), never over slots.
+""")
+
+code(r"""
+blocks = []                                        # the answer, one offset at a time
+for off in offsets_for(cfg):                       # off = 1, then off = 5
+    j = (p + off) % N                              # the slot each of the 8 queries needs, wrapped round
+    print(f"offset {off}:  p + {off} mod 8 = {j[0].tolist()}")
+    blocks.append(torch.gather(content, 1, j.unsqueeze(-1).expand(-1, -1, m)))   # those slots' items: (1, 8, 4)
+T = torch.cat(blocks, dim=-1)                      # item for offset 1 | item for offset 5: (1, 8, 8)
+print("T", tuple(T.shape))
+print(T[0])
+""")
+
+md(r"""
+**Step 7: check against the real function.** Same seed, so the same random draws in the same
+order; every number must match.
+""")
+
+code(r"""
+X2, Y2, T2, _ = make_batch(1, SMALL, "cpu", gen=torch.Generator().manual_seed(0))   # the real function
+print("same X:", torch.equal(X, X2), "  same Y:", torch.equal(Y, Y2), "  same T:", torch.equal(T, T2))
+""")
+
+md(r"""
+**Check the answers by hand.** Pick query token 0, read its $p$, add each offset mod 8, and
+check the answer holds the items stored in those slots:
 """)
 
 code(r"""
@@ -323,6 +710,86 @@ show(HemoAttn.forward, {
     "used = gate * keep": "failed heads get gain 0 (the others are rescaled, as in dropout)",
     "return self.combine(out, used), gate": "apply the valves (THE attachment point) and the output weights",
 })
+""")
+
+md(r"""
+### Run the layer one line at a time
+
+Now push the example from section 1 through a real 2-head layer, one line of `heads` and
+`combine` at a time, printing the shape after each. The weights are untrained (random), so the
+attention is still spread out; training is what makes it sharp. The last cell checks we got
+exactly what `layer(X, Y)` gives.
+
+**Step 1: queries for all heads at once** (`nn.Linear`, 0.11). `W_q` turns each token's 16
+numbers into $H \cdot d_k = 2 \times 8 = 16$ numbers: the first 8 belong to head 0, the next 8
+to head 1.
+""")
+
+code(r"""
+import math                                        # for the square root
+torch.manual_seed(0)                               # fixed random starting weights
+layer = CrossAttn(SMALL, num_heads=2)              # the real layer, 2 heads
+B, N, H, d_k = X.size(0), X.size(1), layer.H, layer.d_k   # 1 example, 8 tokens, 2 heads, 8 numbers per head
+print("W_q.weight", tuple(layer.W_q.weight.shape), "= (H*d_k, d_model): every head's query weights stacked")
+q_all = layer.W_q(X)                               # every query token through the query weights
+print("W_q(X)", tuple(q_all.shape), "= (examples, tokens, H*d_k)")
+""")
+
+md(r"""
+**Step 2: cut into heads** (`view` and `transpose`, 0.7). This is `_split`. Keys and values are
+made the same way, but from the memory `Y`.
+""")
+
+code(r"""
+q4 = q_all.view(B, N, H, d_k)                      # each token's 16 numbers -> 2 heads of 8: (1, 8, 2, 8)
+Q = q4.transpose(1, 2)                             # heads before tokens: (1, 2, 8, 8)
+print("view", tuple(q4.shape), " -> transpose", tuple(Q.shape), "= (examples, heads, tokens, d_k)")
+print("same as the real _split:", torch.equal(Q, layer._split(layer.W_q(X))))
+K, V = layer._split(layer.W_k(Y)), layer._split(layer.W_v(Y))   # keys and values from the memory slots
+print("K", tuple(K.shape), " V", tuple(V.shape))
+""")
+
+md(r"""
+**Step 3: score, softmax, blend** (`@`, 0.9; `F.softmax`, 0.10). Each head scores every query
+against every slot, turns each row of scores into weights, and returns each query's weighted
+average of the values (section 2). This is `heads`.
+""")
+
+code(r"""
+scores = Q @ K.transpose(-2, -1) / math.sqrt(d_k)  # every query vs every slot, per head; / sqrt(8) keeps numbers moderate
+print("scores", tuple(scores.shape), "= (examples, heads, queries, slots)")
+attn = F.softmax(scores, dim=-1)                   # each query's row -> 8 weights that add up to 1
+print("head 0, query 0, weights on the 8 slots:", attn[0, 0, 0].detach())   # nearly even: untrained
+print("every row adds up to 1:", torch.allclose(attn.sum(-1), torch.ones(1)))
+out = attn @ V                                     # weighted average of the values: one blend per head per query
+print("out", tuple(out.shape), "= (examples, heads, queries, d_k)")
+""")
+
+md(r"""
+**Step 4: the valve, glue, read out** (broadcasting, 0.8; `transpose` and `reshape`, 0.7;
+`nn.Linear`, 0.11). This is `combine`: each head's blend is multiplied by its gain $g_h$, the
+heads are glued back side by side, and the output weights write the answer.
+""")
+
+code(r"""
+gate = torch.ones(B, H)                            # every head fully on (what forward uses when no gate is given)
+gated = out * gate[:, :, None, None]               # THE VALVE: each head's blend times its gain: (1, 2, 8, 8)
+side = gated.transpose(1, 2).reshape(B, -1, H * d_k)   # tokens first again, heads glued side by side: (1, 8, 16)
+pred = layer.W_o(side)                             # the output weights read both heads and write the answer: (1, 8, 8)
+print("side by side", tuple(side.shape), "  prediction", tuple(pred.shape), "  answer T", tuple(T.shape))
+print("same as the real layer(X, Y):", torch.allclose(pred, layer(X, Y)[0]))
+""")
+
+md(r"""
+**Step 5: close a valve.** With head 1's gain at 0, its 8 columns of `side` are all zero, so the
+output weights never see head 1. Section 5 checks that it then also gets no gradient.
+""")
+
+code(r"""
+gate0 = torch.tensor([[1.0, 0.0]])                 # head 0 on, head 1 off
+side0 = (out * gate0[:, :, None, None]).transpose(1, 2).reshape(B, -1, H * d_k)   # the same two lines as step 4
+print("token 0, head 0's columns:", side0[0, 0, :d_k].detach())
+print("token 0, head 1's columns:", side0[0, 0, d_k:].detach())   # all zeros ("-0." is still zero)
 """)
 
 md(r"""
