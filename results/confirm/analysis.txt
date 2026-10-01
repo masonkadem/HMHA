@@ -1,0 +1,56 @@
+741 runs loaded
+
+A. The collateral rule against its controls (no fixed total), heads kept per seed
+  collateral rule      k*=2  n=10  kept [2, 2, 2, 2, 2, 3, 2, 2, 2, 2]  compute 0.32
+  collateral rule      k*=3  n=10  kept [3, 3, 3, 3, 3, 4, 3, 3, 3, 4]  compute 0.34
+  collateral rule      k*=4  n=10  kept [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  compute 0.36
+  collateral rule      k*=6  n=10  kept [6, 6, 6, 6, 6, 6, 6, 6, 6, 6]  compute 0.40
+  collateral rule      k*=8  n=10  kept [8, 8, 8, 8, 8, 8, 8, 8, 8, 8]  compute 0.45
+  ordinary importance  k*=2  n=10  kept [6, 5, 6, 4, 6, 5, 6, 7, 5, 5]  compute 0.39
+  ordinary importance  k*=4  n=10  kept [8, 5, 4, 6, 4, 6, 5, 6, 7, 5]  compute 0.41
+  ordinary importance  k*=8  n=10  kept [10, 12, 10, 10, 9, 10, 10, 10, 11, 10]  compute 0.53
+  random pick          k*=2  n=10  kept [2, 2, 2, 2, 2, 2, 2, 2, 2, 2]  compute 0.31
+  random pick          k*=4  n=10  kept [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  compute 0.36
+  random pick          k*=8  n=10  kept [8, 8, 8, 8, 8, 8, 8, 8, 8, 8]  compute 0.45
+  standard pruning     k*=2  n=10  kept [2, 2, 2, 2, 2, 2, 2, 2, 2, 2]  compute 0.38
+  standard pruning     k*=3  n= 3  kept [3, 3, 3]  compute 0.40
+  standard pruning     k*=4  n=10  kept [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]  compute 0.42
+  standard pruning     k*=6  n= 3  kept [6, 6, 6]  compute 0.45
+  standard pruning     k*=8  n=10  kept [9, 9, 8, 8, 8, 8, 8, 8, 8, 8]  compute 0.50
+
+                         exact count   fell back above bar
+  collateral rule           47/50                0/50
+  ordinary importance        2/30                0/30
+  random pick               30/30               24/30
+  standard pruning          34/36               36/36
+  collateral vs ordinary importance  exact count p = 6.0e-16   fell back p = 1.0e+00
+  collateral vs random pick          exact count p = 2.9e-01   fell back p = 3.7e-15
+  collateral vs standard pruning     exact count p = 1.0e+00   fell back p = 4.7e-25
+
+A5. Planted copies (k* = 4, no fixed total): heads kept, pairs of copies both kept
+  collateral           n=10  [(4, 0), (4, 0), (4, 0), (4, 0), (4, 0), (4, 0), (4, 0), (4, 0), (4, 0), (4, 0)]
+  ordinary importance  n=10  [(11, 5), (10, 5), (15, 7), (10, 5), (10, 4), (8, 4), (8, 4), (10, 5), (8, 4), (10, 5)]
+
+A6. Price sweep: heads kept (mean over seeds) at each price
+  k*      0.01    0.02    0.03    0.05     0.1
+  2        2.0     2.0     2.1     2.0     2.0
+  4        4.0     4.0     4.0     4.0     4.0
+  8        8.0     8.0     8.0     8.0     8.0
+
+B. Backup heads under damage: heads kept against the prediction written beforehand
+   R  price     p  predicted    measured (per seed)   mean  final loss / trivial
+   2   0.03   0.0          2 [2, 2, 2, 2, 2, 3, 2, 2, 2, 2]    2.1                0.0000
+   2   0.03  0.05          3              [3, 3, 3]    3.0                0.0032
+   2   0.03   0.1          3              [3, 3, 3]    3.0                0.0059
+   2   0.03   0.2          4              [4, 4, 4]    4.0                0.0537
+   2   0.03   0.3          4              [5, 4, 5]    4.7                0.0153
+   4   0.03   0.0          4 [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]    4.0                0.0000
+   4   0.03  0.05          5              [5, 5, 4]    4.7                0.0082
+   4   0.03   0.1          5              [5, 5, 5]    5.0                0.0093
+   4   0.03   0.2          6              [6, 6, 6]    6.0                0.0396
+   4   0.03   0.3          7              [7, 7, 7]    7.0                0.0701
+   4   0.01   0.0          4              [4, 4, 4]    4.0                0.0000
+   4   0.01   0.1          6              [6, 6, 6]    6.0                0.0275
+   4   0.01   0.2          7              [8, 7, 8]    7.7                0.0464
+
+  damaged runs: mean (measured - predicted) = +0.10 heads, mean |miss| = 0.17, exact 25/30

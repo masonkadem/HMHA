@@ -1,0 +1,12 @@
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.1
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.1
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.1
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.2
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.2
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.2
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.3
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.3
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --head_dropout 0.3

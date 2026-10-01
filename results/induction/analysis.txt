@@ -1,0 +1,19 @@
+75 induction runs
+
+dense, 8 + 8 heads                   n=10  final loss median 0.0028  acc 0.999
+dense, 1 + 1 heads (known answer)    n=10  final loss median 0.0107  acc 0.995
+
+rule            n  kept (layer1, layer2) per seed                                1+1  solved  stays  roles  compute
+collateral     10  [(3, 4), (3, 3), (2, 3), (2, 3), (3, 3), (3, 3), (3, 3), (2, 3), (3, 3), (3, 4)]    0      10     10     10     0.77
+ablate         10  [(5, 7), (5, 8), (5, 8), (5, 8), (4, 8), (5, 8), (5, 8), (4, 8), (5, 7), (5, 7)]    0      10     10     10     1.04
+random         10  [(2, 3), (2, 3), (2, 2), (2, 3), (1, 0), (2, 2), (1, 0), (2, 3), (3, 3), (1, 2)]    0       8      6      8     0.67
+prune          10  [(2, 1), (2, 1), (2, 1), (2, 2), (2, 2), (2, 1), (2, 2), (2, 1), (2, 1), (2, 1)]    0      10      0     10     0.44
+  collateral vs ablate   minimal p = 1   stays solved p = 1   solved p = 1
+  collateral vs random   minimal p = 1   stays solved p = 0.087   solved p = 0.47
+  collateral vs prune    minimal p = 1   stays solved p = 1.1e-05   solved p = 1
+
+price sweep, collateral rule: heads kept (layer1, layer2) per seed, and solved
+  price 0.01  n= 5  [(4, 7), (4, 7), (4, 6), (4, 6), (4, 6)]  solved 5/5  roles 5/5
+  price 0.03  n=10  [(3, 4), (3, 3), (2, 3), (2, 3), (3, 3), (3, 3), (3, 3), (2, 3), (3, 3), (3, 4)]  solved 10/10  roles 10/10
+  price 0.1   n= 5  [(1, 1), (0, 1), (1, 1), (1, 1), (0, 1)]  solved 3/5  roles 3/5
+  price 0.3   n= 5  [(1, 0), (0, 1), (1, 0), (0, 1), (0, 1)]  solved 0/5  roles 0/5

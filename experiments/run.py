@@ -14,16 +14,56 @@ from hemo.train import train, pick_device
 from hemo.analysis import (redundancy_check, circuit_recovery, head_ablation, k_list)
 
 
+# Every field a sweep varies must appear here, or that sweep silently overwrites the
+# other arm's pickle. This has already bitten kappa_end, pool_beta, leak and n_rel.
+TAG_FIELDS = ["task", "n_rel", "seq_len", "d_k", "steps", "supply", "demand",
+              "n_territories", "delay", "kappa_end", "pool_beta", "leak", "seed"]
+TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
+            "n_territories": "T", "delay": "tau", "kappa_end": "k", "pool_beta": "b",
+            "leak": "lk", "seed": "s", "autoreg_gain": "g", "target_frac": "tf",
+            "autoreg_every": "ae", "loss_ema": "le", "stall_gate": "sg",
+            "flow_exponent": "fx", "watershed_penalty": "wp",
+            "flow_price": "fp", "cvr_boost": "cb", "cvr_every": "ce", "terr_kappa": "tk",
+            "precondition": "pc", "precondition_relax": "pr", "price_frac": "pf",
+            "probe_every": "pe", "prune_stop": "ps", "probe_batch": "pb", "taper": "tp",
+            "budget_hold_frac": "hf", "conserve": "cv", "local_value": "lv", "plant_copies": "cp",
+            "head_dropout": "hd", "probe_masks": "pm", "trial": "tr", "trial_taper": "tt",
+            "trial_settle": "ts", "trial_wait": "tw", "trial_cooldown": "tc", "trial_undo": "tu",
+            "trial_max_fail": "tm", "trial_stop": "tst", "l0_lambda": "l0l", "l0_init": "l0i"}
+# Swept only occasionally. These appear in the tag ONLY when they differ from the
+# default, so adding one here does not rename every result already on disk.
+TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
+                "stall_gate", "flow_exponent", "watershed_penalty", "flow_price",
+                "cvr_boost", "cvr_every", "terr_kappa", "precondition",
+                "precondition_relax", "price_frac", "probe_every", "prune_stop", "probe_batch",
+                "taper", "budget_hold_frac", "conserve", "local_value", "plant_copies",
+                "head_dropout", "probe_masks", "trial", "trial_taper", "trial_settle",
+                "trial_wait", "trial_cooldown", "trial_undo", "trial_max_fail", "trial_stop", "l0_lambda", "l0_init"]
+
+
+def _fmt(a, v):
+    return f"{a}{v:g}" if isinstance(v, float) else f"{a}{v}"
+
+
+def result_tag(cfg):
+    from hemo.config import Cfg
+    d = Cfg()
+    parts = [_fmt(TAG_ABBR.get(f, ""), getattr(cfg, f)) for f in TAG_FIELDS]
+    extra = [_fmt(TAG_ABBR[f], getattr(cfg, f)) for f in TAG_OPTIONAL
+             if hasattr(cfg, f) and getattr(cfg, f) != getattr(d, f)]
+    seed = parts.pop()                       # keep the seed last for readability
+    return "_".join(parts + extra + [seed])
+
+
 def main():
     ap = argparse.ArgumentParser()
-    for f, t in [("seed", int), ("steps", int), ("num_heads", int), ("n_rel", int),
-                 ("seq_len", int), ("d_k", int), ("n_territories", int), ("delay", int),
-                 ("val_size", int)]:
-        ap.add_argument(f"--{f}", type=t, default=None)
-    for f in ["supply", "demand", "task", "device"]:
-        ap.add_argument(f"--{f}", type=str, default=None)
-    for f in ["pool_beta", "kappa_end", "leak", "lr"]:
-        ap.add_argument(f"--{f}", type=float, default=None)
+    # Derived from Cfg rather than listed by hand. A hand-written list silently drops
+    # any knob added to Cfg later: --target_frac was added to the model, swept by
+    # sweep.py, and rejected by argparse, so 27 control runs failed in 0 seconds.
+    for name, fld in Cfg.__dataclass_fields__.items():
+        t = type(getattr(Cfg(), name))
+        if t in (int, float, str):
+            ap.add_argument(f"--{name}", type=t, default=None)
     ap.add_argument("--out", default="results")
     ap.add_argument("--skip-redundancy", action="store_true")
     a = ap.parse_args()
@@ -49,7 +89,25 @@ def main():
     out["hist"] = hist
     out["final_loss"] = hist["val_loss"][-1]
     out["ablation"] = head_ablation(model, val)               # at FULL perfusion
-    out["recovery"] = circuit_recovery(model, val, cfg, device)
+    final_gate = torch.tensor(hist["final_gate"], device=device)
+    # KNOCKOUT: the loss when each kept head is switched off after training, nobody re-fits.
+    # If spare heads are real backups, losing one costs little.
+    from hemo.train import evaluate as _evaluate
+    kept_heads = torch.nonzero(final_gate > 0).flatten().tolist()
+    out["knockout"] = {"intact": _evaluate(model, val, gate=final_gate), "per_head": {}}
+    for h in kept_heads:
+        g = final_gate.clone()
+        g[h] = 0.0
+        out["knockout"]["per_head"][h] = _evaluate(model, val, gate=g)
+    out["recovery"] = circuit_recovery(model, val, cfg, device, gate=final_gate)
+    # loss at B = k*, read off DURING annealing (never by re-gating a converged model,
+    # which is already adapted to its own final budget and so flatters small B)
+    kstar = predicted_kstar(cfg)
+    rec = list(zip(hist["n_perfused"], hist["val_loss"]))
+    # B does not always land exactly on k* during annealing, so take the closest
+    # recorded perfusion level and report which level it actually was.
+    b_at, l_at = min(rec, key=lambda bl: (abs(bl[0] - kstar), -rec.index(bl)))
+    out["loss_at_kstar"], out["B_at_kstar"], out["kstar"] = l_at, b_at, kstar
     # circuit recovery as a function of perfusion, using the converged demand field
     out["recovery_vs_kappa"] = {}
     for kap in [-3, -2, -1, -0.5, 0, 0.5, 1, 1.5, 2]:
@@ -62,10 +120,15 @@ def main():
                         "n_distinct_roles", "territory_span")}}
 
     os.makedirs(a.out, exist_ok=True)
-    tag = f"{cfg.task}_{cfg.supply}_{cfg.demand}_T{cfg.n_territories}_tau{cfg.delay}_s{cfg.seed}"
+    # R, N and d_k belong in the tag for the same reason kappa_end and leak do: they are
+    # swept, and a tag that omits a swept field silently overwrites the other arm.
+    tag = result_tag(cfg)
     with open(os.path.join(a.out, tag + ".pkl"), "wb") as f:
         pickle.dump(out, f)
-    print(f"  final loss {out['final_loss']:.5f}  perfused {out['recovery']['n_perfused']}"
+    lk = out["loss_at_kstar"]
+    print(f"  final loss {out['final_loss']:.5f}  loss@B={out['B_at_kstar']}"
+          f"(k*={out['kstar']}) {lk:.5f}"
+          f"  perfused {out['recovery']['n_perfused']}"
           f"  role_coverage {out['recovery']['role_coverage']:.2f}"
           f"  territory_span {out['recovery']['territory_span']}")
     for n in ["qnorm", "neg_entropy", "outnorm", "demand"]:

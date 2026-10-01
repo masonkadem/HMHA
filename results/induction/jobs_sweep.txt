@@ -1,0 +1,55 @@
+--probe logit --price_mode bar --price_frac 0.02 --seed 0
+--probe logit --price_mode bar --price_frac 0.05 --seed 0
+--probe logit --price_mode bar --price_frac 0.1 --seed 0
+--probe logit --price_mode bar --price_frac 0.2 --seed 0
+--probe logit --price_mode absolute --price_frac 0.005 --seed 0
+--probe logit --price_mode absolute --price_frac 0.02 --seed 0
+--probe logit --price_mode absolute --price_frac 0.05 --seed 0
+--probe logit --price_mode relative --price_frac 0.1 --seed 0
+--probe logit --price_mode relative --price_frac 0.3 --seed 0
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --seed 0
+--probe logit --price_mode bar --price_frac 0.1 --steps 6000 --seed 0
+--probe logit --price_mode bar --price_frac 0.02 --seed 1
+--probe logit --price_mode bar --price_frac 0.05 --seed 1
+--probe logit --price_mode bar --price_frac 0.1 --seed 1
+--probe logit --price_mode bar --price_frac 0.2 --seed 1
+--probe logit --price_mode absolute --price_frac 0.005 --seed 1
+--probe logit --price_mode absolute --price_frac 0.02 --seed 1
+--probe logit --price_mode absolute --price_frac 0.05 --seed 1
+--probe logit --price_mode relative --price_frac 0.1 --seed 1
+--probe logit --price_mode relative --price_frac 0.3 --seed 1
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --seed 1
+--probe logit --price_mode bar --price_frac 0.1 --steps 6000 --seed 1
+--probe logit --price_mode bar --price_frac 0.02 --seed 2
+--probe logit --price_mode bar --price_frac 0.05 --seed 2
+--probe logit --price_mode bar --price_frac 0.1 --seed 2
+--probe logit --price_mode bar --price_frac 0.2 --seed 2
+--probe logit --price_mode absolute --price_frac 0.005 --seed 2
+--probe logit --price_mode absolute --price_frac 0.02 --seed 2
+--probe logit --price_mode absolute --price_frac 0.05 --seed 2
+--probe logit --price_mode relative --price_frac 0.1 --seed 2
+--probe logit --price_mode relative --price_frac 0.3 --seed 2
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --seed 2
+--probe logit --price_mode bar --price_frac 0.1 --steps 6000 --seed 2
+--probe logit --price_mode bar --price_frac 0.02 --seed 3
+--probe logit --price_mode bar --price_frac 0.05 --seed 3
+--probe logit --price_mode bar --price_frac 0.1 --seed 3
+--probe logit --price_mode bar --price_frac 0.2 --seed 3
+--probe logit --price_mode absolute --price_frac 0.005 --seed 3
+--probe logit --price_mode absolute --price_frac 0.02 --seed 3
+--probe logit --price_mode absolute --price_frac 0.05 --seed 3
+--probe logit --price_mode relative --price_frac 0.1 --seed 3
+--probe logit --price_mode relative --price_frac 0.3 --seed 3
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --seed 3
+--probe logit --price_mode bar --price_frac 0.1 --steps 6000 --seed 3
+--probe logit --price_mode bar --price_frac 0.02 --seed 4
+--probe logit --price_mode bar --price_frac 0.05 --seed 4
+--probe logit --price_mode bar --price_frac 0.1 --seed 4
+--probe logit --price_mode bar --price_frac 0.2 --seed 4
+--probe logit --price_mode absolute --price_frac 0.005 --seed 4
+--probe logit --price_mode absolute --price_frac 0.02 --seed 4
+--probe logit --price_mode absolute --price_frac 0.05 --seed 4
+--probe logit --price_mode relative --price_frac 0.1 --seed 4
+--probe logit --price_mode relative --price_frac 0.3 --seed 4
+--probe logit --price_mode bar --price_frac 0.05 --steps 6000 --seed 4
+--probe logit --price_mode bar --price_frac 0.1 --steps 6000 --seed 4
