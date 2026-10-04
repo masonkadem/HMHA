@@ -83,10 +83,8 @@ with torch.no_grad():
     pred_off = model(tok, off).argmax(-1)[0]
 mask = predict_mask(starts, cfg)[0]
 
-fig = plt.figure(figsize=(7.2, 4.5))
-outer = fig.add_gridspec(2, 1, height_ratios=[0.85, 1], hspace=0.38)
-top = outer[0].subgridspec(1, 2, width_ratios=[2.2, 1.1], wspace=0.2)
-bot = outer[1].subgridspec(1, 3, width_ratios=[1, 1.05, 1.05], wspace=0.75)
+fig = plt.figure(figsize=(7.2, 2.3))
+top = fig.add_gridspec(1, 2, width_ratios=[2.5, 1], wspace=0.22)
 
 # ---------------------------------------------------------------- a  task and predictions
 ax = fig.add_subplot(top[0])
@@ -124,72 +122,19 @@ ok_off = sum(int(pred_off[t]) == int(tok[0, t + 1]) for t in range(end - 1) if m
 ax.text(end + 0.1, -1.35, f"{ok_on}/{nr}", va="center", fontsize=6.3, color=K)
 ax.text(end + 0.1, -2.5, f"{ok_off}/{nr}", va="center", fontsize=6.3, color=RED)
 
-# ---------------------------------------------------------------- b  where the kept heads look
-# the strongest kept head of each layer on the example in a: layer 1 looks one token back,
-# layer 2 looks at the token after the earlier copy of the current token
-sub = top[1].subgridspec(1, 2, wspace=0.12)
-best1 = max((h for h in range(h1) if kept[h]), key=lambda h: roles["prev"][0][h])
-best2 = max((h for h in range(model.sizes[1]) if kept[h1 + h]), key=lambda h: roles["ind"][1][h])
-for i, (layer, h, name) in enumerate(((0, best1, "layer 1:\nprevious token"), (1, best2, "layer 2:\ninduction"))):
-    a_ = fig.add_subplot(sub[i])
-    a_.imshow(attns[layer][0, h, :end, :end].numpy(), cmap="Reds", vmin=0, vmax=1, interpolation="nearest")
-    a_.set_xticks([]); a_.set_yticks([])
-    for sp in a_.spines.values():
-        sp.set_visible(True); sp.set_color(G2); sp.set_linewidth(0.5)
-    a_.set_xlabel(name, fontsize=6, linespacing=1.15, labelpad=2)
-    if i == 0:
-        a_.set_ylabel("token", fontsize=6, labelpad=2)
-        title(a_, "b", "Where the kept heads look")
-        a_.text(0.5, -0.42, "looks at \u2192", transform=a_.transAxes, fontsize=5.6, color=G1, ha="center", va="top")
-
-# ---------------------------------------------------------------- c  open heads over training
-ax = fig.add_subplot(bot[0])
+# ---------------------------------------------------------------- b  open heads over training
+ax = fig.add_subplot(top[1])
 for r in pick(**METHODS[0][1]):
     led = np.asarray(r["hist"]["ledger"]) > 0
     for cols, color, label in ((slice(0, h1), RED, "layer 1"), (slice(h1, None), K, "layer 2")):
         ax.plot(led[:, cols].sum(1), color=color, lw=0.8, alpha=0.6,
                 label=label if r["cfg"]["seed"] == 0 else None)
 ax.axhline(1, color=G2, lw=0.7, ls="--", zorder=0)
-ax.text(5950, 1.25, "needed", ha="right", va="bottom", fontsize=5.8, color=G1)
+ax.text(5950, 1.25, "needed per layer", ha="right", va="bottom", fontsize=5.8, color=G1)
 ax.set(xlim=(0, 6000), ylim=(0, 8.6), yticks=[0, 1, 2, 4, 8], xticks=[0, 3000, 6000],
        xticklabels=["0", "3k", "6k"], xlabel="training step", ylabel="open heads")
 ax.legend(loc="upper right", handlelength=1.2, borderaxespad=0, fontsize=6)
-title(ax, "c", "Heads closing (10 runs)")
-
-# ---------------------------------------------------------------- c  never broke, every run
-# every method kept the same heads here (2 in layer 1, 1 in layer 2, in every run), so the panel
-# shows the one thing that differs: whether the model stayed solved while heads closed
-ax = fig.add_subplot(bot[1])
-kept_all = set()
-for i, (name, kw, color, fill) in enumerate(METHODS):
-    rs = pick(**kw)
-    kept_all |= {(int(r["kept"][:h1].sum()), int(r["kept"][h1:].sum())) for r in rs}
-    n_ok = sum(never_broke(r) for r in rs)
-    ax.barh(i, n_ok, 0.6, color=RED if color == RED else "white", edgecolor=RED if color == RED else K, lw=0.6)
-    ax.text(n_ok + 0.2, i, f"{n_ok}/{len(rs)}", va="center", fontsize=6.3, color=RED if color == RED else K)
-ax.set(yticks=range(len(METHODS)), ylim=(len(METHODS) - 0.5, -0.5), xlim=(0, 13), xticks=[0, 5, 10],
-       xlabel="runs (of 10)")
-ax.set_yticklabels([m[0] for m in METHODS], fontsize=6, linespacing=1.1)
-assert kept_all == {(2, 1)}, kept_all
-ax.text(0, len(METHODS) + 0.5, "every run of every method\nkept 2 + 1 heads",
-        fontsize=5.8, color=G1, va="top", linespacing=1.15)
-title(ax, "d", "Never broke")
-
-# ---------------------------------------------------------------- d  loss during training, one seed
-ax = fig.add_subplot(bot[2])
-for label, kw, color in (("dense (8 + 8)", dict(rule="dense", steps=6000), G2),
-                         ("Michel et al. 2019", METHODS[1][1], K),
-                         ("ours", METHODS[0][1], RED)):
-    r = pick(**kw)[0]
-    ax.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=color, lw=0.9, label=label)
-r = pick(**METHODS[0][1])[0]
-ax.axhline(r["bar"], color=G2, lw=0.6, ls=":")
-ax.text(5950, r["bar"] * 1.25, "solved", ha="right", va="bottom", fontsize=5.5, color=G1)
-ax.set(yscale="log", ylim=(3e-4, 8), xlim=(0, 6000), xticks=[0, 2000, 4000, 6000],
-       xticklabels=["0", "2k", "4k", "6k"], xlabel="training step", ylabel="loss")
-ax.minorticks_off()
-ax.legend(loc="upper right", handlelength=1.2, borderaxespad=0, fontsize=5.6)
-title(ax, "e", "What breaking looks like")
+title(ax, "b", "Heads closing (10 runs)")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_induction.{ext}"), bbox_inches="tight", facecolor="white")

@@ -329,12 +329,13 @@ to how likely they are to be needed. A formula written before the experiments pr
 kept exactly in 21 of 24 runs and to within one head in the rest (Figure~\ref{fig:main}e).
 
 \paragraph{Induction.} In a two-layer attention-only model with 8 + 8 heads, the minimal induction
-circuit is one previous-token head and one induction head \cite{olsson2022}. Hemodynamic attenuation
-kept 2 + 1 heads in 10 of 10 runs and never broke the model. The kept heads had the expected roles
-in all 10 runs, and switching off the induction head reduced next-token accuracy on the repeat to
-zero (Figure~\ref{fig:induction}). Layer 2 reached the needed single head, while layer 1 kept two.
-Every method kept the same 2 + 1 heads on this task, so only stability separated them. The method
-of Michel et al.\ broke the model in all 10 runs.
+circuit is one previous-token head in layer 1 and one induction head in layer 2 \cite{olsson2022}.
+Our runs confirm this minimum in both directions. A dense model with 1 + 1 heads trained from
+scratch solved the task in 10 of 10 runs, and every run that ended with a layer empty failed to
+solve it (9 of 9). Hemodynamic attenuation kept 2 + 1 heads in 10 of 10 runs and never broke the
+model. Layer 2 reached the needed single head, while layer 1 kept one head more than needed
+(Figure~\ref{fig:induction}b). Switching off the kept layer-2 head reduced next-token accuracy on
+the repeat to zero (Figure~\ref{fig:induction}a).
 
 \begin{figure}[t]
 \centering
@@ -342,12 +343,8 @@ of Michel et al.\ broke the model in all 10 runs.
 \caption{Two-layer induction.
 \textbf{a}, An example sequence and the model's predictions on the repeat, with all kept heads
 (7/7 correct) and with the layer-2 head switched off (0/7).
-\textbf{b}, Attention of the kept heads on that sequence. The layer-1 head looks one token back, and
-the layer-2 head looks at the token after the earlier copy.
-\textbf{c}, Open heads in each layer during training, 10 runs. Layer 2 reaches the needed one head,
-and layer 1 stops at two.
-\textbf{d}, Runs that never broke, 10 per method, all with the same settings.
-\textbf{e}, Loss during training for one seed.}
+\textbf{b}, Open heads in each layer during training, 10 runs. Layer 2 reaches the needed one head,
+and layer 1 stops at two.}
 \label{fig:induction}
 \end{figure}
 
