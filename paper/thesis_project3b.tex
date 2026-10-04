@@ -59,23 +59,22 @@ The biology motivates the design, and no claim is made about the brain.
 
 \subsection{Astrocytes and attention}
 
-Kozachkov et al.\ \cite{kozachkov2023} showed that neurons and one astrocyte can approximately
-compute self-attention. With hidden activity $h = \varphi(Wx) \in \mathbb{R}^m$ and output
-synapses $H \in \mathbb{R}^{d \times m}$, each scaled by an astrocyte process (their Eq.~6),
+Softmax attention turns a query's scores $s_1, \dots, s_N$ into weights
 \begin{equation}
-\ell = \big(H \odot \widetilde P\big)\, h + x,
-\qquad \widetilde P_{i\alpha} = 1/p_{i\alpha}.
-\label{eq:koz6}
+a_i = \frac{e^{s_i}}{\sum_j e^{s_j}} ,
 \end{equation}
-Calcium equalises across the astrocyte, so every process takes the same value (their Eq.~8) and
-$H \odot \widetilde P = H/p$ with $p = \frac{1}{m}\sum_j \varphi(k_j)^{\top}\varphi(q_t)$. With
-Hebbian weights $H = \frac{1}{m} V\varphi(K)^{\top}$, the output for token $t$ is (their Eq.~11)
+a numerator that differs for each memory slot and a denominator that is one number shared by
+all of them. Kozachkov et al.\ \cite{kozachkov2023} showed that a network of neurons and one
+astrocyte can approximately compute self-attention. The neurons store the numerators in Hebbian
+synapses. The astrocyte computes the denominator: it pools activity across all the synapses it
+wraps and scales every one of them by the same gain, $1/p_t$. For token $t$ the output is
+approximately (their Eq.~11)
 \begin{equation}
-\ell_t = \frac{V\,\varphi(K)^{\top}\varphi(q_t)}{\sum_j \varphi(k_j)^{\top}\varphi(q_t)} + x_t
-\;\approx\; \sum_i \frac{e^{k_i^{\top} q_t}}{\sum_j e^{k_j^{\top} q_t}}\, v_i + x_t ,
+\ell_t \approx \frac{1}{p_t} \sum_i e^{k_i^{\top} q_t}\, v_i + x_t,
+\qquad p_t = \sum_j e^{k_j^{\top} q_t},
 \end{equation}
-since $\varphi(a)^{\top}\varphi(b) \approx e^{a^{\top} b}$. The neurons compute the numerator of
-the softmax and the astrocyte its denominator.
+which is softmax attention plus a residual connection. The point used in this chapter is that
+the astrocyte acts as a single gain on a whole block of synapses.
 
 \subsection{Head pruning}
 
@@ -130,34 +129,26 @@ results are unchanged for any threshold from $0.01$ to $0.1$.
 
 \subsection{Model}
 
-Matrices have one column per token, following \cite{kozachkov2023}. The model is one
-cross-attention layer with $H = 32$ heads and no MLP, reading queries $X$ and memory $Y$. Head $h$
-computes
+The model is one cross-attention layer with $H = 32$ heads and no MLP. Matrices have one column
+per token, as in \cite{kozachkov2023}: $X$ holds the queries and $Y$ the memory. Head $h$
+computes the usual attention,
 \begin{equation}
-E_h = \exp\!\Big(\tfrac{1}{\sqrt{d_k}}\, (W_K^h Y)^{\top} W_Q^h X\Big),
-\qquad
-D_h = \operatorname{diag}\big(\mathbf{1}^{\top} E_h\big),
-\qquad
-O_h = W_V^h Y\, E_h\, D_h^{-1},
+O_h = V_h\, \mathrm{softmax}\!\Big(\frac{K_h^{\top} Q_h}{\sqrt{d_k}}\Big),
+\qquad Q_h = W_Q^h X,\quad K_h = W_K^h Y,\quad V_h = W_V^h Y,
 \end{equation}
-where $E_h D_h^{-1}$ is the softmax. Each head is scaled by its valve before the heads are
-combined:
+with the softmax taken down each column, so each query's weights over the memory add up to one.
+Each head's output is multiplied by its valve $g_h$ before the heads are added together:
 \begin{equation}
-\hat{T} = \sum_{h=1}^{H} g_h\, W_O^h\, O_h = \big(W_O \odot P\big)\, O,
-\qquad P_{i,(h,c)} = g_h .
+\hat{T} = \sum_{h=1}^{H} g_h\, W_O^h\, O_h .
 \label{eq:valve}
 \end{equation}
 A head with $g_h = 0$ contributes nothing and receives no gradient, so a model with $k$ open
 valves is exactly a $k$-head model.
 
-The right-hand form of Equation~\eqref{eq:valve} is the astrocyte gain of
-Equation~\eqref{eq:koz6}, constant within each head's block of $W_O$ rather than over a whole
-domain. The layer therefore contains two gains of the same form (Table~\ref{tab:astro}):
-\begin{equation}
-\hat T = \sum_h g_h\, W_O^h\, W_V^h Y\, E_h\, D_h^{-1},
-\end{equation}
-where $D_h^{-1}$ is the per-query gain the astrocyte computes in \cite{kozachkov2023} and $g_h$ is
-the per-head gain set by our rule. The correspondence is algebraic only.
+The valve plays the same algebraic role as the astrocyte gain: one number that multiplies a
+whole block of synapses, here the output weights $W_O^h$ of one head. The two differ in what
+sets them and how fast they change (Table~\ref{tab:astro}). The correspondence is algebraic
+only.
 
 \begin{table}[h]
 \centering
@@ -166,10 +157,10 @@ the per-head gain set by our rule. The correspondence is algebraic only.
 \toprule
  & Astrocyte gain \cite{kozachkov2023} & Head valve \\
 \midrule
-Matrix form & $H \odot \widetilde P$, one value $1/p$ & $W_O \odot P$, one value $g_h$ per head \\
-Set by      & pooled input activity                   & collateral value relative to a price \\
-Time scale  & every token                             & over training \\
-Function    & softmax normalisation                   & selection of heads \\
+One number for     & all synapses of one astrocyte & all output weights of one head \\
+Set by             & pooled input activity         & collateral value relative to a price \\
+Changes            & with every token              & slowly, over training \\
+Function           & softmax denominator           & selection of heads \\
 \bottomrule
 \end{tabular}
 \caption{Two gains on blocks of synapses.}
@@ -189,20 +180,15 @@ open heads re-fit their output weights:
 \begin{equation}
 v_h = \min_W L(\text{without } h) - \min_W L(\text{all open heads}).
 \end{equation}
-With $Z$ the stacked outputs of the open heads on a batch, $A = \frac{1}{n} ZZ^{\top}$,
-$W^{*} = \frac{1}{n} TZ^{\top}A^{-1}$, $M = A^{-1}$ and $J$ the rows of head $h$,
-\begin{equation}
-v_h = \tfrac{1}{d_{\text{out}}}\,
-\operatorname{tr}\!\big( W^{*}_J \,(M_{JJ})^{-1} W^{*\top}_J \big),
-\end{equation}
-one inverse for all heads. This is the block Optimal Brain Surgeon score \cite{obs,ziplm}. The
-contribution is its use during training, with a price, a gradual fade, and reopening.
+This is the Optimal Brain Surgeon score \cite{obs}, applied to whole heads as in ZipLM
+\cite{ziplm}. The score is not new. The contribution is its use during training, with a price, a
+gradual fade, and reopening. It is computed in closed form from one matrix inverse
+(Section~\ref{sec:details}).
 
-The re-fit is what makes a copy worthless. If $z_2 = z_1$ and the target is $z_1$, removing head 2
-without re-fitting raises the loss by $0.25\,\mathrm{var}(z_1)$ when the weights are
-$(0.5, 0.5)$. With re-fitting, head 1 takes weight 1 and $v_2 = 0$. Computing the values added
-about 5\% to training compute. In one layer $A$ is the exact curvature, and deeper models would need a
-layer-wise approximation \cite{ziplm}.
+The re-fit is what makes a copy worthless. If two heads output the same signal and the weights
+are $(0.5, 0.5)$, removing one without re-fitting halves the output, so both heads look
+important. With re-fitting the other head takes weight 1, the loss does not change, and the copy
+is worth nothing.
 
 \subsection{Baselines and evaluation}
 
@@ -264,14 +250,10 @@ kept too many heads. With random choice it broke in 24 of 30 runs.
 and never both members of a pair. Without the re-fit, 8 to 15 heads and 4 to 7 pairs were kept
 (Figure~\ref{fig:main}d).
 
-\paragraph{Backup heads.} If each head fails with probability $p$, a head's value with $B$ heads
-open is
-\begin{equation}
-v(B) = \frac{1-p}{R}\; \Pr\big[\,\text{Binomial}(B-1,\,1-p) \le R-1\,\big],
-\end{equation}
-and the rule should keep the largest $B$ with $v(B)$ above the price. This prediction, made before
-the experiments, matched 21 of 24 runs exactly and the rest to within one head
-(Figure~\ref{fig:main}e).
+\paragraph{Backup heads.} When heads fail at random, the rule should keep extra heads in
+proportion to how likely they are to be needed. A formula written before the experiments
+(Section~\ref{sec:details}) predicted the number kept exactly in 21 of 24 runs and to within one
+head in the rest (Figure~\ref{fig:main}e).
 
 \paragraph{Induction.} In a two-layer attention-only model with 8 + 8 heads, trained to predict
 the token that followed an earlier copy of the current token, the minimal circuit is one
@@ -315,6 +297,30 @@ Two experiments would connect this chapter to the rest of the thesis and have no
 applying the rule to qSA-Cross, to test whether it keeps the two causal heads found in Chapter~4,
 and to the Cross-Site Transformer on WildPPG, to test whether the same heads are kept across all
 sixteen leave-one-subject-out folds.
+
+%=========================================================================================
+% This section can be left out of the proposal version.
+\section{Technical details}
+\label{sec:details}
+
+\paragraph{Collateral value in closed form.} Let $Z$ hold the outputs of the open heads on a
+batch ($n$ columns) and $T$ the targets. The best output weights are
+$W^{*} = T Z^{\top} (ZZ^{\top})^{-1}$. With $M = (ZZ^{\top}/n)^{-1}$ and $J$ the rows of head $h$,
+\begin{equation}
+v_h = \tfrac{1}{d_{\text{out}}}\,
+\operatorname{tr}\!\big( W^{*}_J \,(M_{JJ})^{-1} W^{*\top}_J \big),
+\end{equation}
+so one inverse serves all heads. This added about 5\% to training compute. In one layer
+$ZZ^{\top}/n$ is the exact curvature of the loss in the output weights. Deeper models would need a
+layer-wise approximation \cite{ziplm}.
+
+\paragraph{Backup heads.} If each head fails with probability $p$ at every step, with $B$ heads
+open and $R$ needed, a head's expected value is
+\begin{equation}
+v(B) = \frac{1-p}{R}\; \Pr\big[\,\text{Binomial}(B-1,\,1-p) \le R-1\,\big],
+\end{equation}
+the probability that it works times the probability that fewer than $R$ of the others do. The
+rule should keep the largest $B$ with $v(B)$ above the price.
 
 %=========================================================================================
 \begin{thebibliography}{99}
