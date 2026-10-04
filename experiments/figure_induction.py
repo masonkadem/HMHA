@@ -83,46 +83,45 @@ with torch.no_grad():
     pred_off = model(tok, off).argmax(-1)[0]
 mask = predict_mask(starts, cfg)[0]
 
-fig = plt.figure(figsize=(7.2, 4.0))
-outer = fig.add_gridspec(2, 1, height_ratios=[0.62, 1], hspace=0.38)
-bot = outer[1].subgridspec(1, 3, width_ratios=[1, 0.25, 1], wspace=0)
-top = [outer[0].subgridspec(1, 2, width_ratios=[4, 1], wspace=0)[0], bot[0], bot[2]]   # a, b, c
+fig = plt.figure(figsize=(7.2, 1.85))
+top = fig.add_gridspec(1, 3, width_ratios=[2.7, 1, 1], wspace=0.45)   # a, b, c on one row
+TOK = 4.6                                                             # font size inside token boxes
 
 # ---------------------------------------------------------------- a  task and predictions
 ax = fig.add_subplot(top[0])
-title(ax, "a", "Induction: find the earlier copy, predict what came next")
+title(ax, "a", "Induction task")
 ax.axis("off")
 f, s = int(starts[0, 0]), int(starts[0, 1])
 end = s + cfg.L
-ax.set(xlim=(-5.5, end + 1.2), ylim=(-3.2, 2.1))
-ax.text(-5.4, 0, "sequence", va="center", color=G1)
-ax.text(-5.4, -1.35, "prediction", va="center", color=G1)
-ax.text(-5.4, -2.5, "layer-2 heads off", va="center", color=G1)
+ax.set(xlim=(-5.2, end + 1.4), ylim=(-3.0, 2.0))
+ax.text(-5.2, 0, "sequence", va="center", color=G1, fontsize=6)
+ax.text(-5.2, -1.3, "prediction", va="center", color=G1, fontsize=6)
+ax.text(-5.2, -2.45, "layer 2 off", va="center", color=G1, fontsize=6)
 for t in range(end):
     in_copy = f <= t < f + cfg.L or s <= t < s + cfg.L
     ax.add_patch(Rectangle((t - 0.45, -0.4), 0.9, 0.8, facecolor=G3 if in_copy else "white",
                            edgecolor=K if in_copy else G2, lw=0.5))
-    ax.text(t, 0, str(int(tok[0, t])), ha="center", va="center", fontsize=5.3, color=K if in_copy else G1)
+    ax.text(t, 0, str(int(tok[0, t])), ha="center", va="center", fontsize=TOK, color=K if in_copy else G1)
 for t in range(end - 1):
     if not mask[t]:
         continue
-    for row, pred in ((-1.35, pred_on), (-2.5, pred_off)):
+    for row, pred in ((-1.3, pred_on), (-2.45, pred_off)):
         ok = int(pred[t]) == int(tok[0, t + 1])
         ax.add_patch(Rectangle((t + 1 - 0.45, row - 0.4), 0.9, 0.8, facecolor="white",
                                edgecolor=K if ok else RED, lw=0.5 if ok else 1.0))
-        ax.text(t + 1, row, str(int(pred[t])), ha="center", va="center", fontsize=5.3, color=K if ok else RED)
+        ax.text(t + 1, row, str(int(pred[t])), ha="center", va="center", fontsize=TOK, color=K if ok else RED)
 # the bracket runs above the boxes: from a token in the repeat back to what followed it the first time
 x0, x1, yb = s + 2, f + 3, 1.05
 ax.plot([x0, x0, x1], [0.45, yb, yb], color=RED, lw=0.7)
 ax.annotate("", xy=(x1, 0.45), xytext=(x1, yb + 0.01),
             arrowprops=dict(arrowstyle="-|>", color=RED, lw=0.7, mutation_scale=6, shrinkA=0, shrinkB=0))
 ax.text((x0 + x1) / 2, yb + 0.15, f"after {int(tok[0, x0])} came {int(tok[0, x1])} last time, "
-        f"so predict {int(tok[0, x1])}", ha="center", va="bottom", fontsize=6, color=RED)
+        f"so predict {int(tok[0, x1])}", ha="center", va="bottom", fontsize=5.5, color=RED)
 nr = int(mask.sum())
 ok_on = sum(int(pred_on[t]) == int(tok[0, t + 1]) for t in range(end - 1) if mask[t])
 ok_off = sum(int(pred_off[t]) == int(tok[0, t + 1]) for t in range(end - 1) if mask[t])
-ax.text(end + 0.1, -1.35, f"{ok_on}/{nr}", va="center", fontsize=6.3, color=K)
-ax.text(end + 0.1, -2.5, f"{ok_off}/{nr}", va="center", fontsize=6.3, color=RED)
+ax.text(end + 0.2, -1.3, f"{ok_on}/{nr}", va="center", fontsize=5.8, color=K)
+ax.text(end + 0.2, -2.45, f"{ok_off}/{nr}", va="center", fontsize=5.8, color=RED)
 
 # ---------------------------------------------------------------- b  open heads over training
 ax = fig.add_subplot(top[1])
@@ -132,32 +131,32 @@ for r in pick(**METHODS[0][1]):
         ax.plot(led[:, cols].sum(1), color=color, lw=0.8, alpha=0.6,
                 label=label if r["cfg"]["seed"] == 0 else None)
 ax.axhline(1, color=G2, lw=0.7, ls="--", zorder=0)
-ax.text(5950, 0.85, "needed per layer", ha="right", va="top", fontsize=5.8, color=G1)
+ax.text(5950, 0.8, "needed per layer", ha="right", va="top", fontsize=5.2, color=G1)
 ax.set(xlim=(0, 6000), ylim=(0, 8.6), yticks=[0, 1, 2, 4, 8], xticks=[0, 3000, 6000],
        xticklabels=["0", "3k", "6k"], xlabel="training step", ylabel="open heads")
-ax.legend(loc="upper right", handlelength=1.2, borderaxespad=0, fontsize=6)
-title(ax, "b", "Heads closing (10 runs)")
+ax.legend(loc="upper right", handlelength=1.0, handletextpad=0.4, borderaxespad=0, fontsize=5.4)
+title(ax, "b", "Heads closing")
 
 # ---------------------------------------------------------------- c  the minimal circuit: two layers, one head each
 # dense models trained from scratch with only the heads listed, 6000 steps, 10 seeds each
 ax = fig.add_subplot(top[2])
 rng = np.random.default_rng(2)
-groups = (((1, 0), "1 layer,\n1 head"), ((8, 0), "1 layer,\n8 heads"), ((1, 1), "2 layers,\n1 + 1"))
-names = []
+groups = (((1, 0), "1 layer\n1 head"), ((8, 0), "1 layer\n8 heads"), ((1, 1), "2 layers\n1 + 1"))
 for i, (heads, name) in enumerate(groups):
     rs = pick(heads=heads, rule="dense", steps=6000)
     loss = np.array([r["final_loss"] for r in rs])
     ok = loss <= rs[0]["bar"]
     color = RED if heads == (1, 1) else K
-    ax.plot(i + rng.uniform(-0.15, 0.15, len(loss)), loss, "o", ms=4, mec=K, mew=0.8,
+    ax.plot(i + rng.uniform(-0.15, 0.15, len(loss)), loss, "o", ms=3.4, mec=K, mew=0.7,
             mfc=(0.698, 0.094, 0.169, 0.25) if heads == (1, 1) else (1, 1, 1, 0.6), ls="none")
-    names.append(f"{name}\n{ok.sum()}/{len(rs)} solved")
+    ax.text(i, 40, f"{ok.sum()}/{len(rs)}", ha="center", va="center", fontsize=5.6, color=color)
 ax.axhline(rs[0]["bar"], color=G2, lw=0.6, ls=":")
-ax.text(2.45, rs[0]["bar"] * 1.3, "solved", ha="right", va="bottom", fontsize=5.6, color=G1)
-ax.set(yscale="log", ylim=(3e-4, 20), xlim=(-0.5, 2.5), xticks=range(3), ylabel="final loss")
-ax.set_xticklabels(names, fontsize=6, linespacing=1.15)
+ax.text(2.45, rs[0]["bar"] * 1.3, "solved", ha="right", va="bottom", fontsize=5.2, color=G1)
+ax.set(yscale="log", ylim=(3e-4, 150), xlim=(-0.5, 2.5), xticks=range(3), ylabel="final loss",
+       yticks=[1e-3, 1e-1, 1e1])
+ax.set_xticklabels([g[1] for g in groups], fontsize=5.4, linespacing=1.1)
 ax.minorticks_off()
-title(ax, "c", "Trained from scratch with only these heads")
+title(ax, "c", "Minimal circuit")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_induction.{ext}"), bbox_inches="tight", facecolor="white")
