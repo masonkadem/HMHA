@@ -39,9 +39,12 @@ md(r"""
 ## 1. The sizes
 """)
 code(r"""
-N, R, M = 8, 2, 4          # lockers (slots), distances = heads needed, numbers per item
-D, DK = 16, 8              # length of every vector, size of each head
-DISTANCES = [1, 5]         # look 1 and 5 lockers ahead
+N = 8                # how many lockers (memory slots)
+R = 2                # how many distances to look ahead; this is also how many heads the task needs
+M = 4                # how many numbers are stored in each locker (the item)
+D = 16               # length of every vector: 8 for the label + 4 for the item + 4 of noise
+DK = 8               # size of each head: how many numbers each head works with
+DISTANCES = [1, 5]   # the R distances: look 1 locker ahead, and 5 lockers ahead
 """)
 
 # ---------------------------------------------------------------- 2
