@@ -1,8 +1,8 @@
 """Main figure (publication style). Every number is read from the result pickles.
 
   Figure 2 (results). (a) loss and (b) heads during training for k* = 2, 4, 6, 8, collateral
-  rule against the dense model  (c) every method on the same 30 runs (k* = 2, 4, 8, 10 seeds):
-  exact count and never broke  (d) duplicated heads  (e) backup heads under damage.
+  rule against the dense model  (c) table: every method on the same 30 runs (k* = 2, 4, 8, 10 seeds),
+  score, use, exact count, never broke  (d) duplicated heads  (e) spare heads under failure  (f) one run per method.
   The task and model are in figure_setup.py; the full comparison table in figure_compare.py.
 
   python experiments/figure_main.py   ->  figures/fig_main.png and figures/fig_main.pdf
@@ -72,13 +72,13 @@ def compute(r):
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
 BAR = 0.02
-fig = plt.figure(figsize=(7.2, 6.4))
-gs = fig.add_gridspec(3, 4, height_ratios=[0.85, 0.7, 1.1], hspace=0.45, wspace=0.55)
-bottom = gs[2, :].subgridspec(1, 3, width_ratios=[1.75, 1, 1], wspace=0.55)
+fig = plt.figure(figsize=(7.2, 8.9))
+outer = fig.add_gridspec(3, 1, height_ratios=[1.55, 1.05, 1.1], hspace=0.32)
+bottom = outer[2].subgridspec(1, 3, wspace=0.5)
 
-# ---------------------------------------------------------------- c, d  training, small multiples
+# ---------------------------------------------------------------- a, b  training, small multiples
 show = (2, 4, 6, 8)
-cd = gs[0:2, :].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.16, wspace=0.55)
+cd = outer[0].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.16, wspace=0.55)
 for i, k in enumerate(show):
     r = sorted(runs(**RULE, n_rel=k), key=lambda r: get(r, "seed"))[0]
     d0 = next(d for d in dense(k) if d["cfg"]["seed"] == get(r, "seed"))
@@ -103,6 +103,8 @@ for i, k in enumerate(show):
         axl.set_ylabel("loss")
         axh.set_ylabel("heads")
         axl.legend(loc="upper right", handlelength=1.2, borderaxespad=0)
+        axl.text(1450, 2.2e-3, "heads\nclosing", fontsize=5.5, color=G1, va="bottom")
+        axl.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
     else:
         axl.set_title(f"$k^*={k}$", pad=4)
         axl.set_yticklabels([])
@@ -110,46 +112,61 @@ for i, k in enumerate(show):
     if i == 1:
         axh.set_xlabel("training step", x=1.15)
 
-# ---------------------------------------------------------------- c  every method on the same 30 runs
+# ---------------------------------------------------------------- c  the comparison, as a table with bars
 EQUAL = (2, 4, 8)                                  # tasks needing 2, 4 and 8 heads, 10 seeds each
-pick = lambda rs: [x for x in rs if get(x, "seed") < 10]
 
 
 def score(kw):
-    rs = pick([x for k in EQUAL for x in runs(**kw, n_rel=k)])
+    rs = [x for k in EQUAL for x in runs(**kw, n_rel=k) if get(x, "seed") < 10]
     return sum(kept(x) == get(x, "n_rel") for x in rs), sum(stayed_solved(x) for x in rs), len(rs)
 
 
 gates = {lam: score(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam)) for lam in (0.05, 0.2, 1.0)}
 best_lam = max(gates, key=lambda lam: gates[lam][0] + gates[lam][1])
-methods = [("collateral rule (ours)", score(RULE)),
-           ("Michel et al. 2019", score(dict(supply="prune"))),
-           ("learned gates (Voita et al. 2019)", gates[best_lam]),
-           ("same score, all at once", score({**RULE, "oneshot": 1, "budget_hold_frac": 0.3})),
-           ("ordinary importance", score({**RULE, "local_value": "ablate"})),
-           ("random choice", score({**RULE, "local_value": "random"}))]
-ax = fig.add_subplot(bottom[0])
-for i, (name, (exact, safe, n)) in enumerate(methods):
-    ours = i == 0
-    for j, (value, shade) in enumerate(((exact, RED if ours else K), (safe, "#e8a5a5" if ours else G2))):
-        y = i + (j - 0.5) * 0.36
-        ax.barh(y, 100 * value / n, 0.34, color=shade, lw=0)
-        ax.text(100 * value / n + 2, y, f"{value}/{n}", va="center", fontsize=5.5, color=RED if ours else G1)
-ax.set(yticks=range(len(methods)), xlim=(0, 168), xticks=[0, 50, 100], xlabel="% of runs", ylim=(len(methods) - 0.45, -0.6))
-ax.set_yticklabels([m for m, _ in methods], fontsize=6.3)
-ax.get_yticklabels()[0].set_color(RED)
-ax.spines["left"].set_visible(False)
-ax.tick_params(axis="y", length=0)
-ax.barh(0, 0, color=K, label="exact count")
-ax.barh(0, 0, color=G2, label="never broke")
-ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.56), handlelength=1, handletextpad=0.4, borderaxespad=0)
-title(ax, "c", "Every method, same 30 runs")
-print("panel c:", methods, "learned-gate penalty", best_lam)
+ONESHOT = {**RULE, "oneshot": 1, "budget_hold_frac": 0.3}
+OBD = {**RULE, "local_value": "ablate"}
+RANDOM = {**RULE, "local_value": "random"}
+rows = [  # method, how a head is scored, how it is used, (exact, never broke, runs)
+    ("Collateral rule (ours)", "OBS score: loss after removing it,\nthe others re-fit (Hassibi & Stork 1993)",
+     "during training, from scratch;\nprice per head, gradual fade", score(RULE)),
+    ("ZipLM-style\n(Kurtic et al. 2023)", "OBS score (the same as ours)", "all at once after training,\nthen fine-tuned", score(ONESHOT)),
+    ("OBD-style\n(LeCun et al. 1990)", "loss after removing it,\nno re-fit (diagonal Hessian)", "our rule, this score", score(OBD)),
+    ("Michel et al. 2019", r"gradient $|\partial L/\partial g_h|$", "one at a time, while solved", score(dict(supply="prune"))),
+    ("Learned gates\n(Voita et al. 2019)", "a learned on/off gate,\nL0 penalty (best of 3)", "learned during training",
+     gates[best_lam]),
+    ("Random choice", "none", "our rule, random head", score(RANDOM)),
+]
+ax = fig.add_subplot(outer[1])
+ax.axis("off")
+ax.set(xlim=(0, 1), ylim=(len(rows) + 0.75, -1.45))
+X_M, X_S, X_U, X_E, X_N, BW = 0.0, 0.215, 0.475, 0.70, 0.86, 0.10      # columns; BW = bar length for 100%
+for x, name in ((X_M, "Method"), (X_S, "How a head is scored"), (X_U, "How it is used"),
+                (X_E, "Exact count"), (X_N, "Never broke")):
+    ax.text(x, -0.55, name, fontsize=6.5, fontweight="bold", va="center")
+ax.plot([0, 1], [-0.2, -0.2], color=K, lw=0.6)
+for i, (method, scored, used, (exact, safe, n)) in enumerate(rows):
+    y = i + 0.35
+    c = RED if i == 0 else K
+    ax.text(X_M, y, method, color=c, fontsize=6.3, va="center", linespacing=1.2)
+    ax.text(X_S, y, scored, color=c, fontsize=5.8, va="center", linespacing=1.25)
+    ax.text(X_U, y, used, color=c, fontsize=5.8, va="center", linespacing=1.25)
+    for x, v, shade in ((X_E, exact, RED if i == 0 else K), (X_N, safe, "#e8a5a5" if i == 0 else G2)):
+        ax.add_patch(Rectangle((x, y - 0.22), BW * v / n, 0.44, color=shade, lw=0))
+        ax.add_patch(Rectangle((x, y - 0.22), BW, 0.44, fill=False, edgecolor=G3, lw=0.5))
+        ax.text(x + BW + 0.008, y, f"{v}/{n}", color=c, fontsize=6, va="center")
+    if i == 0:
+        ax.plot([0, 1], [y + 0.5, y + 0.5], color=G2, lw=0.4)
+ax.plot([0, 1], [len(rows) - 0.1, len(rows) - 0.1], color=K, lw=0.6)
+ax.text(0, len(rows) + 0.12, "Every method on the same 30 runs (tasks needing 2, 4 and 8 heads, 10 seeds each). "
+        "Exact count: heads left = heads needed.\nNever broke: once solved, the loss never went back above the solved bar.",
+        fontsize=5.5, color=G1, va="top", linespacing=1.3)
+ax.text(0, -1.45, r"$\mathbf{c}$   Every method, same 30 runs", fontsize=7, va="top")
+print("panel c:", [(m, sc) for m, _, _, sc in rows], "learned-gate penalty", best_lam)
 
-# ---------------------------------------------------------------- g  duplicated heads
+# ---------------------------------------------------------------- d  duplicated heads
 # every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its
 # copy, so it should be removed. Bars: heads kept, split into distinct heads and extra twins.
-ax = fig.add_subplot(bottom[1])
+ax = fig.add_subplot(bottom[0])
 rng = np.random.default_rng(1)
 for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate", "white", "importance"))):
     L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
@@ -164,11 +181,11 @@ ax.text(-0.57, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="left")
 ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin also kept")
 ax.legend(loc="upper left", handlelength=1.2, handletextpad=0.4, borderaxespad=0)
 ax.set(xticks=[0, 1], ylim=(0, 18), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
-ax.set_xticklabels(["collateral\nrule", "ordinary\nimportance"])
+ax.set_xticklabels(["collateral\nrule", "OBD-style"])
 title(ax, "d", "Every head given a twin")
 
-# ---------------------------------------------------------------- h  damage
-ax = fig.add_subplot(bottom[2])
+# ---------------------------------------------------------------- e  spare heads under failure
+ax = fig.add_subplot(bottom[1])
 
 
 def predict(R, p, price=0.03):
@@ -179,16 +196,36 @@ def predict(R, p, price=0.03):
 
 ps = [0.0, 0.05, 0.1, 0.2, 0.3]
 for R, m in ((4, "o"), (2, "s")):
-    ax.plot(ps, [predict(R, p) for p in ps], color=G2, lw=0.9, ls="--", zorder=1,
-            label="predicted" if R == 4 else None)
+    pred = [predict(R, p) for p in ps]
+    ax.fill_between(ps, R, pred, color=RED, alpha=0.10, lw=0, step=None)
+    ax.plot(ps, [R] * len(ps), color=G2, lw=0.6, ls=":")
+    ax.plot(ps, pred, color=G2, lw=0.9, ls="--", zorder=1, label="predicted before the runs" if R == 4 else None)
     means = [np.mean([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) for p in ps]
     ax.plot(ps, means, m, color=RED, ms=3.5, mfc=RED if R == 4 else "white", mew=0.8, ls="none",
             label="measured" if R == 4 else None)
-    ax.text(0.325, predict(R, 0.3), f"$k^*={R}$", va="center", fontsize=6, color=G1)
-ax.set(xlabel="chance a head fails", ylabel="heads kept", ylim=(1, 8), xlim=(-0.02, 0.385),
+    ax.text(0.31, R - 0.35 if R == 4 else R, f"needs {R}", va="center", fontsize=5.5, color=G1)
+ax.text(0.16, 4.45, "spares", fontsize=5.5, color=RED, ha="center")
+ax.set(xlabel="chance a head fails", ylabel="heads kept", ylim=(1, 8.6), xlim=(-0.02, 0.38),
        xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[2, 4, 6, 8])
-ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0)
-title(ax, "e", "Backup heads")
+ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0, fontsize=6)
+title(ax, "e", "Spare heads when heads can fail")
+
+# ---------------------------------------------------------------- f  what breaking looks like
+ax = fig.add_subplot(bottom[2])
+first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
+for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al."),
+                             (ONESHOT, G1, "-", "ZipLM-style"),
+                             (RANDOM, G2, "--", "random"),
+                             (RULE, RED, "-", "collateral")):
+    x = first(kw)
+    ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
+ax.axhline(BAR, color=G2, lw=0.6, ls=":")
+ax.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
+ax.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
+       xlabel="training step", ylabel="loss")
+ax.minorticks_off()
+ax.legend(loc="upper right", handlelength=1.4, borderaxespad=0, fontsize=5.8)
+title(ax, "f", "What breaking looks like ($k^*=4$)")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
