@@ -314,7 +314,10 @@ random head failure, and a two-layer induction task \cite{olsson2022}.
 
 \paragraph{Count and stability.} Hemodynamic attenuation kept exactly $\kstar$ heads in 29 of 30
 runs and never broke the model in 30 of 30. No other method achieved both
-(Figure~\ref{fig:main}c). Without the fade the model broke in every run. Without the re-fit it kept
+(Figure~\ref{fig:main}c). The method of Michel et al.\ stops when the loss crosses the solved
+threshold, so it breaks the model by design. Told the true number of heads instead, it stopped at
+that number but still broke the model in 28 of 30 runs. Without the fade the model broke in every
+run. Without the re-fit it kept
 too many heads. With random choice it broke in 24 of 30 runs.
 
 \paragraph{Duplicated heads.} With every head starting as a copy of another, the rule kept 4 heads
