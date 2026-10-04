@@ -74,8 +74,8 @@ def compute(r):
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
 BAR = 0.02
-fig = plt.figure(figsize=(7.2, 9.6))
-outer = fig.add_gridspec(3, 1, height_ratios=[1.55, 1.45, 1.1], hspace=0.3)
+fig = plt.figure(figsize=(7.2, 10.2))
+outer = fig.add_gridspec(3, 1, height_ratios=[1.55, 1.75, 1.1], hspace=0.28)
 bottom = outer[2].subgridspec(1, 3, wspace=0.5)
 
 # ---------------------------------------------------------------- a, b  training, small multiples
@@ -131,85 +131,84 @@ RANDOM = {**RULE, "local_value": "random"}
 INSTANT = {**RULE, "taper": 0}
 OBS = r"$\mathrm{min}_W\, L_{-h} - \mathrm{min}_W\, L$"
 SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1989)"
-rows = [  # (group, method, (score, where it comes from), during training, gradual fade, reopens, gate learned, result)
-    (None, "Hemodynamic\nattenuation (ours)", (OBS, SURGEON), "yes", "yes", "yes", "no", score(RULE)),
-    ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", (OBS, SURGEON), "no", "no", "no", "no", score(ONESHOT)),
-    (None, "Michel-style\n(Michel et al. 2019)", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "yes", "no", "no", "no",
+rows = [  # (group, method, (score, source), prunes during training as published, gradual fade, reopens, result)
+    (None, "Hemodynamic attenuation (ours)", (OBS, SURGEON), "yes", "yes", "yes", score(RULE)),
+    ("Published methods", "Kurtic et al. 2023 (ZipLM)", (OBS, SURGEON), "no", "no", "no", score(ONESHOT)),
+    (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "no", "no", "no",
      score(dict(supply="prune"))),
-    (None, "Voita-style gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
-     "yes", "no", "no", "yes", gates[best_lam]),
-    ("Controls: our rule with one part removed", "no fade\n(instant closing)", (OBS, SURGEON), "yes", "no", "yes", "no",
+    (None, "Voita et al. 2019", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
+     "no", "no", "no", gates[best_lam]),
+    ("Controls: our method with one part removed", "no fade (instant closing)", (OBS, SURGEON), "yes", "no", "yes",
      score(INSTANT)),
-    (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", "no", score(OBD)),
-    (None, "no score\n(random choice)", ("random head", ""), "yes", "yes", "yes", "no", score(RANDOM)),
+    (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", score(OBD)),
+    (None, "no score (random choice)", ("random head", ""), "yes", "yes", "yes", score(RANDOM)),
 ]
 ax = fig.add_subplot(outer[1])
 ax.axis("off")
-COLS = dict(method=0.0, score=0.165, during=0.47, fade=0.55, reopen=0.63, bars=0.72)
-BW = 0.17                                          # bar length for 100% of runs
+COLS = dict(method=0.0, score=0.27, train=0.585, fade=0.66, reopen=0.735, bars=0.80)
+BW = 0.125                                         # bar length for 100% of runs
+FS, FS_SMALL = 7.0, 6.0
 y = 0.0
-ax.text(0, y - 1.25, "Every method, same 30 runs", fontsize=7, va="top")
-AX_C, C_TITLE_Y = ax, y - 1.25
-for key, name in (("method", "Method"), ("score", "Head score"), ("during", "During\ntraining"), ("fade", "Gradual\nfade"),
-                  ("reopen", "Reopens")):
-    ha = "center" if key in ("during", "fade", "reopen") else "left"
-    ax.text(COLS[key] + (0.02 if ha == "center" else 0), y - 0.5, name, fontsize=6.3, fontweight="bold", va="center",
-            ha=ha, linespacing=1.15)
-ax.add_patch(Rectangle((COLS["bars"], y - 0.82), 0.018, 0.2, color=K, lw=0))
-ax.text(COLS["bars"] + 0.024, y - 0.72, "exact count", fontsize=6.3, fontweight="bold", va="center")
-ax.add_patch(Rectangle((COLS["bars"], y - 0.40), 0.018, 0.2, color=G2, lw=0))
-ax.text(COLS["bars"] + 0.024, y - 0.30, "never broke", fontsize=6.3, fontweight="bold", va="center")
+for key, name in (("method", "Method"), ("score", "Head score"), ("train", "Prunes in\ntraining*"),
+                  ("fade", "Gradual\nfade"), ("reopen", "Reopens")):
+    ha = "center" if key in ("train", "fade", "reopen") else "left"
+    ax.text(COLS[key] + (0.022 if ha == "center" else 0), y - 0.55, name, fontsize=FS if ha == "left" else FS - 0.6,
+            fontweight="bold", va="center", ha=ha, linespacing=1.15)
+AX_C, C_TITLE_Y = ax, y - 0.95
+ax.add_patch(Rectangle((COLS["bars"], y - 0.93), 0.018, 0.22, color=K, lw=0))
+ax.text(COLS["bars"] + 0.026, y - 0.82, "exact count", fontsize=FS - 0.6, fontweight="bold", va="center")
+ax.add_patch(Rectangle((COLS["bars"], y - 0.43), 0.018, 0.22, color=G2, lw=0))
+ax.text(COLS["bars"] + 0.026, y - 0.32, "never broke", fontsize=FS - 0.6, fontweight="bold", va="center")
 ax.plot([0, 1], [y - 0.05, y - 0.05], color=K, lw=0.6)
-y = 0.45
-for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
+y = 0.6
+for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
     if group:
-        y += 0.25
-        ax.text(0, y, group, fontsize=6, color=G1, style="italic", va="center")
-        ax.plot([0, 1], [y - 0.28, y - 0.28], color=G3, lw=0.5)
-        y += 0.72
+        y += 0.3
+        ax.text(0, y, group, fontsize=FS_SMALL + 0.3, color=G1, style="italic", va="center")
+        ax.plot([0, 1], [y - 0.34, y - 0.34], color=G3, lw=0.5)
+        y += 0.8
     ours = method.startswith("Hemodynamic")
     c = RED if ours else K
     if ours:                                       # light band behind our row
-        ax.add_patch(Rectangle((-0.005, y - 0.45), 1.005, 0.9, color="#fbeeee", lw=0, zorder=0))
-    ax.text(COLS["method"], y, method, color=c, fontsize=6.2, va="center", linespacing=1.15)
+        ax.add_patch(Rectangle((-0.005, y - 0.55), 1.005, 1.1, color="#fbeeee", lw=0, zorder=0))
+    ax.text(COLS["method"], y, method, color=c, fontsize=FS, va="center")
     formula, source = sc
-    ax.text(COLS["score"], y - (0.16 if source else 0), formula, color=c, fontsize=6.0, va="center")
+    ax.text(COLS["score"], y - (0.2 if source else 0), formula, color=c, fontsize=FS - 0.3, va="center")
     if source:
-        ax.text(COLS["score"], y + 0.24, source, color=c if ours else G1, fontsize=5.2, va="center")
-    for key, v in (("during", during), ("fade", fade), ("reopen", reopen)):  # a dot for yes, a dash for no
+        ax.text(COLS["score"], y + 0.28, source, color=c if ours else G1, fontsize=FS_SMALL - 0.3, va="center")
+    for key, v in (("train", train_), ("fade", fade), ("reopen", reopen)):  # a dot for yes, a dash for no
         if v == "yes":
-            ax.plot(COLS[key] + 0.02, y, "o", color=c, ms=3.6, mew=0)
+            ax.plot(COLS[key] + 0.022, y, "o", color=c, ms=4.2, mew=0)
         else:
-            ax.plot([COLS[key] + 0.012, COLS[key] + 0.028], [y, y], color=G2, lw=0.8)
-    for dy, v, shade in ((-0.17, exact, RED if ours else K), (0.17, safe, "#e8a5a5" if ours else G2)):
-        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW * v / n, 0.26, color=shade, lw=0))
-        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW, 0.26, fill=False, edgecolor=G3, lw=0.4))
-        ax.text(COLS["bars"] + BW + 0.008, y + dy, f"{v}/{n}", color=c, fontsize=5.6, va="center")
-    y += 0.95
-ax.plot([0, 1], [y - 0.45, y - 0.45], color=K, lw=0.6)
-ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no.   Published methods are run inside our training from scratch; the original papers prune trained models.", fontsize=5.6, color=G1, va="top")
-ax.set(xlim=(0, 1), ylim=(y + 0.2, -1.3))
-print("panel c:", [(m.replace(chr(10), " "), r) for _, m, _, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
+            ax.plot([COLS[key] + 0.012, COLS[key] + 0.032], [y, y], color=G2, lw=0.9)
+    for dy, v, shade in ((-0.2, exact, RED if ours else K), (0.2, safe, "#e8a5a5" if ours else G2)):
+        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW * v / n, 0.3, color=shade, lw=0))
+        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW, 0.3, fill=False, edgecolor=G3, lw=0.4))
+        ax.text(COLS["bars"] + BW + 0.01, y + dy, f"{v}/{n}", color=c, fontsize=FS_SMALL, va="center")
+    y += 1.15
+ax.plot([0, 1], [y - 0.55, y - 0.55], color=K, lw=0.6)
+ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each; every method run the same way here.   "
+        "*as published.   \u25cf yes   \u2013 no", fontsize=FS_SMALL, color=G1, va="top")
+ax.set(xlim=(0, 1), ylim=(y + 0.1, -1.05))
+print("panel c:", [(m, r) for _, m, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
 # ---------------------------------------------------------------- d  duplicated heads
-# every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its
-# copy, so it should be removed. Bars: heads kept, split into distinct heads and extra twins.
+# every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its copy,
+# so it should be removed. One circle per run: heads kept; below, how many pairs kept both twins.
 ax = fig.add_subplot(bottom[0])
 rng = np.random.default_rng(1)
-for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate", "white", "importance"))):
+for i, (value, color) in enumerate((("refit", RED), ("ablate", K))):
     L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
     n_kept = np.array([o.sum() for o in L])
     twins = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16)) for o in L])
-    distinct = (n_kept - twins).mean()
-    ax.bar(i, distinct, 0.6, color=face, edgecolor=RED if face == RED else K, lw=0.6)
-    ax.bar(i, twins.mean(), 0.6, bottom=distinct, color="white", edgecolor=K, lw=0.6, hatch="//////")
-    ax.plot(i + rng.uniform(-0.16, 0.16, len(n_kept)), n_kept, "o", ms=4.6, mfc=(1, 1, 1, 0.55), mec=K, mew=0.9,
-            ls="none", zorder=3)                  # one circle per run
-ax.axhline(4, color=G2, lw=0.6, ls=":", zorder=0)
-ax.text(-0.57, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="left")
-ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin also kept")
-ax.legend(loc="upper left", handlelength=1.2, handletextpad=0.4, borderaxespad=0)
-ax.set(xticks=[0, 1], ylim=(0, 18), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
+    fill = (0.698, 0.094, 0.169, 0.25) if color == RED else (1, 1, 1, 0.6)
+    ax.plot(i + rng.uniform(-0.17, 0.17, len(n_kept)), n_kept, "o", ms=5, mfc=fill, mec=K, mew=0.9, ls="none", zorder=3)
+    lo, hi = twins.min(), twins.max()
+    ax.text(i, 0.9, f"twin pairs\nkept: {lo}" if lo == hi else f"twin pairs\nkept: {lo}\u2013{hi}", ha="center",
+            va="bottom", fontsize=6, color=color, linespacing=1.15)
+ax.axhline(4, color=G2, lw=0.7, ls="--", zorder=0)
+ax.text(1.55, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="right")
+ax.set(xticks=[0, 1], ylim=(0, 17), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
 ax.set_xticklabels(["hemodynamic\nattenuation", "OBD-style"])
 ax.set_title("Every head given a twin", pad=4)
 AX_D = ax
@@ -231,7 +230,7 @@ ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="
 for i, p in enumerate(ps):
     spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
     jitter = rng.uniform(-0.009, 0.009, len(spares))
-    ax.plot(p + jitter, spares, "o", ms=4.6, mfc=(0.698, 0.094, 0.169, 0.22), mec=RED, mew=0.9, ls="none",
+    ax.plot(p + jitter, spares, "o", ms=5, mfc=(0.698, 0.094, 0.169, 0.25), mec=K, mew=0.9, ls="none",
             label="measured (one circle per run)" if i == 0 else None)
 ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
        xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
@@ -241,8 +240,8 @@ title(ax, "e", "Spare heads when heads fail ($k^*=4$)")
 # ---------------------------------------------------------------- f  what breaking looks like
 ax = fig.add_subplot(bottom[2])
 first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
-for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel-style"),
-                             (ONESHOT, G1, "-", "ZipLM-style"),
+for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al. 2019"),
+                             (ONESHOT, G1, "-", "Kurtic et al. 2023"),
                              (RANDOM, G2, "--", "random"),
                              (RULE, RED, "-", "ours")):
     x = first(kw)
@@ -260,7 +259,7 @@ for letter, axis in (("a", AX_A), ("b", AX_B), ("d", AX_D)):
     tr = offset_copy(blended_transform_factory(fig.transFigure, axis.transAxes), fig=fig, y=4, units="points")
     fig.text(X_LETTER, 1.0, letter, transform=tr, fontsize=7, fontweight="bold", va="baseline")
 fig.text(X_LETTER, C_TITLE_Y, "c", transform=blended_transform_factory(fig.transFigure, AX_C.transData),
-         fontsize=7, fontweight="bold", va="top")
+         fontsize=7, fontweight="bold", va="center")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
