@@ -23,44 +23,45 @@
 %=========================================================================================
 \section{Overview}
 
-Wearable devices now stage sleep, estimate heart rate from light passed through the skin, and
-remove motion noise as it happens, all continuously on a device the size of a watch face. Blood
-pressure, one of the most basic hemodynamic measurements, is still taken much as it was around
-1900. A cuff is inflated around the upper arm until it stops the flow of blood, then slowly
-released while the device listens for the sounds, or senses the pressure oscillations, of blood
-forcing its way back through the compressed artery. The result is a single reading of a quantity
-that changes with every heartbeat.
+The circulation works at two scales. In the macrocirculation, the large arteries, each heartbeat
+sends a pressure wave from the heart to the periphery, and the timing of that wave carries
+information about blood pressure. In the microcirculation, small vessels match local supply to
+local demand. In the brain this matching is tuned continuously. Astrocytes help raise flow where
+neurons are active, collateral vessels take over when a route is lost, and vessels that carry
+little flow are gradually pruned. This chapter draws on both scales. The physics of the large
+arteries defines what a correct blood pressure model must compute, and the regulation of the
+microcirculation suggests how a model should allocate its own computation.
 
-The continuous reference is invasive. A catheter carrying a pressure sensor is placed inside an
-artery, which is done only in intensive care and during surgery. Neither the cuff nor the catheter
-allows continuous monitoring in daily life.
+Blood pressure is the motivating measurement. Wearable devices now stage sleep, estimate heart
+rate from light passed through the skin, and remove motion noise as it happens, all continuously
+on a device the size of a watch face. Blood pressure, one of the most basic hemodynamic
+measurements, is still taken much as it was around 1900. A cuff is inflated around the upper arm
+until it stops the flow of blood, then slowly released while the device listens for the sounds, or
+senses the pressure oscillations, of blood forcing its way back through the compressed artery. The
+result is a single reading of a quantity that changes with every heartbeat. The continuous
+reference is a catheter with a pressure sensor placed inside an artery, used only in intensive care
+and during surgery. Neither allows continuous monitoring in daily life.
 
-Pulse transit time offers a way around both. Each heartbeat launches a pressure wave along the
-arteries. Timing that wave between two points on the body gives its speed, and the wave travels
-faster when pressure is higher. In principle, blood pressure then follows from a timing
-measurement and a calibration.
+Pulse transit time offers a way around both. Timing the pressure wave between two points on the
+body gives its speed, and the wave travels faster when pressure is higher. The artery, however, is
+not a passive pipe. When the left ventricle ejects blood into the aorta, the blood itself moves at
+about 1~m/s at peak systole, while the stretch of the arterial wall travels along the arterial tree
+at 4 to 15~m/s, depending on how stiff the arteries are. Transit time measures this wave in the
+wall, and the stiffness of the wall depends on pressure in a way that differs between people
+(Section~\ref{sec:bp_background}). A cuffless estimator can therefore match reference pressure on
+a benchmark while computing nothing related to pulse propagation, and accuracy alone cannot reveal
+this.
 
-In practice the artery is not a passive pipe. When the left ventricle ejects blood into the aorta,
-the blood itself moves at about 1~m/s at peak systole. The ejection also stretches the arterial
-wall, and this stretch travels along the arterial tree at 4 to 15~m/s, depending on how stiff the
-arteries are. Transit time measures this wave in the wall, not the movement of the blood, and the
-stiffness of the wall depends on pressure in a way that differs between people
-(Section~\ref{sec:bp_background}).
-
-Chapter~3 constrained what a model sees. Chapter~4 used blood flow principles to constrain the
-macro architecture of a model, at the level of cross-attention between measurement sites. This
-chapter moves to the computation inside the model and asks whether it can be verified. Blood
-pressure is the test case because it is the hemodynamic quantity for which an unverified model is
-most dangerous. A cuffless estimator can match reference pressure on a benchmark while computing
-nothing related to pulse propagation, and accuracy alone cannot reveal this.
-
-The chapter has two parts. Project~3A (Section~\ref{sec:audit}) is a mechanistic audit that tests
-whether an estimator's prediction depends on transit time in the way the physics requires, with
-preliminary results on a synthetic testbed. Project~3B (Section~\ref{sec:3b}) applies a second
-set of blood flow principles, from how the brain keeps and prunes its vessels, to the micro
-architecture of a transformer. A rule we call hemodynamic attenuation closes attention heads
-during training until only the circuit the task needs remains, so that the computation which
-survives training is small enough to audit.
+Chapter~3 constrained what a model sees. Chapter~4 used the macrocirculation to constrain the macro
+architecture of a model, at the level of cross-attention between measurement sites. This chapter
+moves inside the model. Project~3A (Section~\ref{sec:audit}) uses the physics of the large arteries
+to verify a model: a mechanistic audit tests whether an estimator's prediction depends on transit
+time in the way the physics requires, with preliminary results on a synthetic testbed. Project~3B
+(Section~\ref{sec:3b}) uses the regulation of the microcirculation to build the model: a rule we
+call hemodynamic attenuation closes attention heads during training, the way unneeded vessels
+regress, until only the circuit the task needs remains. The two meet in a joint experiment. A blood
+pressure model trained with hemodynamic attenuation keeps only a few heads, and the audit of 3A can
+then ask which of them, if any, carries transit time (Section~\ref{sec:joint}).
 
 %=========================================================================================
 \section{Background}
@@ -149,7 +150,9 @@ systems of this kind have already been reported \cite{jeong2016}, so this route 
 \section{Project 3B: Hemodynamic Attenuation of the Micro Architecture}
 \label{sec:3b}
 
-An audit is only practical when the computation it examines is small. In Chapter~4, a trained
+An audit is only practical when the computation it examines is small. In the microcirculation,
+supply is not fixed in advance. Vessels are kept where they are needed and pruned where they are
+not. Project~3B applies the same idea to attention heads. In Chapter~4, a trained
 transformer carried its causal computation in two of forty heads, but this was found only after
 training, by ablating each head in turn, and the number of heads to keep had to be chosen by hand.
 Project~3B asks whether a model can find the number of heads it needs during training, without
@@ -391,6 +394,17 @@ the same layer-wise approach used to prune large language models \cite{ziplm}. T
 needed to apply the rule at scale. We will then test the rule on qSA-Cross, asking whether it keeps
 the two causal heads found in Chapter~4, and on the Cross-Site Transformer with WildPPG, asking
 whether the same heads are kept across all sixteen leave-one-subject-out folds.
+
+\subsection{Joint experiment: attenuate, then audit}
+\label{sec:joint}
+
+The two projects meet in one experiment. A transformer is trained to estimate blood pressure on
+the synthetic tube-load testbed of Project~3A, where the role of transit time is known, with
+hemodynamic attenuation closing heads during training. The audit of Project~3A is then run on each
+of the few heads that remain. If the model computes pressure from transit time, the audit should
+find it in a small number of named heads, and switching those heads off should move the predicted
+pressure in the direction the physics requires. If no surviving head carries transit time, the
+model is accurate for another reason, and the audit has caught it with far fewer heads to check.
 
 %=========================================================================================
 \section{Timeline}

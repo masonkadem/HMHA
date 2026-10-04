@@ -19,7 +19,8 @@ TASKS = [  # (label, first month, last month), months counted from 0 = October 2
     ("Proposal, comprehensive exam, preliminary results", 0, 1),
     ("qSA-Cross: compare with Chapter 4 heads", 2, 4),
     ("Cross-Site Transformer on WildPPG", 4, 6),
-    ("Scaling to large language models", 6, 9),
+    ("Attenuate, then audit a blood pressure model", 5, 7),
+    ("Scaling to large language models", 7, 9),
     ("Paper writing and submission", 9, 10),
     ("Thesis writing and defence", 11, 14),
 ]
