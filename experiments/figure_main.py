@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.transforms import blended_transform_factory, offset_copy
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
@@ -99,8 +100,8 @@ for i, k in enumerate(show):
     axh.minorticks_off()
     axh.text(3950, 22, f"compute {compute(r):.2f}", ha="right", fontsize=6, color=RED)
     if i == 0:
-        title(axl, "a", f"$k^*={k}$")
-        axh.text(-0.42, 1.0, r"$\mathbf{b}$", transform=axh.transAxes, fontsize=7, va="bottom")
+        axl.set_title(f"$k^*={k}$", pad=4)
+        AX_A, AX_B = axl, axh
         axl.set_ylabel("loss")
         axh.set_ylabel("heads")
         axl.legend(loc="upper right", handlelength=1.2, borderaxespad=0)
@@ -133,7 +134,7 @@ rows = [  # (group, method, score, during training, gradual fade, reopens, gate 
     (None, "Collateral rule (ours)", OBS + "  (OBS)", "yes", "yes", "yes", "no", score(RULE)),
     ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", OBS + "  (OBS)", "no", "no", "no", "no", score(ONESHOT)),
     (None, "Michel et al. 2019", r"$|\partial L / \partial g_h|$", "yes", "no", "no", "no", score(dict(supply="prune"))),
-    (None, "Learned gates\n(Voita et al. 2019)", r"$L + \lambda \sum_h P(g_h \neq 0)$", "yes", "no", "yes", "yes",
+    (None, "Learned gates\n(Voita et al. 2019)", r"$L + \lambda \sum_h P(g_h \neq 0)$", "yes", "no", "no*", "yes",
      gates[best_lam]),
     ("Ablations of our rule (one part removed)", "no fade\n(instant closing)", OBS, "yes", "no", "yes", "no", score(INSTANT)),
     (None, "no re-fit (OBD score,\nLeCun et al. 1990)", r"$L_{-h}(W) - L(W)$", "yes", "yes", "yes", "no", score(OBD)),
@@ -144,7 +145,8 @@ ax.axis("off")
 COLS = dict(method=0.0, score=0.185, during=0.405, fade=0.475, reopen=0.545, learned=0.615, bars=0.70)
 BW = 0.17                                          # bar length for 100% of runs
 y = 0.0
-ax.text(0, y - 1.25, r"$\mathbf{c}$   Every method, same 30 runs", fontsize=7, va="top")
+ax.text(0, y - 1.25, "Every method, same 30 runs", fontsize=7, va="top")
+AX_C, C_TITLE_Y = ax, y - 1.25
 for key, name in (("method", "Method"), ("score", "Head score"), ("during", "During\ntraining"), ("fade", "Gradual\nfade"),
                   ("reopen", "Reopens"), ("learned", "Gate\nlearned")):
     ax.text(COLS[key], y - 0.5, name, fontsize=6.3, fontweight="bold", va="center", linespacing=1.15)
@@ -174,7 +176,8 @@ for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
 ax.plot([0, 1], [y - 0.4, y - 0.4], color=K, lw=0.6)
 ax.text(0, y - 0.25, "Every method on the same 30 runs (tasks needing 2, 4 and 8 heads, 10 seeds each). Exact count: heads left = "
         "heads needed. Never broke: once solved, the loss never\nwent back above the solved bar. OBS = Optimal Brain Surgeon "
-        "(Hassibi & Stork 1993): the loss after removing head h, the others re-fitted. Learned gates: best of 3 penalties.",
+        "(Hassibi & Stork 1993): the loss after removing head h, the others re-fitted. Learned gates: best of 3 penalties;\n"
+        "*a closed gate could reopen by gradient, but none of the 2,709 closed gates did.",
         fontsize=5.4, color=G1, va="top", linespacing=1.3)
 ax.set(xlim=(0, 1), ylim=(y + 0.75, -1.3))
 print("panel c:", [(m.replace(chr(10), " "), r) for _, m, _, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
@@ -198,7 +201,8 @@ ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin als
 ax.legend(loc="upper left", handlelength=1.2, handletextpad=0.4, borderaxespad=0)
 ax.set(xticks=[0, 1], ylim=(0, 18), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
 ax.set_xticklabels(["collateral\nrule", "OBD-style"])
-title(ax, "d", "Every head given a twin")
+ax.set_title("Every head given a twin", pad=4)
+AX_D = ax
 
 # ---------------------------------------------------------------- e  spare heads under failure
 ax = fig.add_subplot(bottom[1])
@@ -242,6 +246,13 @@ ax.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xti
 ax.minorticks_off()
 ax.legend(loc="upper right", handlelength=1.4, borderaxespad=0, fontsize=5.8)
 title(ax, "f", "What breaking looks like ($k^*=4$)")
+
+X_LETTER = AX_A.get_position().x0 - 0.085           # one column for the left-hand panel letters
+for letter, axis in (("a", AX_A), ("b", AX_B), ("d", AX_D)):
+    tr = offset_copy(blended_transform_factory(fig.transFigure, axis.transAxes), fig=fig, y=4, units="points")
+    fig.text(X_LETTER, 1.0, letter, transform=tr, fontsize=7, fontweight="bold", va="baseline")
+fig.text(X_LETTER, C_TITLE_Y, "c", transform=blended_transform_factory(fig.transFigure, AX_C.transData),
+         fontsize=7, fontweight="bold", va="top")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
