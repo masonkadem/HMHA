@@ -108,18 +108,19 @@ lines = [
     "Each sheet is one step. Work through them in order: 1 Task, 2 One head, 3 Two heads, 4 Why R heads,",
     "5 Collateral value, 6 The rule, 7 Backup heads.",
     "",
-    "Colours:  yellow = an input you may change (blue numbers)   blue = left matrix   orange = top matrix",
-    "          green = the product (a formula)   grey = other computed cells",
+    "Colours:  yellow = an input you may change (blue numbers)   blue = left matrix (the WEIGHTS)",
+    "          orange = top matrix (the DATA)   green = the result (a formula)   grey = other computed cells",
     "",
-    "How to read an L-shape. To multiply A times B, put B above and to the right, A below and to the left.",
-    "Each green cell sits in A's row and B's column: multiply them entry by entry and add. Try it below,",
-    "then click any green cell to see the formula Excel uses: it is exactly your hand calculation.",
+    "How to read an L-shape. To compute W times X: the WEIGHTS W go on the LEFT, the DATA X go on TOP, and the",
+    "result sits in between: to the right of W and below X. Each green cell sits in W's row and X's column:",
+    "multiply them entry by entry and add. Click any green cell to see the formula: it is your hand calculation.",
+    "Every sheet uses this layout. The data always has one COLUMN per item (per memory slot, or per query).",
 ]
 for i, s in enumerate(lines):
     text(ws, 3 + i, 2, s)
-lblock(ws, 13, 3, [[1, 2], [3, 4]], [[5, 6], [7, 8]], "A", "B", "A B",
+lblock(ws, 13, 3, [[1, 2], [3, 4]], [[5, 6], [7, 8]], "W (weights)", "X (data)", "W X",
        rowlab=["row 1", "row 2"], collab=["col 1", "col 2"], inpA=True, inpB=True, fmtC="General")
-text(ws, 21, 2, "By hand: row 1 times col 1 = 1*5 + 2*7 = 19.   row 2 times col 2 = 3*6 + 4*8 = 50.")
+text(ws, 21, 2, "By hand: W row 1 times X column 1 = 1*5 + 2*7 = 19.   W row 2 times X column 2 = 3*6 + 4*8 = 50.")
 text(ws, 23, 2, "The tiny task: 4 memory slots, 2 distances (1 and 3), one number per item. The real experiments use")
 text(ws, 24, 2, "16 slots, 4 distances (1, 5, 9, 13), 16 numbers per item and 32 heads: same steps, bigger matrices.")
 
@@ -154,150 +155,100 @@ text(ws, 14, 2, "target 1 = the item in slot (p+1) mod 4;  target 2 = the item i
 text(ws, 15, 2, "By hand: query 0 has p = 2. (2+1) mod 4 = 3, so target 1 = c_3 = 6. (2+3) mod 4 = 1, so target 2 = c_1 = 1.")
 text(ws, 16, 2, "Why mod: without it p = 2 would need slot 5, which does not exist. Wrapping round gives every query")
 text(ws, 17, 2, "both answers inside the memory, and 'look 1 ahead' is the same rule at every position.")
-text(ws, 19, 2, "As matrices (used on the next sheets): memory row j = [one-hot of j | c_j], query row i = one-hot of p_i,")
-text(ws, 20, 2, "target row i = [c_(p+1) | c_(p+3)]. The real code adds a little noise to every vector.")
+text(ws, 19, 2, "As matrices (used on the next sheets): memory column j = [one-hot of j ; c_j], query column i = one-hot of p_i,")
+text(ws, 20, 2, "target column i = [c_(p+1) ; c_(p+3)]. The real code adds a little noise to every vector.")
 text(ws, 22, 2, "What are 'memory' and 'slots'? Yes, the memory is just a list: [2, 1, -3, 6]. A slot is a position", bold=True)
 text(ws, 23, 2, "in that list (0, 1, 2, 3), like an index. In plain Python the whole task is:")
 text(ws, 24, 3, "memory = [2, 1, -3, 6];   answer(p) = (memory[(p + 1) % 4], memory[(p + 3) % 4])")
 text(ws, 25, 2, "So why the one-hot labels? Attention cannot see list positions: it compares the query with every row and")
 text(ws, 26, 2, "treats the rows like an unordered pile. So each memory row carries its own position as a code next to its")
-text(ws, 27, 2, "item (slot 2 = [0, 0, 1, 0 | -3]), the query carries a code for p, and the head learns to match codes.")
+text(ws, 27, 2, "item (slot 2 = [0, 0, 1, 0 ; -3], one column), the query carries a code for p, and the head learns to match codes.")
 text(ws, 28, 2, "The items change every example, so the model cannot memorise them; it can only learn WHERE to look.")
 
 
 # ===================================================================== a head, built by hand
-S_POS = {}
+# Every L-shape: WEIGHTS on the LEFT, DATA on TOP (one column per slot or per query), result in between.
 
 
 def build_head(ws, top, shift, tag):
-    """One attention head that looks `shift` slots ahead. Returns the cells of its output O (4 x 1)
-    and the next free row."""
+    """One attention head that looks `shift` slots ahead. Returns the cells of its output (one row:
+    one number per query) and the next free row."""
     slots = [f"slot {j}" for j in range(N)]
     queries = [f"p = {P[i]}" for i in range(N)]
-    # memory Y: [one-hot of j | item]
-    Y = [[1 if t == j else 0 for t in range(N)] + [f"={ITEM[j]}"] for j in range(N)]
-    ycol = [f"lab {t}" for t in range(N)] + ["item"]
-    # keys: K = Y W_K, W_K copies the slot label and ignores the item
-    WK = [[1 if (t == u) else 0 for u in range(N)] for t in range(N)] + [[0] * N]
-    text(ws, top, 2, f"(a) Keys: K = Y W_K. W_K keeps each slot's label and ignores its item, so key j = one-hot of j.",
-         italic=True)
-    _, _, K = lblock(ws, top + 1, 3, Y, WK, "Y (memory)", "W_K", "K = Y W_K",
-                     rowlab=slots, collab=[f"k{u}" for u in range(N)], inpB=True, fmtC="General")
+    # memory Y: one COLUMN per slot = [one-hot of j ; item]
+    Y = [[1 if t == j else 0 for j in range(N)] for t in range(N)] + [[f"={ITEM[j]}" for j in range(N)]]
+    WK = [[1 if t == u else 0 for t in range(N + 1)] for u in range(N)]
+    text(ws, top, 2, "(a) Keys: K = W_K Y. Weights on the left, memory on top (one column per slot). W_K keeps each "
+                     "slot's label and ignores its item, so key j = one-hot of j.", italic=True)
+    _, _, K = lblock(ws, top + 1, 3, WK, Y, "W_K (weights)", "Y (memory: one column per slot)",
+                     "K = W_K Y (one column per slot)", rowlab=[f"k{u}" for u in range(N)], collab=slots,
+                     inpA=True, fmtC="General")
     top = K[0] + N + 2
-    # values: V = Y W_V, W_V keeps only the item
-    WV = [[0]] * N + [[1]]
-    text(ws, top, 2, "(b) Values: V = Y W_V. W_V keeps only the item, so value j = c_j.", italic=True)
-    _, _, V = lblock(ws, top + 1, 3, Y, WV, "Y (memory)", "W_V", "V = Y W_V",
-                     rowlab=slots, collab=["v"], inpB=True, fmtC="General")
-    top = V[0] + N + 2
-    # queries: Q = X W_Q, W_Q shifts the label by `shift`
-    X = [[f"=IF({PCELL[i]}={t},1,0)" for t in range(N)] for i in range(N)]
-    WQ = [[1 if u == (t + shift) % N else 0 for u in range(N)] for t in range(N)]
-    text(ws, top, 2, f"(c) Queries: Q = X W_Q. Row t of W_Q has its 1 in column (t + {shift}) mod 4, so the query for p "
-                     f"becomes one-hot of p + {shift}: this head looks {shift} ahead.", italic=True)
-    _, _, Q = lblock(ws, top + 1, 3, X, WQ, "X (queries, one-hot of p)", f"W_Q (shift by {shift})", "Q = X W_Q",
-                     rowlab=queries, collab=[f"q{u}" for u in range(N)], inpB=True, fmtC="General")
+    # values: V = W_V Y, W_V keeps only the item
+    WV = [[0] * N + [1]]
+    text(ws, top, 2, "(b) Values: V = W_V Y. W_V keeps only the item, so value j = c_j.", italic=True)
+    _, _, V = lblock(ws, top + 1, 3, WV, Y, "W_V (weights)", "Y (memory: one column per slot)", "V = W_V Y",
+                     rowlab=["v"], collab=slots, inpA=True, fmtC="General")
+    top = V[0] + 3
+    # queries: Q = W_Q X, W_Q shifts the label by `shift`
+    X = [[f"=IF({PCELL[i]}={t},1,0)" for i in range(N)] for t in range(N)]
+    WQ = [[1 if u == (t + shift) % N else 0 for t in range(N)] for u in range(N)]
+    text(ws, top, 2, f"(c) Queries: Q = W_Q X. X has one column per query (one-hot of p). Column t of W_Q has its 1 in "
+                     f"row (t + {shift}) mod 4, so query p becomes one-hot of p + {shift}: this head looks {shift} ahead.",
+         italic=True)
+    _, _, Q = lblock(ws, top + 1, 3, WQ, X, f"W_Q (weights, shift by {shift})", "X (queries: one column per query)",
+                     "Q = W_Q X (one column per query)", rowlab=[f"q{u}" for u in range(N)], collab=queries,
+                     inpA=True, fmtC="General")
     top = Q[0] + N + 2
-    # scores: S = Q K^T
-    text(ws, top, 2, "(d) Scores: S = Q K^T. Row i, column j = query i dotted with key j: 1 where j = p + shift.",
-         italic=True)
+    # scores: S = K^T Q
     Qc, Kc = cells(Q), cells(K)
-    KT = [[f"={Kc[j][u]}" for j in range(N)] for u in range(N)]
-    _, _, S = lblock(ws, top + 1, 3, [[f"={c}" for c in row] for row in Qc], KT, "Q (copied)", "K^T (K turned on its side)",
-                     "S = Q K^T", rowlab=queries, collab=slots, fmtC="General")
-    S_POS[tag] = S
+    KT = [[f"={Kc[u][j]}" for u in range(N)] for j in range(N)]           # row j = the key of slot j
+    text(ws, top, 2, "(d) Scores: S = K^T Q. Keys on the left (one row per slot), queries on top (one column per "
+                     "query). Column i = query i's score for every slot: 1 where slot = p + shift.", italic=True)
+    _, _, S = lblock(ws, top + 1, 3, KT, [[f"={c}" for c in row] for row in Qc], "K^T (keys: one row per slot)",
+                     "Q (copied)", "S = K^T Q", rowlab=slots, collab=queries, fmtC="General")
     top = S[0] + N + 2
-    # softmax, row by row
-    text(ws, top, 2, "(e) Attention = softmax of (sharpness x S), row by row: e^(sharpness x score) / sum of the row's.",
-         italic=True)
+    # softmax, down each column
+    text(ws, top, 2, "(e) Attention = softmax of (sharpness x S), down each column (each query): "
+                     "e^(sharpness x score) / sum of the column's.", italic=True)
     text(ws, top + 1, 3, "sharpness")
     put(ws, top + 1, 4, 10, FILL_IN, inp=True)
     sharp = ref(top + 1, 4, fixed=True)
     Sc = cells(S)
-    att = [[f"=EXP({sharp}*{Sc[i][j]})/(" + "+".join(f"EXP({sharp}*{Sc[i][t]})" for t in range(N)) + ")"
-            for j in range(N)] for i in range(N)]
-    text(ws, top + 2, 3, "attention", bold=True)
-    for j in range(N):
-        label(ws, top + 2, 4 + j, f"slot {j}")
+    att = [[f"=EXP({sharp}*{Sc[j][i]})/(" + "+".join(f"EXP({sharp}*{Sc[t][i]})" for t in range(N)) + ")"
+            for i in range(N)] for j in range(N)]
+    text(ws, top + 2, 2, "attention", bold=True)
+    for i in range(N):
+        label(ws, top + 2, 4 + i, queries[i])
     A = matrix(ws, top + 3, 4, att, FILL_X, fmt="0.000")
+    for j in range(N):
+        label(ws, top + 3 + j, 3, slots[j])
+    label(ws, top + 3 + N, 3, "sum")
     for i in range(N):
-        label(ws, top + 3 + i, 3, queries[i])
-        put(ws, top + 3 + i, 4 + N, f"=SUM({COL(4)}{top + 3 + i}:{COL(3 + N)}{top + 3 + i})", FILL_X, fmt="0.000")
-    label(ws, top + 2, 4 + N, "row sum")
-    top = top + 3 + N + 1
-    # output: O = attention V
-    text(ws, top, 2, "(f) Output: O = attention x V, a weighted average of the items. Compare with the target.",
-         italic=True)
+        put(ws, top + 3 + N, 4 + i, f"=SUM({COL(4 + i)}{top + 3}:{COL(4 + i)}{top + 2 + N})", FILL_X, fmt="0.000")
+    top = top + 3 + N + 2
+    # output: O = V attention
+    text(ws, top, 2, "(f) Output: O = V x attention. Values on the left, attention on top: each query gets a weighted "
+                     "average of the items. Compare with the target.", italic=True)
     Ac, Vc = cells(A), cells(V)
-    _, _, O = lblock(ws, top + 1, 3, [[f"={c}" for c in row] for row in Ac], [[f"={Vc[j][0]}"] for j in range(N)],
-                     "attention (copied)", "V (copied)", f"O_{tag}", rowlab=queries, collab=["out"], fmtA="0.000", fmtC="0.000")
-    tcol = O[1] + 2
-    text(ws, O[0] - 1, tcol, f"target c(p+{shift})", bold=True)
+    _, _, O = lblock(ws, top + 1, 3, [[f"={c}" for c in Vc[0]]], [[f"={c}" for c in row] for row in Ac],
+                     "V (copied)", "attention (copied)", "", rowlab=["out"], collab=queries,
+                     fmtB="0.000", fmtC="0.000")
+    text(ws, O[0], O[1] + N, f"<- O_{tag}", bold=True)
     k = OFFS.index(shift)
+    text(ws, O[0] + 1, 2, f"target c(p+{shift})", bold=True)
     for i in range(N):
-        put(ws, O[0] + i, tcol, f"={TGT[i][k]}", FILL_X)
-    return cells(O), O[0] + N + 2
+        put(ws, O[0] + 1, O[1] + i, f"={TGT[i][k]}", FILL_X)
+    return cells(O), O[0] + 4
 
 
 # ===================================================================== 2 One head
 ws = wb.create_sheet("2 One head")
 widths(ws)
 text(ws, 1, 2, "Step 2. One attention head, built by hand (it looks 1 slot ahead)", bold=True, size=14)
-text(ws, 2, 2, "Follow (a) to (f). The head scores every slot, turns the scores into weights that add up to 1, and")
-text(ws, 3, 2, "returns the weighted average of the items. Try: change W_Q so the 1s move, or lower the sharpness to 1.")
+text(ws, 2, 2, "Follow (a) to (f). Weights always on the left, data on top. The head scores every slot, turns the scores")
+text(ws, 3, 2, "into weights that add up to 1, and returns the weighted average of the items. Try: change W_Q, or set sharpness to 1.")
 O1, _ = build_head(ws, 5, 1, "1")
-
-
-# ===================================================================== 2b weights on the left
-ws = wb.create_sheet("2b Weights on the left")
-widths(ws)
-text(ws, 1, 2, "Step 2b. The same head with the weights on the LEFT and the memory on TOP", bold=True, size=14)
-text(ws, 2, 2, "Order matters in matrix multiplication: Y W_K and W_K Y are different. To put the weights on the left, turn")
-text(ws, 3, 2, "both matrices on their side (transpose, written ^T): K^T = W_K^T Y^T. The numbers are the same as sheet 2, but each")
-text(ws, 4, 2, "locker is now a COLUMN instead of a row. The payoff: K^T comes out already turned the right way for the scores.")
-
-# (a) queries as rows, exactly as on sheet 2 (data on the left)
-X = [[f"=IF({PCELL[i]}={t},1,0)" for t in range(N)] for i in range(N)]
-WQ = [[1 if u == (t + 1) % N else 0 for u in range(N)] for t in range(N)]
-text(ws, 6, 2, "(a) Queries as rows, as on sheet 2: Q = X W_Q (each row = one query; the head looks 1 ahead).", italic=True)
-_, _, Qb = lblock(ws, 7, 3, X, WQ, "X (queries)", "W_Q (shift by 1)", "Q = X W_Q",
-                  rowlab=[f"p = {p}" for p in P], collab=[f"q{u}" for u in range(N)], inpB=True, fmtC="General")
-Qc = cells(Qb)
-
-# (b) keys as columns: K^T = W_K^T Y^T, weights on the left, memory on top
-top = Qb[0] + N + 2
-text(ws, top, 2, "(b) Keys as columns: K^T = W_K^T Y^T. Weights on the LEFT, memory on TOP (each column of Y^T is one locker).",
-     italic=True)
-YT = [[1 if t == j else 0 for j in range(N)] for t in range(N)] + [[f"={ITEM[j]}" for j in range(N)]]
-WKT = [[1 if t == u else 0 for t in range(N + 1)] for u in range(N)]
-_, _, KT = lblock(ws, top + 1, 3, WKT, YT, "W_K^T (weights, turned on their side)", "Y^T (memory: one column per locker)",
-                  "", rowlab=[f"k{u}" for u in range(N)], collab=[f"slot {j}" for j in range(N)],
-                  inpA=True, fmtC="General")
-r0, c0 = KT[0], KT[1]
-text(ws, r0, c0 + N, "<- K^T: one column per locker", bold=True)
-
-# (c) scores: the K^T just computed IS the top matrix; Q goes on the left, right below W_K^T
-text(ws, r0 + N, c0 + N, "<- S = Q K^T: K^T above is used as it is, no copying", bold=True)
-for i in range(N):
-    label(ws, r0 + N + i, c0 - 6, f"p = {P[i]}")
-    for t in range(N):
-        put(ws, r0 + N + i, c0 - 5 + t, f"={Qc[i][t]}", FILL_A)
-    for j in range(N):
-        f = "=" + "+".join(f"{ref(r0 + N + i, c0 - 5 + t)}*{ref(r0 + t, c0 + j)}" for t in range(N))
-        put(ws, r0 + N + i, c0 + j, f, FILL_C)
-text(ws, r0 + 2 * N, c0 - 5, "Q (copied from (a))", bold=True)
-text(ws, r0 + 2 * N, c0, "S", bold=True)
-
-# (d) check against sheet 2
-S2 = S_POS["1"]
-rng2 = f"'2 One head'!{COL(S2[1])}{S2[0]}:{COL(S2[1] + N - 1)}{S2[0] + N - 1}"
-rng = f"{COL(c0)}{r0 + N}:{COL(c0 + N - 1)}{r0 + 2 * N - 1}"
-r = r0 + 2 * N + 2
-text(ws, r, 2, "(c) Check: are these scores the same as the scores on sheet 2?", italic=True)
-put(ws, r, 11, f"=IF(SUMPRODUCT(ABS({rng}-{rng2}))=0,\"same as sheet 2\",\"different\")", FILL_C)
-text(ws, r + 2, 2, "What to notice: one stacked L. Y^T on top, K^T in the middle, S at the bottom: the answer of one")
-text(ws, r + 3, 2, "multiplication is the top matrix of the next. The rest of the head (softmax, then attention x V) is as on sheet 2.")
-text(ws, r + 4, 2, "Try: change an item on sheet 1 Task. The bottom row of Y^T changes, but K^T and S do not: keys only use the labels.")
 
 # ===================================================================== 3 Two heads and valves
 ws = wb.create_sheet("3 Two heads")
@@ -305,29 +256,34 @@ widths(ws)
 text(ws, 1, 2, "Step 3. A second head (looks 3 ahead), then both heads through their valves", bold=True, size=14)
 text(ws, 2, 2, "Head 2 is built exactly like head 1; only W_Q differs (shift by 3). Its output is at the bottom of (f).")
 O2, top = build_head(ws, 4, 3, "2")
-text(ws, top, 2, "(g) Valves and read-out: prediction = [g_1 O_1 | g_2 O_2] W_O. This is the line out * gate in the code.",
-     italic=True)
+queries = [f"p = {p}" for p in P]
+text(ws, top, 2, "(g) Valves and read-out: prediction = W_O [g_1 O_1 ; g_2 O_2]. Each head's output row is multiplied by "
+                 "its valve; W_O (weights) on the left. This is the line out * gate in the code.", italic=True)
 text(ws, top + 1, 3, "valve g_1")
 put(ws, top + 1, 4, 1, FILL_IN, inp=True)
 text(ws, top + 1, 6, "valve g_2")
 put(ws, top + 1, 7, 1, FILL_IN, inp=True)
 g1, g2 = ref(top + 1, 4, fixed=True), ref(top + 1, 7, fixed=True)
-O1_other = [[f"'2 One head'!{c[0]}"] for c in O1]
-Z = [[f"={g1}*{O1_other[i][0]}", f"={g2}*{O2[i][0]}"] for i in range(N)]
-_, _, PRED = lblock(ws, top + 3, 3, Z, [[1, 0], [0, 1]], "[g_1 O_1 | g_2 O_2]", "W_O", "prediction",
-                    rowlab=[f"p = {p}" for p in P], collab=["ans 1", "ans 2"], inpB=True, fmtA="0.000", fmtC="0.000")
+Z = [[f"={g1}*'2 One head'!{O1[0][i]}" for i in range(N)], [f"={g2}*{O2[0][i]}" for i in range(N)]]
+_, Zb, PRED = lblock(ws, top + 3, 3, [[1, 0], [0, 1]], Z, "W_O (weights)",
+                     "[g_1 O_1 ; g_2 O_2] (one row per head)", "prediction", rowlab=["ans 1", "ans 2"],
+                     collab=queries, inpA=True, fmtB="0.000", fmtC="0.000")
+label(ws, Zb[0], Zb[1] - 1, "head 1")
+label(ws, Zb[0] + 1, Zb[1] - 1, "head 2")
 pr = cells(PRED)
-r0, c0 = PRED[0], PRED[1] + 3
-text(ws, r0 - 1, c0, "target", bold=True)
-text(ws, r0 - 1, c0 + 3, "squared error", bold=True)
-for i in range(N):
-    for k in range(R):
-        put(ws, r0 + i, c0 + k, f"={TGT[i][k]}", FILL_X)
-        put(ws, r0 + i, c0 + 3 + k, f"=({pr[i][k]}-{ref(r0 + i, c0 + k)})^2", FILL_X, fmt="0.000")
-text(ws, r0 + N + 1, c0 + 3, "loss (average)", bold=True)
-put(ws, r0 + N + 1, c0 + 5, f"=AVERAGE({COL(c0 + 3)}{r0}:{COL(c0 + 4)}{r0 + N - 1})", FILL_C, fmt="0.000")
-text(ws, r0 + N + 3, 2, "Try: set valve g_2 to 0. Column 2 of the prediction becomes 0 whatever head 2 computes, and the loss")
-text(ws, r0 + N + 4, 2, "jumps. A head with its valve at 0 is removed exactly: it adds nothing, so training sends it no gradient.")
+r0, c0 = PRED[0], PRED[1]
+text(ws, r0 + 3, 2, "target", bold=True)
+text(ws, r0 + 6, 2, "squared error", bold=True)
+for k in range(R):
+    label(ws, r0 + 3 + k, c0 - 1, f"ans {k + 1}")
+    label(ws, r0 + 6 + k, c0 - 1, f"ans {k + 1}")
+    for i in range(N):
+        put(ws, r0 + 3 + k, c0 + i, f"={TGT[i][k]}", FILL_X)
+        put(ws, r0 + 6 + k, c0 + i, f"=({pr[k][i]}-{ref(r0 + 3 + k, c0 + i)})^2", FILL_X, fmt="0.000")
+text(ws, r0 + 9, 2, "loss (average)", bold=True)
+put(ws, r0 + 9, c0, f"=AVERAGE({COL(c0)}{r0 + 6}:{COL(c0 + N - 1)}{r0 + 7})", FILL_C, fmt="0.000")
+text(ws, r0 + 11, 2, "Try: set valve g_2 to 0. Head 2's row becomes 0 whatever head 2 computes, answer 2 is lost and the")
+text(ws, r0 + 12, 2, "loss jumps. A head with its valve at 0 is removed exactly: it adds nothing, so training sends it no gradient.")
 
 # ===================================================================== 4 Why R heads
 ws = wb.create_sheet("4 Why R heads")
@@ -365,16 +321,17 @@ ws = wb.create_sheet("5 Collateral value")
 widths(ws)
 text(ws, 1, 2, "Step 5. The collateral value: what nobody else can cover", bold=True, size=14)
 text(ws, 2, 2, "Three trained heads. Head A looks 1 ahead, head B looks 3 ahead, head C is an exact COPY of A. Their")
-text(ws, 3, 2, "outputs are the items they fetch (as in steps 2 and 3). The read-out W_O turns them into the two answers.")
+text(ws, 3, 2, "outputs are the items they fetch (one row per head). The read-out W_O (weights, on the left) turns them into the answers.")
 text(ws, 4, 2, "A head's collateral value = how much the loss rises when it is removed AND the others re-fit W_O.")
-ZA = [f"={TGT[i][0]}" for i in range(N)]
-ZB = [f"={TGT[i][1]}" for i in range(N)]
+queries = [f"p = {p}" for p in P]
+ZA = [TGT[i][0] for i in range(N)]
+ZB = [TGT[i][1] for i in range(N)]
 cases = [
-    ("Case 1. All heads on.", (1, 1, 1), [[0.5, 0], [0, 1], [0.5, 0]]),
-    ("Case 2. A off, W_O unchanged (ordinary importance: nobody re-fits).", (0, 1, 1), [[0.5, 0], [0, 1], [0.5, 0]]),
-    ("Case 3. A off, W_O re-fitted by hand: C takes A's weight (collateral value of A).", (0, 1, 1), [[0, 0], [0, 1], [1, 0]]),
-    ("Case 4. B off, best re-fit: nobody else carries c(p+3), so its column gets weight 0 (collateral value of B).",
-     (1, 0, 1), [[0.5, 0], [0, 0], [0.5, 0]]),
+    ("Case 1. All heads on.", (1, 1, 1), [[0.5, 0, 0.5], [0, 1, 0]]),
+    ("Case 2. A off, W_O unchanged (ordinary importance: nobody re-fits).", (0, 1, 1), [[0.5, 0, 0.5], [0, 1, 0]]),
+    ("Case 3. A off, W_O re-fitted by hand: C takes A's weight (collateral value of A).", (0, 1, 1), [[0, 0, 1], [0, 1, 0]]),
+    ("Case 4. B off, best re-fit: nobody else carries c(p+3), so answer 2 gets weight 0 (collateral value of B).",
+     (1, 0, 1), [[0.5, 0, 0.5], [0, 0, 0]]),
 ]
 LOSS = []
 top = 6
@@ -384,21 +341,26 @@ for title, g, W in cases:
     for j in range(3):
         put(ws, top + 1, 7 + j, g[j], FILL_IN, inp=True)
     gref = [ref(top + 1, 7 + j, fixed=True) for j in range(3)]
-    Zg = [[f"={gref[0]}*{ZA[i][1:]}", f"={gref[1]}*{ZB[i][1:]}", f"={gref[2]}*{ZA[i][1:]}"] for i in range(N)]
-    _, _, Pc = lblock(ws, top + 2, 3, Zg, W, "[g_A A | g_B B | g_C C]", "W_O", "prediction",
-                      rowlab=[f"p = {p}" for p in P], collab=["ans 1", "ans 2"], inpB=True, fmtC="General")
+    Zg = [[f"={gref[0]}*{ZA[i]}" for i in range(N)], [f"={gref[1]}*{ZB[i]}" for i in range(N)],
+          [f"={gref[2]}*{ZA[i]}" for i in range(N)]]
+    _, Zb, Pc = lblock(ws, top + 2, 3, W, Zg, "W_O (read-out weights)", "[g_A A ; g_B B ; g_C C] (one row per head)",
+                       "prediction", rowlab=["ans 1", "ans 2"], collab=queries, inpA=True, fmtC="General")
+    for h, name in enumerate("ABC"):
+        label(ws, Zb[0] + h, Zb[1] - 1, f"head {name}")
     pr = cells(Pc)
-    r0, c0 = Pc[0], Pc[1] + 3
-    text(ws, r0 - 1, c0, "target", bold=True)
-    text(ws, r0 - 1, c0 + 3, "squared error", bold=True)
-    for i in range(N):
-        for k in range(R):
-            put(ws, r0 + i, c0 + k, f"={TGT[i][k]}", FILL_X)
-            put(ws, r0 + i, c0 + 3 + k, f"=({pr[i][k]}-{ref(r0 + i, c0 + k)})^2", FILL_X, fmt="General")
-    text(ws, r0 + N, c0 + 3, "loss", bold=True)
-    put(ws, r0 + N, c0 + 4, f"=AVERAGE({COL(c0 + 3)}{r0}:{COL(c0 + 4)}{r0 + N - 1})", FILL_C, fmt="General")
-    LOSS.append(ref(r0 + N, c0 + 4, "5 Collateral value", fixed=True))
-    top = r0 + N + 3
+    r0, c0 = Pc[0], Pc[1]
+    text(ws, r0 + 3, 2, "target", bold=True)
+    text(ws, r0 + 6, 2, "squared error", bold=True)
+    for k in range(R):
+        label(ws, r0 + 3 + k, c0 - 1, f"ans {k + 1}")
+        label(ws, r0 + 6 + k, c0 - 1, f"ans {k + 1}")
+        for i in range(N):
+            put(ws, r0 + 3 + k, c0 + i, f"={TGT[i][k]}", FILL_X)
+            put(ws, r0 + 6 + k, c0 + i, f"=({pr[k][i]}-{ref(r0 + 3 + k, c0 + i)})^2", FILL_X, fmt="General")
+    text(ws, r0 + 9, 2, "loss", bold=True)
+    put(ws, r0 + 9, c0, f"=AVERAGE({COL(c0)}{r0 + 6}:{COL(c0 + N - 1)}{r0 + 7})", FILL_C, fmt="General")
+    LOSS.append(ref(r0 + 9, c0, "5 Collateral value", fixed=True))
+    top = r0 + 12
 text(ws, top, 2, "Check of case 4: the best weight for answer 2 on head A's output is sum(A x B) / sum(A x A):", italic=True)
 rngA = f"'{TASK}'!$F$10:$F${9 + N}"
 rngB = f"'{TASK}'!$I$10:$I${9 + N}"
@@ -406,9 +368,9 @@ put(ws, top, 11, f"=SUMPRODUCT({rngA},{rngB})/SUMPRODUCT({rngA},{rngA})", FILL_C
 text(ws, top + 1, 2, "It is 0 for these items, so A (and its copy C) can cover nothing of B's job.", italic=True)
 top += 3
 text(ws, top, 2, "Summary", bold=True)
-for c, s in ((2, "head"), (4, "ordinary importance (no re-fit)"), (8, "collateral value (re-fit)")):
-    text(ws, top + 1, c, s, bold=True)
-L1, L2, L3, L4 = [s.split("!")[1] for s in LOSS]
+for c, s_ in ((2, "head"), (4, "ordinary importance (no re-fit)"), (8, "collateral value (re-fit)")):
+    text(ws, top + 1, c, s_, bold=True)
+L1, L2, L3, L4 = [s_.split("!")[1] for s_ in LOSS]
 rows = [("A", f"={L2}-{L1}", f"={L3}-{L1}"), ("B", f"={L4}-{L1}", f"={L4}-{L1}"), ("C (copy of A)", f"={L2}-{L1}", f"={L3}-{L1}")]
 VAL = {}
 for i, (h, imp, col) in enumerate(rows):
@@ -582,33 +544,27 @@ side_panel(wb[TASK], [
      src(h_tasks.make_batch, 'elif cfg.task == "multi_relation"', 'T = torch.cat'))])
 
 side_panel(wb["2 One head"], [
-    ("W_Q, one head", "(4, 4)", "(128, 32)", "all 32 heads stored together: W_q is 128 -> 1024"),
-    ("W_K, one head", "(5, 4)", "(128, 32)", "W_k: 128 -> 1024"),
-    ("W_V, one head", "(5, 1)", "(128, 32)", "W_v: 128 -> 1024"),
-    ("Q = X W_Q", "(4, 4)", "(B, 32, 16, 32)", "after _split: (examples, heads, tokens, d_k)"),
-    ("K = Y W_K", "(4, 4)", "(B, 32, 16, 32)", ""),
-    ("V = Y W_V", "(4, 1)", "(B, 32, 16, 32)", ""),
-    ("S = Q K^T", "(4, 4)", "(B, 32, 16, 16)", "every query against every slot, per head"),
-    ("attention", "(4, 4)", "(B, 32, 16, 16)", "each row adds up to 1"),
-    ("O = attention V", "(4, 1)", "(B, 32, 16, 32)", "one blend per head per query"),
+    ("W_Q, one head", "(4, 4)", "(32, 128)", "all 32 heads stored together as W_q: 128 -> 1024"),
+    ("W_K, one head", "(4, 5)", "(32, 128)", "W_k: 128 -> 1024"),
+    ("W_V, one head", "(1, 5)", "(32, 128)", "W_v: 128 -> 1024"),
+    ("Y (memory)", "(5, 4): a column per slot", "(128, 16) per example", "the code keeps the same numbers turned on their side (one ROW per token)"),
+    ("X (queries)", "(4, 4): a column per query", "(128, 16) per example", ""),
+    ("K = W_K Y", "(4, 4)", "(32, 16) per head", "in the code: (B, 32 heads, 16, 32)"),
+    ("Q = W_Q X", "(4, 4)", "(32, 16) per head", ""),
+    ("V = W_V Y", "(1, 4)", "(32, 16) per head", ""),
+    ("S = K^T Q", "(4, 4): slots x queries", "(16, 16) per head", "the code computes Q K^T: queries x slots"),
+    ("attention", "(4, 4)", "(16, 16) per head", "each column adds up to 1 here (each row in the code)"),
+    ("O = V attention", "(1, 4)", "(32, 16) per head", "one blend per query"),
     ("sharpness", "10 (set by hand)", "1/sqrt(32) x learned", "real scores are scaled by 1/sqrt(d_k)"),
-], [("The code: src/hemo/model.py, class CrossAttn",
+], [("The code: src/hemo/model.py, class CrossAttn (the code keeps the same numbers turned on their side (one ROW per token))",
      src(h_model.CrossAttn.__init__) + [""] + src(h_model.CrossAttn._split) + [""] + src(h_model.CrossAttn.heads))])
-
-side_panel(wb["2b Weights on the left"], [
-    ("W_K^T", "(4, 5)", "(32, 128) per head", "the real code keeps W_K the other way round"),
-    ("Y^T", "(5, 4)", "(128, 16) per example", "one column per locker"),
-    ("K^T = W_K^T Y^T", "(4, 4)", "(32, 16) per head", "the same numbers as K, turned on their side"),
-    ("S = Q K^T", "(4, 4)", "(16, 16) per head", "identical to sheet 2"),
-], [("The code: the real code uses the row layout of sheet 2 (W_k(Y) = Y W_K), then turns K inside heads()",
-     src(h_model.CrossAttn.heads))])
 
 side_panel(wb["3 Two heads"], [
     ("heads", "2", "32", ""),
     ("valves g", "(2,)", "(32,), copied to (B, 32)", "one gain per head"),
-    ("[g_1 O_1 | g_2 O_2]", "(4, 2)", "(B, 16, 1024)", "32 heads x 32 numbers, side by side"),
-    ("W_O", "(2, 2)", "(1024, 64)", ""),
-    ("prediction", "(4, 2)", "(B, 16, 64)", ""),
+    ("[g_1 O_1 ; g_2 O_2]", "(2, 4): a row per head", "(1024, 16) per example", "32 heads x 32 numbers, stacked"),
+    ("W_O", "(2, 2)", "(64, 1024)", "W_o: 1024 -> 64"),
+    ("prediction", "(2, 4)", "(64, 16) per example", "the code keeps the same numbers turned on their side (one ROW per token)"),
     ("loss", "average of 8", "average of B x 16 x 64", "mean squared error"),
 ], [("The code: src/hemo/model.py, CrossAttn.combine and forward",
      src(h_model.CrossAttn.combine) + [""] + src(h_model.CrossAttn.forward))])
@@ -624,11 +580,11 @@ side_panel(wb["4 Why R heads"], [
 
 side_panel(wb["5 Collateral value"], [
     ("heads valued", "3 (A, B, C)", "32", "every 25 training steps"),
-    ("head outputs Z", "(4, 3)", "(8,192, 1,024)", "512 probe examples x 16 tokens; 32 heads x 32"),
-    ("Gram matrix A = Z^T Z / n", "(3, 3)", "(1,024, 1,024)", "plus a tiny ridge for stability"),
-    ("W_O re-fit", "(3, 2)", "(1,024, 64)", "W = M B, with M the inverse of A for open heads"),
+    ("head outputs Z", "(3, 4): a row per head", "(1,024, 8,192)", "32 heads x 32 numbers; 512 probe examples x 16 tokens"),
+    ("W_O re-fit", "(2, 3)", "(64, 1,024)", "W = M B, with M the inverse of the Gram matrix of open heads"),
+    ("Gram matrix Z Z^T / n", "(3, 3)", "(1,024, 1,024)", "plus a tiny ridge for stability"),
     ("value of head h", "re-fit by hand", "trace(W_J^T M_JJ^-1 W_J) / 64", "same number as re-fitting without h, without redoing it"),
-], [("The code: src/hemo/model.py, HemoAttn.probe_ischemia",
+], [("The code: src/hemo/model.py, HemoAttn.probe_ischemia (the code keeps the same numbers turned on their side (one ROW per token))",
      src(h_model.HemoAttn.probe_ischemia, "H, dk = self.H", "self.head_value.copy_(value"))])
 
 train_lines = [l for l in src(h_train.train) if any(k in l for k in (
