@@ -69,7 +69,7 @@ l0_safe = f"{l0[1]}/{l0[2]}*"
 # ---------------------------------------------------------------- the table
 rows = [
     # method, type, how a head is scored, how heads are removed, exact, never broke, backups
-    ("Collateral rule", "ours", r"$\min_W L_{-h}\, - \,\min_W L$" + "\nloss after removing $h$, read-out re-fitted",
+    ("Hemodynamic attenuation", "ours", r"$\min_W L_{-h}\, - \,\min_W L$" + "\nloss after removing $h$, read-out re-fitted",
      "during training, from scratch;\nprice, no target; gradual, reopens", frac(ours[0], ours[2]),
      frac(ours[1], ours[2]), "predicted"),
     ("Michel et al. 2019", "published", r"$|\,\partial L / \partial g_h\,|$" + "\ngradient of the loss w.r.t. head gate",

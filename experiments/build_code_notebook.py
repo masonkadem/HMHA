@@ -194,7 +194,7 @@ def collateral_values(model, open_heads):
 
 # ---------------------------------------------------------------- 5
 md(r"""
-## 5. Training, with the collateral rule
+## 5. Training, with hemodynamic attenuation
 
 An ordinary training loop. With `rule=True`, after a warm-up and then every 25 steps: value the open
 heads, and close the cheapest one if it is worth less than the **price** (3% of the loss of a model

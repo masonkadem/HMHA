@@ -20,7 +20,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from hemo.config import Cfg
 
-RED = "#b2182b"                       # the collateral rule (blood)
+RED = "#b2182b"                       # hemodynamic attenuation (blood)
 K, G1, G2, G3 = "#111111", "#6b6b6b", "#a8a8a8", "#e4e4e4"
 plt.rcParams.update({
     "font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
@@ -86,7 +86,7 @@ for i, k in enumerate(show):
     d0 = next(d for d in dense(k) if d["cfg"]["seed"] == get(r, "seed"))
     axl = fig.add_subplot(cd[0, i])
     axl.plot(d0["hist"]["val_step"], d0["hist"]["val_loss"], color=K, lw=0.9, label="dense")
-    axl.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=RED, lw=0.9, label="collateral")
+    axl.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=RED, lw=0.9, label="ours")
     axl.axhline(BAR, color=G2, lw=0.6, ls=":")
     axl.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=[])
     axl.minorticks_off()
@@ -130,13 +130,13 @@ OBD = {**RULE, "local_value": "ablate"}
 RANDOM = {**RULE, "local_value": "random"}
 INSTANT = {**RULE, "taper": 0}
 OBS = r"$\mathrm{min}_W\, L_{-h} - \mathrm{min}_W\, L$"
-SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1990)"
+SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1989)"
 rows = [  # (group, method, (score, where it comes from), during training, gradual fade, reopens, gate learned, result)
-    (None, "Collateral rule (ours)", (OBS, SURGEON), "yes", "yes", "yes", "no", score(RULE)),
+    (None, "Hemodynamic\nattenuation (ours)", (OBS, SURGEON), "yes", "yes", "yes", "no", score(RULE)),
     ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", (OBS, SURGEON), "no", "no", "no", "no", score(ONESHOT)),
-    (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "yes", "no", "no", "no",
+    (None, "Michel-style\n(Michel et al. 2019)", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "yes", "no", "no", "no",
      score(dict(supply="prune"))),
-    (None, "Learned gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
+    (None, "Voita-style gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
      "yes", "no", "no", "yes", gates[best_lam]),
     ("Controls: our rule with one part removed", "no fade\n(instant closing)", (OBS, SURGEON), "yes", "no", "yes", "no",
      score(INSTANT)),
@@ -167,7 +167,7 @@ for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
         ax.text(0, y, group, fontsize=6, color=G1, style="italic", va="center")
         ax.plot([0, 1], [y - 0.28, y - 0.28], color=G3, lw=0.5)
         y += 0.72
-    ours = method.startswith("Collateral")
+    ours = method.startswith("Hemodynamic")
     c = RED if ours else K
     if ours:                                       # light band behind our row
         ax.add_patch(Rectangle((-0.005, y - 0.45), 1.005, 0.9, color="#fbeeee", lw=0, zorder=0))
@@ -187,7 +187,7 @@ for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
         ax.text(COLS["bars"] + BW + 0.008, y + dy, f"{v}/{n}", color=c, fontsize=5.6, va="center")
     y += 0.95
 ax.plot([0, 1], [y - 0.45, y - 0.45], color=K, lw=0.6)
-ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no", fontsize=5.6, color=G1, va="top")
+ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no.   Published methods are run inside our training from scratch; the original papers prune trained models.", fontsize=5.6, color=G1, va="top")
 ax.set(xlim=(0, 1), ylim=(y + 0.2, -1.3))
 print("panel c:", [(m.replace(chr(10), " "), r) for _, m, _, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
@@ -209,7 +209,7 @@ ax.text(-0.57, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="left")
 ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin also kept")
 ax.legend(loc="upper left", handlelength=1.2, handletextpad=0.4, borderaxespad=0)
 ax.set(xticks=[0, 1], ylim=(0, 18), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
-ax.set_xticklabels(["collateral\nrule", "OBD-style"])
+ax.set_xticklabels(["hemodynamic\nattenuation", "OBD-style"])
 ax.set_title("Every head given a twin", pad=4)
 AX_D = ax
 
@@ -239,10 +239,10 @@ title(ax, "e", "Spare heads when heads fail ($k^*=4$)")
 # ---------------------------------------------------------------- f  what breaking looks like
 ax = fig.add_subplot(bottom[2])
 first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
-for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al."),
+for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel-style"),
                              (ONESHOT, G1, "-", "ZipLM-style"),
                              (RANDOM, G2, "--", "random"),
-                             (RULE, RED, "-", "collateral")):
+                             (RULE, RED, "-", "ours")):
     x = first(kw)
     ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
 ax.axhline(BAR, color=G2, lw=0.6, ls=":")

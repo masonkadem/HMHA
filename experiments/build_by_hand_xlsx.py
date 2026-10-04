@@ -103,7 +103,7 @@ wb = Workbook()
 ws = wb.active
 ws.title = "0 Read me"
 widths(ws)
-text(ws, 1, 2, "The collateral rule by hand: the whole project on a tiny task", bold=True, size=14)
+text(ws, 1, 2, "Hemodynamic attenuation by hand: the whole project on a tiny task", bold=True, size=14)
 lines = [
     "Each sheet is one step. Work through them in order: 1 Task, 2 One head, 3 Two heads, 4 Why R heads,",
     "5 Collateral value, 6 The rule, 7 Backup heads.",

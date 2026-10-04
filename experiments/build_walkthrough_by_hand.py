@@ -44,7 +44,7 @@ numbers small enough to check by eye. Later cells point back to it, e.g. "(0.5)"
 | 6b | everything as matrices, by hand: every shape and every number |
 | 6c | where the valve and the collateral value live in the real code |
 | 6d | the whole task in L-shapes, spreadsheet style |
-| 7 | the collateral rule, running during training |
+| 7 | hemodynamic attenuation, running during training |
 | 8 | what the full experiments found |
 | 9 | backup heads when heads can fail |
 | 10 | a second circuit: two-layer induction |
@@ -119,7 +119,7 @@ print(f"{'cfg.' + 'name':<16}{'SMALL':>8}{'real':>8}   meaning")
 for name, meaning in settings:                      # one line per setting
     print(f"{'cfg.' + name:<16}{getattr(SMALL, name):>8}{getattr(REAL, name):>8}   {meaning}")
 print()
-print("The collateral rule's own settings (price, fade, first decision) are set where the rule is used: section 7.")
+print("Hemodynamic attenuation's own settings (price, fade, first decision) are set where the rule is used: section 7.")
 print("To try a different size, make another copy:  mine = replace(SMALL, seq_len=4, n_rel=2)")
 """)
 
@@ -730,7 +730,7 @@ show(HemoAttn.forward, {
     "Q, attn, out = self.heads": "run every head, exactly as in CrossAttn",
     "if gate is None:": "no valves given: ask the supply rule",
     "self.update_demand": "older rules only: track how much each head writes",
-    "gate = self.gate(": "every head's valve from the rule (for the collateral rule: its tone, section 6c)",
+    "gate = self.gate(": "every head's valve from the rule (for hemodynamic attenuation: its tone, section 6c)",
     "if self.needs_gate_grad()": "pruning baseline only: let the loss send a gradient to the valves",
     "gate = gate.detach().requires_grad_": "(pruning baseline) make the valves a tensor that collects gradients",
     "self._gate_leaf = gate": "(pruning baseline) keep it to read the gradient later",
@@ -1136,9 +1136,9 @@ md(r"""
 
 code(r"""
 src = inspect.getsource(HemoAttn.gate).splitlines()             # the whole gate function ...
-start = next(i for i, l in enumerate(src) if 'supply_kind == "local"' in l)  # ... find the collateral rule's branch
+start = next(i for i, l in enumerate(src) if 'supply_kind == "local"' in l)  # ... find hemodynamic attenuation's branch
 annotated(src[start:start + 4], {
-    'supply_kind == "local"': "the collateral rule",
+    'supply_kind == "local"': "hemodynamic attenuation",
     "if not self.conserve": "the version we use (no fixed total)",
     "return self.tone.clone()": "valve = tone: 1 on, 0 off, in between while fading",
     "return self.H * self.tone / self.tone.sum()": "original version: rescale so the valves add up to H",
@@ -1303,7 +1303,7 @@ for h, k in ((1, 1), (2, 3)):                           # head 1 looks 1 ahead, 
 
 # ------------------------------------------------------------------ 7
 md(r"""
-## 7. The collateral rule, running during training
+## 7. Hemodynamic attenuation, running during training
 
 **Idea.** Train with all heads on for a while. Then, every 25 steps:
 1. compute every open head's collateral value on a fresh batch (`probe_ischemia`);
@@ -1338,7 +1338,7 @@ annotated(keep, {
 
 code(r"""
 RULE_SMALL = replace(SMALL, supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.2,
-                     conserve=0, probe_batch=256)  # the collateral rule, experiment settings, small task
+                     conserve=0, probe_batch=256)  # hemodynamic attenuation, experiment settings, small task
 results = []
 for seed in range(3):                              # three runs with different seeds
     model, hist = train(replace(RULE_SMALL, seed=seed), val, "cpu", hemo=True)   # the real training loop
@@ -1351,7 +1351,7 @@ fig, ax = plt.subplots(2, 1, figsize=(6, 3.6), sharex=True)   # two plots stacke
 ax[0].semilogy(hist["val_step"], hist["val_loss"], color=RED, lw=0.8); ax[0].set_ylabel("loss")   # loss, log scale
 ax[1].plot((hist["ledger"] > 0).sum(1), color=RED); ax[1].axhline(R, color=GREY, ls=":")         # heads with supply
 ax[1].set_ylabel("heads on"); ax[1].set_xlabel("training step")
-ax[0].set_title("The real collateral rule on the small task (seed 0)", loc="left")
+ax[0].set_title("The real hemodynamic attenuation on the small task (seed 0)", loc="left")
 plt.tight_layout(); plt.show()                     # draw it
 """)
 
@@ -1400,8 +1400,8 @@ def stayed_solved(r):                              # never back above the solved
     return first is not None and max(ls[first:]) <= bar             # never above the bar afterwards
 
 
-RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)  # the collateral rule's settings
-arms = {"collateral rule": (RULE, (2, 3, 4, 6, 8)),     # each rule: (its settings, task sizes run)
+RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)  # hemodynamic attenuation's settings
+arms = {"hemodynamic attenuation": (RULE, (2, 3, 4, 6, 8)),     # each rule: (its settings, task sizes run)
         "ordinary importance": ({**RULE, "local_value": "ablate"}, (2, 4, 8)),
         "random choice": ({**RULE, "local_value": "random"}, (2, 4, 8)),
         "standard pruning": (dict(supply="prune"), (2, 3, 4, 6, 8))}
@@ -1417,12 +1417,12 @@ for lam in (0.05, 0.2, 1.0):                       # the learned-gate baseline a
 """)
 
 md(r"""
-Only the collateral rule does both. Ordinary importance keeps redundant heads; random
+Only hemodynamic attenuation does both. Ordinary importance keeps redundant heads; random
 choice and standard pruning get the count but break the model on the way. The classic
 learned-gate method (Voita et al. 2019: a learnable on/off gate per head plus a penalty for
 every open head) keeps too many heads at a weak penalty and cuts too far at a strong one;
 no single penalty works for every task size. Two more checks
-from the same runs: started with every head duplicated, the collateral rule keeps exactly 4
+from the same runs: started with every head duplicated, hemodynamic attenuation keeps exactly 4
 heads and never both copies of a pair (10 of 10 seeds), and the right count holds at every
 price from 0.01 to 0.1.
 """)
@@ -1614,7 +1614,7 @@ md(r"""
 - A head at zero supply is removed exactly (section 5).
 - Valuing a head by what the others cannot cover removes duplicates that ordinary importance
   keeps (sections 6, 8).
-- On the main task the collateral rule keeps exactly the needed heads and never breaks the
+- On the main task hemodynamic attenuation keeps exactly the needed heads and never breaks the
   model while pruning, unlike standard pruning (section 8).
 - With random head failures it keeps the number of backups a simple formula predicts
   (section 9).

@@ -1,8 +1,8 @@
 """Figure 1 (setup): the task, the model, one head one equation, and what a solved model
-looks like (attention of the heads the collateral rule kept, and which memory slot each of
+looks like (attention of the heads hemodynamic attenuation kept, and which memory slot each of
 the model's answers points to, with all kept heads and with one switched off).
 
-Trains one collateral-rule model (k* = 4, seed 0, the settings of the confirmation runs)
+Trains one hemodynamic-attenuation model (k* = 4, seed 0, the settings of the confirmation runs)
 and caches its weights in figures/solved_model.pt; later runs reuse the cache.
 
   python experiments/figure_setup.py   ->  figures/fig_setup.png and figures/fig_setup.pdf

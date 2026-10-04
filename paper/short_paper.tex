@@ -10,7 +10,7 @@
 \graphicspath{{../figures/}}
 
 \title{\bfseries Finding the minimal attention circuit during training\\
-       with a collateral-supply rule}
+       with hemodynamic attenuation}
 \author{Anonymous authors\\ \small Paper under double-blind review}
 \date{}
 
@@ -23,7 +23,8 @@ A trained transformer usually has many more attention heads than its task needs.
 whether training can find the smallest set of heads by itself, without being told how many
 to keep. We give each head a valve and, during training, close a head when the other heads
 can take over its job, the way a blood vessel can be pruned when collateral vessels supply
-its tissue. The value we use for each head, the loss that remains after the other heads
+its tissue, and fade it out gradually, the way unused vessels regress. We call this
+\emph{hemodynamic attenuation}. The value we use for each head, the loss that remains after the other heads
 re-fit to cover for it, is a classical pruning score (Optimal Brain Surgeon, ZipLM). What is
 new is how it is used: from the start of training, with a price per head instead of a target
 size, and with heads fading out gradually. We test this on a retrieval task whose minimal
@@ -160,7 +161,7 @@ $g_h \in [0, 1]$ before the output weights:
 A head with $g_h = 0$ is removed exactly: it adds nothing to the output and gets no gradient. So a
 model with $k$ open valves \emph{is} a $k$-head model, not an approximation of one.
 
-\section{The collateral rule}
+\section{Hemodynamic attenuation}
 \label{sec:rule}
 
 Training starts with every valve open. After a short warm-up (10\% of training), every 25 steps:
@@ -180,7 +181,9 @@ Training starts with every valve open. After a short warm-up (10\% of training),
 The value is computed in the space of the heads' outputs, which is why a head that copies another
 is worth nothing however much it writes.
 
-\paragraph{Baselines.} All use the same model, task and training. \emph{Ordinary importance}: the
+\paragraph{Baselines.} All use the same model, task and training. The published methods are run
+inside our training from scratch, so that every method sees the same runs; the original papers prune
+already-trained models. \emph{Ordinary importance}: the
 same rule, but the value is the loss rise when the head is removed with no re-fit. \emph{Random
 choice}: the same rule and timing, but the head to close is picked at random. \emph{Standard
 pruning} \citep{michel}: remove the head with the smallest gradient-based importance while the
@@ -200,21 +203,25 @@ that bar, it never goes back above it. ``Exact count'' means the number of open 
 \begin{figure}[p]
 \centering
 \includegraphics[width=\linewidth]{fig_main.pdf}
-\caption{\textbf{The collateral rule during training.}
-\textbf{a}, Loss of the dense model (black) and with the collateral rule (red) for $k^\star = 2, 4, 6, 8$
-(one seed each); dotted line, the solved bar.
+\caption{\textbf{Hemodynamic attenuation during training.}
+\textbf{a}, Loss of the dense model (black) and with hemodynamic attenuation (red) for $k^\star = 2, 4, 6, 8$
+(one seed each); dotted line, the solved bar. The small rise is heads fading out.
 \textbf{b}, Number of open heads; dotted line, $k^\star$. ``Compute'' is head-steps used, as a
-fraction of the dense model's.
-\textbf{c}, Exact count against staying solved, per rule.
-\textbf{d}, Final loss of dense and collateral models, every run.
-\textbf{e}, Runs that start with every head copied ($k^\star = 4$): heads kept, and how many were kept
+fraction of the dense model's, including the cost of valuing heads.
+\textbf{c}, Every method on the same 30 runs ($k^\star = 2, 4, 8$, 10 seeds each): how it scores a head,
+whether it acts during training, fades heads gradually and can reopen them, and how often it kept exactly
+$k^\star$ heads (dark bar) and never broke the model (light bar). Published methods above; below, controls
+that remove one part of our method.
+\textbf{d}, Runs that start with every head copied ($k^\star = 4$): heads kept, and how many were kept
 together with their twin (hatched).
-\textbf{f}, Heads kept when each head fails with chance $p$ at every step: measured (dots, squares)
-against the prediction written before the runs (dashed).}
+\textbf{e}, Spare heads kept when each head fails with chance $p$ at every step ($k^\star = 4$): one dot
+per run, against the number predicted before the runs (dashed).
+\textbf{f}, One run of each method ($k^\star = 4$, seed 0): only hemodynamic attenuation stays below the
+solved bar.}
 \label{fig:main}
 \end{figure}
 
-\paragraph{Only the collateral rule finds the count and never breaks the model.}
+\paragraph{Only hemodynamic attenuation finds the count and never breaks the model.}
 Table~\ref{tab:rules} and Figure~\ref{fig:main}c. Each baseline gets at most one of the two
 properties. Ordinary importance never breaks the model but keeps too many heads, because it values
 heads that copy each other. Random choice and standard pruning reach the right count but break the
@@ -226,7 +233,7 @@ model on the way: they close heads that are still needed. Learned gates rarely g
 \toprule
 rule & runs & exact count & stays solved \\
 \midrule
-\textbf{collateral rule}            & 50 & \textbf{47/50} & \textbf{50/50} \\
+\textbf{hemodynamic attenuation}            & 50 & \textbf{47/50} & \textbf{50/50} \\
 ordinary importance                 & 30 & 2/30  & 30/30 \\
 random choice                       & 30 & 30/30 & 6/30 \\
 standard pruning \citep{michel}     & 36 & 34/36 & 0/36 \\
@@ -235,7 +242,7 @@ learned gates, penalty 0.2          & 9  & 0/9   & 1/9 \\
 learned gates, penalty 1.0          & 9  & 3/9   & 0/9 \\
 \bottomrule
 \end{tabular}
-\caption{\textbf{Count and stability.} $k^\star \in \{2, 3, 4, 6, 8\}$ for the collateral rule and
+\caption{\textbf{Count and stability.} $k^\star \in \{2, 3, 4, 6, 8\}$ for hemodynamic attenuation and
 standard pruning, $\{2, 4, 8\}$ for the others; 3 to 10 seeds per size.}
 \label{tab:rules}
 \end{table}
@@ -267,14 +274,14 @@ first solved (median per size; the solved bar is 0.02). Compute is head-steps us
 \end{table}
 
 \paragraph{Duplicate heads are removed.} If every head starts as an exact copy of another
-(Figure~\ref{fig:main}e), the collateral rule keeps 4 heads and never both members of a pair
+(Figure~\ref{fig:main}d), hemodynamic attenuation keeps 4 heads and never both members of a pair
 (10 of 10 runs), because a copy is fully covered by its twin. Ordinary importance keeps 8 to 15
 heads, with 4 to 7 pairs kept twice. With near-copies (twin = copy plus noise of 10\% of the
-weights' spread) the collateral rule still kept exactly 4 heads in 5 of 5 runs, while ordinary
+weights' spread) hemodynamic attenuation still kept exactly 4 heads in 5 of 5 runs, while ordinary
 importance kept 5 to 10. In 2 of the 5 runs both members of one pair were among the four; since
-four heads solved the task, those twins had drifted apart into different jobs. With larger noise (50\%) the picture was the same: the collateral rule kept exactly 4 heads in 5 of 5 runs, ordinary importance 5 to 9.
+four heads solved the task, those twins had drifted apart into different jobs. With larger noise (50\%) the picture was the same: hemodynamic attenuation kept exactly 4 heads in 5 of 5 runs, ordinary importance 5 to 9.
 
-\paragraph{Cost.} The rule's final loss is 2 to 7 times that of the dense model (Figure~\ref{fig:main}d),
+\paragraph{Cost.} The rule's final loss is 2 to 7 times that of the dense model (Figure~\ref{fig:main}a),
 always far below the solved bar, using 0.31 to 0.45 of the dense model's head-steps
 (Figure~\ref{fig:main}b).
 
@@ -289,7 +296,7 @@ v(B) = \frac{1 - p}{R}\; \Pr\big[\,\text{Binomial}(B - 1,\, 1 - p) < R\,\big].
 \end{equation}
 The rule keeps heads while $v(B)$ is above the price, so the predicted count is the largest $B$
 with $v(B) \ge$ price. We wrote these predictions down before running the experiments
-(Table~\ref{tab:backup}, Figure~\ref{fig:main}f): 21 of 24 runs matched exactly, the other three
+(Table~\ref{tab:backup}, Figure~\ref{fig:main}e): 21 of 24 runs matched exactly, the other three
 were off by one head. One caveat: the rule estimates the same marginal value that the formula
 computes in expectation, so the match shows that the rule behaves as designed under failures; it
 does not show that every trained network would keep this many backups.
@@ -351,7 +358,7 @@ the dense model's. The blood-flow analogy motivates the rule but is not evidence
   structured pruning of language models. \emph{NeurIPS}, 2023.
 \bibitem[Kwon et al.(2022)]{kwon} W.~Kwon, S.~Kim, M.~Mahoney, J.~Hassoun, K.~Keutzer, A.~Gholami.
   A fast post-training pruning framework for transformers. \emph{NeurIPS}, 2022.
-\bibitem[LeCun et al.(1990)]{obd} Y.~LeCun, J.~Denker, S.~Solla. Optimal brain damage. \emph{NeurIPS}, 1990.
+\bibitem[LeCun et al.(1989)]{obd} Y.~LeCun, J.~Denker, S.~Solla. Optimal brain damage. \emph{NeurIPS}, 1989.
 \bibitem[Louizos et al.(2018)]{louizos} C.~Louizos, M.~Welling, D.~Kingma. Learning sparse neural
   networks through $L_0$ regularization. \emph{ICLR}, 2018.
 \bibitem[McGrath et al.(2023)]{hydra} T.~McGrath, M.~Rahtz, J.~Kram\'ar, V.~Mikulik, S.~Legg.
