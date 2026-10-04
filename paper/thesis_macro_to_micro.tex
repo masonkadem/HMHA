@@ -305,7 +305,9 @@ random head failure, and a two-layer induction task \cite{olsson2022}.
 \caption{Hemodynamic attenuation during training.
 \textbf{a}, Loss of the dense model (black) and with hemodynamic attenuation (red).
 \textbf{b}, Open heads, with $\kstar$ dotted.
-\textbf{c}, All methods on the same 30 runs.
+\textbf{c}, All methods on the same 30 runs: whether each prunes during training as published,
+sets its own number of heads without a target, and can reopen heads, with how often it kept exactly
+$\kstar$ heads (dark bar) and never broke the model (light bar).
 \textbf{d}, Runs in which every head starts with an identical copy.
 \textbf{e}, Spare heads kept under random failure, against the prediction.
 \textbf{f}, One run per method. Only hemodynamic attenuation stays below the solved threshold.}

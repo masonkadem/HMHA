@@ -131,14 +131,15 @@ RANDOM = {**RULE, "local_value": "random"}
 INSTANT = {**RULE, "taper": 0}
 OBS = r"$\mathrm{min}_W\, L_{-h} - \mathrm{min}_W\, L$"
 SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1989)"
-rows = [  # (group, method, (score, source), prunes during training as published, gradual fade, reopens, result)
+rows = [  # (group, method, (score, source), prunes during training as published, sets its own size (no target
+          #  count, fraction, speed-up or penalty chosen to reach a size), reopens, result)
     (None, "Hemodynamic attenuation (ours)", (OBS, SURGEON), "yes", "yes", "yes", score(RULE)),
     ("Published methods", "Kurtic et al. 2023 (ZipLM)", (OBS, SURGEON), "no", "no", "no", score(ONESHOT)),
     (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "no", "no", "no",
      score(dict(supply="prune"))),
     (None, "Voita et al. 2019", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
      "no", "no", "no", gates[best_lam]),
-    ("Controls: our method with one part removed", "no fade (instant closing)", (OBS, SURGEON), "yes", "no", "yes",
+    ("Controls: our method with one part removed", "no fade (instant closing)", (OBS, SURGEON), "yes", "yes", "yes",
      score(INSTANT)),
     (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", score(OBD)),
     (None, "no score (random choice)", ("random head", ""), "yes", "yes", "yes", score(RANDOM)),
@@ -149,8 +150,8 @@ COLS = dict(method=0.0, score=0.27, train=0.585, fade=0.66, reopen=0.735, bars=0
 BW = 0.125                                         # bar length for 100% of runs
 FS, FS_SMALL = 7.0, 6.0
 y = 0.0
-for key, name in (("method", "Method"), ("score", "Head score"), ("train", "Prunes in\ntraining"),
-                  ("fade", "Gradual\nfade"), ("reopen", "Reopens")):
+for key, name in (("method", "Method"), ("score", "Head score"), ("train", "During\ntraining"),
+                  ("fade", "Sets own\nsize"), ("reopen", "Reopens")):
     ha = "center" if key in ("train", "fade", "reopen") else "left"
     ax.text(COLS[key] + (0.022 if ha == "center" else 0), y - 0.55, name, fontsize=FS if ha == "left" else FS - 0.6,
             fontweight="bold", va="center", ha=ha, linespacing=1.15)

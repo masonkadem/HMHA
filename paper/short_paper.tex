@@ -209,7 +209,8 @@ that bar, it never goes back above it. ``Exact count'' means the number of open 
 \textbf{b}, Number of open heads; dotted line, $k^\star$. ``Compute'' is head-steps used, as a
 fraction of the dense model's, including the cost of valuing heads.
 \textbf{c}, Every method on the same 30 runs ($k^\star = 2, 4, 8$, 10 seeds each), all run the same way here:
-how it scores a head, whether it prunes during training as published, fades heads gradually, and can reopen them,
+how it scores a head, whether it prunes during training as published, sets its own number of heads (no target
+size, fraction or penalty chosen to reach one), and can reopen heads,
 and how often it kept exactly $k^\star$ heads (dark bar) and never broke the model (light bar). Published methods
 above; below, controls that remove one part of our method.
 \textbf{d}, Runs that start with every head copied ($k^\star = 4$, 10 runs each; one circle per run): heads
