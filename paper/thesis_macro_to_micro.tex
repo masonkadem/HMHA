@@ -261,24 +261,10 @@ Each head's output is multiplied by its valve $g_h$ before the heads are added t
 A head with $g_h = 0$ contributes nothing and receives no gradient, so a model with $k$ open valves
 is exactly a $k$-head model. The valve plays the same algebraic role as the astrocyte gain, one
 number that multiplies a whole block of synapses, here the output weights $W_O^h$ of one head. The
-two differ in what sets them and how fast they change (Table~\ref{tab:astro}).
-
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{lll}
-\toprule
- & Astrocyte gain \cite{kozachkov2023} & Head valve \\
-\midrule
-One number for     & all synapses of one astrocyte & all output weights of one head \\
-Set by             & pooled input activity         & collateral value relative to a price \\
-Changes            & with every token              & slowly, over training \\
-Function           & softmax denominator           & selection of heads \\
-\bottomrule
-\end{tabular}
-\caption{Two gains on blocks of synapses. The correspondence is algebraic only.}
-\label{tab:astro}
-\end{table}
+two differ in what sets them and how fast they change. The astrocyte gain follows pooled input
+activity and changes with every token to normalise attention, while the valve follows the head's
+collateral value and changes slowly over training to select heads. The correspondence is
+algebraic only.
 
 \subsection{Hemodynamic attenuation}
 \label{sec:rule}
@@ -326,31 +312,9 @@ random head failure, and a two-layer induction task \cite{olsson2022}.
 \label{fig:main}
 \end{figure}
 
-\begin{table}[h]
-\centering
-\small
-\begin{tabular}{lcc}
-\toprule
-Method (30 runs each) & Exact count & Never broke \\
-\midrule
-Hemodynamic attenuation & 29/30 & 30/30 \\
-\addlinespace
-ZipLM-style \cite{ziplm}               & 24/30 & 0/30 \\
-Michel et al.\ \cite{michel2019sixteen} & 28/30 & 0/30 \\
-Voita et al.\ \cite{voita2019analyzing} & 9/30  & 0/30 \\
-\addlinespace
-No fade                                & 30/30 & 0/30 \\
-No re-fit                              & 2/30  & 30/30 \\
-No score (random)                      & 30/30 & 6/30 \\
-\bottomrule
-\end{tabular}
-\caption{Exact count and stability on the retrieval task ($\kstar = 2, 4, 8$, 10 seeds each).}
-\label{tab:results}
-\end{table}
-
 \paragraph{Count and stability.} Hemodynamic attenuation kept exactly $\kstar$ heads in 29 of 30
 runs and never broke the model in 30 of 30. No other method achieved both
-(Table~\ref{tab:results}). Without the fade the model broke in every run. Without the re-fit it kept
+(Figure~\ref{fig:main}c). Without the fade the model broke in every run. Without the re-fit it kept
 too many heads. With random choice it broke in 24 of 30 runs.
 
 \paragraph{Duplicated heads.} With every head starting as a copy of another, the rule kept 4 heads
