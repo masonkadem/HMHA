@@ -270,11 +270,14 @@ in all 10 runs, while the controls without re-fit or with random choice did not.
 \caption{Two-layer induction.
 \textbf{a}, An example sequence and the model's predictions on the repeat, with all kept heads
 (7/7 correct) and with the layer-2 head switched off (0/7).
-\textbf{b}, Heads kept in one run. Numbers give how much more than chance each head attends to the
-position its role requires.
-\textbf{c}, Runs that never broke, 10 per method, all with the same settings. Every run kept 2 + 1
+\textbf{b}, Attention of the kept heads on that sequence (rows: each token, columns: where it
+looks). The layer-1 head looks one token back, and the layer-2 head looks at the token after the
+earlier copy.
+\textbf{c}, Open heads in each layer during training, 10 runs. Layer 2 reaches the needed one head,
+and layer 1 stops at two.
+\textbf{d}, Runs that never broke, 10 per method, all with the same settings. Every run kept 2 + 1
 heads.
-\textbf{d}, Loss during training for one seed.}
+\textbf{e}, Loss during training for one seed.}
 \label{fig:induction}
 \end{figure}
 
