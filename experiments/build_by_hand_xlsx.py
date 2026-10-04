@@ -166,6 +166,9 @@ text(ws, 28, 2, "The items change every example, so the model cannot memorise th
 
 
 # ===================================================================== a head, built by hand
+S_POS = {}
+
+
 def build_head(ws, top, shift, tag):
     """One attention head that looks `shift` slots ahead. Returns the cells of its output O (4 x 1)
     and the next free row."""
@@ -202,6 +205,7 @@ def build_head(ws, top, shift, tag):
     KT = [[f"={Kc[j][u]}" for j in range(N)] for u in range(N)]
     _, _, S = lblock(ws, top + 1, 3, [[f"={c}" for c in row] for row in Qc], KT, "Q (copied)", "K^T (K turned on its side)",
                      "S = Q K^T", rowlab=queries, collab=slots, fmtC="General")
+    S_POS[tag] = S
     top = S[0] + N + 2
     # softmax, row by row
     text(ws, top, 2, "(e) Attention = softmax of (sharpness x S), row by row: e^(sharpness x score) / sum of the row's.",
@@ -242,6 +246,58 @@ text(ws, 1, 2, "Step 2. One attention head, built by hand (it looks 1 slot ahead
 text(ws, 2, 2, "Follow (a) to (f). The head scores every slot, turns the scores into weights that add up to 1, and")
 text(ws, 3, 2, "returns the weighted average of the items. Try: change W_Q so the 1s move, or lower the sharpness to 1.")
 O1, _ = build_head(ws, 5, 1, "1")
+
+
+# ===================================================================== 2b weights on the left
+ws = wb.create_sheet("2b Weights on the left")
+widths(ws)
+text(ws, 1, 2, "Step 2b. The same head with the weights on the LEFT and the memory on TOP", bold=True, size=14)
+text(ws, 2, 2, "Order matters in matrix multiplication: Y W_K and W_K Y are different. To put the weights on the left, turn")
+text(ws, 3, 2, "both matrices on their side (transpose, written ^T): K^T = W_K^T Y^T. The numbers are the same as sheet 2, but each")
+text(ws, 4, 2, "locker is now a COLUMN instead of a row. The payoff: K^T comes out already turned the right way for the scores.")
+
+# (a) queries as rows, exactly as on sheet 2 (data on the left)
+X = [[f"=IF({PCELL[i]}={t},1,0)" for t in range(N)] for i in range(N)]
+WQ = [[1 if u == (t + 1) % N else 0 for u in range(N)] for t in range(N)]
+text(ws, 6, 2, "(a) Queries as rows, as on sheet 2: Q = X W_Q (each row = one query; the head looks 1 ahead).", italic=True)
+_, _, Qb = lblock(ws, 7, 3, X, WQ, "X (queries)", "W_Q (shift by 1)", "Q = X W_Q",
+                  rowlab=[f"p = {p}" for p in P], collab=[f"q{u}" for u in range(N)], inpB=True, fmtC="General")
+Qc = cells(Qb)
+
+# (b) keys as columns: K^T = W_K^T Y^T, weights on the left, memory on top
+top = Qb[0] + N + 2
+text(ws, top, 2, "(b) Keys as columns: K^T = W_K^T Y^T. Weights on the LEFT, memory on TOP (each column of Y^T is one locker).",
+     italic=True)
+YT = [[1 if t == j else 0 for j in range(N)] for t in range(N)] + [[f"={ITEM[j]}" for j in range(N)]]
+WKT = [[1 if t == u else 0 for t in range(N + 1)] for u in range(N)]
+_, _, KT = lblock(ws, top + 1, 3, WKT, YT, "W_K^T (weights, turned on their side)", "Y^T (memory: one column per locker)",
+                  "", rowlab=[f"k{u}" for u in range(N)], collab=[f"slot {j}" for j in range(N)],
+                  inpA=True, fmtC="General")
+r0, c0 = KT[0], KT[1]
+text(ws, r0, c0 + N, "<- K^T: one column per locker", bold=True)
+
+# (c) scores: the K^T just computed IS the top matrix; Q goes on the left, right below W_K^T
+text(ws, r0 + N, c0 + N, "<- S = Q K^T: K^T above is used as it is, no copying", bold=True)
+for i in range(N):
+    label(ws, r0 + N + i, c0 - 6, f"p = {P[i]}")
+    for t in range(N):
+        put(ws, r0 + N + i, c0 - 5 + t, f"={Qc[i][t]}", FILL_A)
+    for j in range(N):
+        f = "=" + "+".join(f"{ref(r0 + N + i, c0 - 5 + t)}*{ref(r0 + t, c0 + j)}" for t in range(N))
+        put(ws, r0 + N + i, c0 + j, f, FILL_C)
+text(ws, r0 + 2 * N, c0 - 5, "Q (copied from (a))", bold=True)
+text(ws, r0 + 2 * N, c0, "S", bold=True)
+
+# (d) check against sheet 2
+S2 = S_POS["1"]
+rng2 = f"'2 One head'!{COL(S2[1])}{S2[0]}:{COL(S2[1] + N - 1)}{S2[0] + N - 1}"
+rng = f"{COL(c0)}{r0 + N}:{COL(c0 + N - 1)}{r0 + 2 * N - 1}"
+r = r0 + 2 * N + 2
+text(ws, r, 2, "(c) Check: are these scores the same as the scores on sheet 2?", italic=True)
+put(ws, r, 11, f"=IF(SUMPRODUCT(ABS({rng}-{rng2}))=0,\"same as sheet 2\",\"different\")", FILL_C)
+text(ws, r + 2, 2, "What to notice: one stacked L. Y^T on top, K^T in the middle, S at the bottom: the answer of one")
+text(ws, r + 3, 2, "multiplication is the top matrix of the next. The rest of the head (softmax, then attention x V) is as on sheet 2.")
+text(ws, r + 4, 2, "Try: change an item on sheet 1 Task. The bottom row of Y^T changes, but K^T and S do not: keys only use the labels.")
 
 # ===================================================================== 3 Two heads and valves
 ws = wb.create_sheet("3 Two heads")
@@ -538,6 +594,14 @@ side_panel(wb["2 One head"], [
     ("sharpness", "10 (set by hand)", "1/sqrt(32) x learned", "real scores are scaled by 1/sqrt(d_k)"),
 ], [("The code: src/hemo/model.py, class CrossAttn",
      src(h_model.CrossAttn.__init__) + [""] + src(h_model.CrossAttn._split) + [""] + src(h_model.CrossAttn.heads))])
+
+side_panel(wb["2b Weights on the left"], [
+    ("W_K^T", "(4, 5)", "(32, 128) per head", "the real code keeps W_K the other way round"),
+    ("Y^T", "(5, 4)", "(128, 16) per example", "one column per locker"),
+    ("K^T = W_K^T Y^T", "(4, 4)", "(32, 16) per head", "the same numbers as K, turned on their side"),
+    ("S = Q K^T", "(4, 4)", "(16, 16) per head", "identical to sheet 2"),
+], [("The code: the real code uses the row layout of sheet 2 (W_k(Y) = Y W_K), then turns K inside heads()",
+     src(h_model.CrossAttn.heads))])
 
 side_panel(wb["3 Two heads"], [
     ("heads", "2", "32", ""),
