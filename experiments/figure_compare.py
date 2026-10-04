@@ -24,7 +24,7 @@ plt.rcParams.update({
 # ---------------------------------------------------------------- count every method from the runs
 D = Cfg()
 RUNS = []
-for d in ("results", "results/proposal", "results/confirm", "results/l0", "results/review"):
+for d in ("results", "results/proposal", "results/confirm", "results/l0", "results/review", "results/equal"):
     for p in glob.glob(os.path.join(ROOT, d, "*.pkl")):
         r = pickle.load(open(p, "rb"))
         if isinstance(r, dict) and "hist" in r and "cfg" in r and "ledger" in r["hist"]:
@@ -48,22 +48,23 @@ def never_broke(r):                # once first solved, never back above the sol
     return first is not None and max(ls[first:]) <= bar
 
 
-def count(arms):
-    rs = [r for kw, sizes in arms for k in sizes for r in runs_of(**kw, n_rel=k)]
+def count(arms):                   # every method on the same 30 runs: k* = 2, 4, 8 with seeds 0 to 9
+    rs = [r for kw, sizes in arms for k in sizes for r in runs_of(**kw, n_rel=k) if get(r, "seed") < 10]
     return (sum(kept(r) == get(r, "n_rel") for r in rs), sum(never_broke(r) for r in rs), len(rs))
 
 
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
-ALL, SOME = (2, 3, 4, 6, 8), (2, 4, 8)
-ours = count([(RULE, ALL)])
-michel = count([(dict(supply="prune"), ALL)])
-l0 = [count([(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam), SOME)]) for lam in (0.05, 0.2, 1.0)]
-oneshot = count([({**RULE, "oneshot": 1, "budget_hold_frac": hf}, SOME) for hf in (0.3, 0.5)])
-importance = count([({**RULE, "local_value": "ablate"}, SOME)])
-random_ = count([({**RULE, "local_value": "random"}, SOME)])
+EQUAL = (2, 4, 8)
+ours = count([(RULE, EQUAL)])
+michel = count([(dict(supply="prune"), EQUAL)])
+l0_all = {lam: count([(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam), EQUAL)]) for lam in (0.05, 0.2, 1.0)}
+l0 = l0_all[max(l0_all, key=lambda lam: l0_all[lam][0] + l0_all[lam][1])]     # the best penalty for the baseline
+oneshot = count([({**RULE, "oneshot": 1, "budget_hold_frac": 0.3}, EQUAL)])
+importance = count([({**RULE, "local_value": "ablate"}, EQUAL)])
+random_ = count([({**RULE, "local_value": "random"}, EQUAL)])
 frac = lambda a, n: f"{a}/{n}"
-l0_exact = f"{max(c[0] for c in l0)}/{l0[0][2]}*"
-l0_safe = f"{max(c[1] for c in l0)}/{l0[0][2]}*"
+l0_exact = f"{l0[0]}/{l0[2]}*"
+l0_safe = f"{l0[1]}/{l0[2]}*"
 
 # ---------------------------------------------------------------- the table
 rows = [
@@ -118,9 +119,9 @@ fig.text(0.01, 0.045,
          "solved bar.", fontsize=6, color=GREY)
 fig.text(0.01, 0.012,
          "Backups: how many spare heads are kept when heads can fail, predicted before the runs.  *best of 3 penalty "
-         "strengths.  Every number is counted from the saved runs.", fontsize=6, color=GREY)
+         "strengths.  Every method on the same 30 runs (tasks needing 2, 4 and 8 heads, 10 seeds each).", fontsize=6, color=GREY)
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_compare.{ext}"), facecolor="white")
-print("ours", ours, "michel", michel, "l0", l0, "oneshot", oneshot, "importance", importance, "random", random_)
+print("ours", ours, "michel", michel, "l0", l0_all, "oneshot", oneshot, "importance", importance, "random", random_)
 print("wrote figures/fig_compare.png and figures/fig_compare.pdf")
