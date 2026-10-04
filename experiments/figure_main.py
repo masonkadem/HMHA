@@ -203,7 +203,8 @@ for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate
     distinct = (n_kept - twins).mean()
     ax.bar(i, distinct, 0.6, color=face, edgecolor=RED if face == RED else K, lw=0.6)
     ax.bar(i, twins.mean(), 0.6, bottom=distinct, color="white", edgecolor=K, lw=0.6, hatch="//////")
-    ax.plot(i + rng.uniform(-0.15, 0.15, len(n_kept)), n_kept, ".", color=G1, ms=2.5, zorder=3)
+    ax.plot(i + rng.uniform(-0.16, 0.16, len(n_kept)), n_kept, "o", ms=4.6, mfc=(1, 1, 1, 0.55), mec=K, mew=0.9,
+            ls="none", zorder=3)                  # one circle per run
 ax.axhline(4, color=G2, lw=0.6, ls=":", zorder=0)
 ax.text(-0.57, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="left")
 ax.bar(0, 0, color="white", edgecolor=K, lw=0.6, hatch="//////", label="twin also kept")
@@ -229,8 +230,9 @@ pred = [predict(R, p) - R for p in ps]
 ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="predicted before the runs")
 for i, p in enumerate(ps):
     spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
-    jitter = rng.uniform(-0.012, 0.012, len(spares))
-    ax.plot(p + jitter, spares, "o", color=RED, ms=2.6, mew=0, alpha=0.75, label="measured (one dot per run)" if i == 0 else None)
+    jitter = rng.uniform(-0.009, 0.009, len(spares))
+    ax.plot(p + jitter, spares, "o", ms=4.6, mfc=(0.698, 0.094, 0.169, 0.22), mec=RED, mew=0.9, ls="none",
+            label="measured (one circle per run)" if i == 0 else None)
 ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
        xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
 ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)

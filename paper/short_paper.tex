@@ -212,10 +212,10 @@ fraction of the dense model's, including the cost of valuing heads.
 whether it acts during training, fades heads gradually and can reopen them, and how often it kept exactly
 $k^\star$ heads (dark bar) and never broke the model (light bar). Published methods above; below, controls
 that remove one part of our method.
-\textbf{d}, Runs that start with every head copied ($k^\star = 4$): heads kept, and how many were kept
-together with their twin (hatched).
-\textbf{e}, Spare heads kept when each head fails with chance $p$ at every step ($k^\star = 4$): one dot
-per run, against the number predicted before the runs (dashed).
+\textbf{d}, Runs that start with every head copied ($k^\star = 4$, 10 runs each; one circle per run): heads
+kept, and how many were kept together with their twin (hatched).
+\textbf{e}, Spare heads kept when each head fails with chance $p$ at every step ($k^\star = 4$): one circle
+per run (10 runs at $p = 0$, 3 at each other $p$), against the number predicted before the runs (dashed).
 \textbf{f}, One run of each method ($k^\star = 4$, seed 0): only hemodynamic attenuation stays below the
 solved bar.}
 \label{fig:main}
