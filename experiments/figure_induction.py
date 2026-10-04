@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.transforms import blended_transform_factory
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
@@ -84,7 +85,7 @@ with torch.no_grad():
 mask = predict_mask(starts, cfg)[0]
 
 fig = plt.figure(figsize=(7.2, 1.85))
-top = fig.add_gridspec(1, 3, width_ratios=[2.7, 1, 1], wspace=0.45)   # a, b, c on one row
+top = fig.add_gridspec(1, 3, width_ratios=[2.7, 1, 1.1], wspace=0.45)   # a, b, c on one row
 TOK = 4.6                                                             # font size inside token boxes
 
 # ---------------------------------------------------------------- a  task and predictions
@@ -141,20 +142,24 @@ title(ax, "b", "Heads closing")
 # dense models trained from scratch with only the heads listed, 6000 steps, 10 seeds each
 ax = fig.add_subplot(top[2])
 rng = np.random.default_rng(2)
-groups = (((1, 0), "1 layer\n1 head"), ((8, 0), "1 layer\n8 heads"), ((1, 1), "2 layers\n1 + 1"))
+groups = (((1, 0), "1"), ((8, 0), "8"), ((1, 1), "1 + 1"), ((2, 1), "2 + 1"))   # heads per layer
 for i, (heads, name) in enumerate(groups):
     rs = pick(heads=heads, rule="dense", steps=6000)
     loss = np.array([r["final_loss"] for r in rs])
     ok = loss <= rs[0]["bar"]
-    color = RED if heads == (1, 1) else K
+    color = RED if heads[1] > 0 else K
     ax.plot(i + rng.uniform(-0.15, 0.15, len(loss)), loss, "o", ms=3.4, mec=K, mew=0.7,
-            mfc=(0.698, 0.094, 0.169, 0.25) if heads == (1, 1) else (1, 1, 1, 0.6), ls="none")
+            mfc=(0.698, 0.094, 0.169, 0.25) if heads[1] > 0 else (1, 1, 1, 0.6), ls="none")
     ax.text(i, 40, f"{ok.sum()}/{len(rs)}", ha="center", va="center", fontsize=5.6, color=color)
 ax.axhline(rs[0]["bar"], color=G2, lw=0.6, ls=":")
-ax.text(2.45, rs[0]["bar"] * 1.3, "solved", ha="right", va="bottom", fontsize=5.2, color=G1)
-ax.set(yscale="log", ylim=(3e-4, 150), xlim=(-0.5, 2.5), xticks=range(3), ylabel="final loss",
-       yticks=[1e-3, 1e-1, 1e1])
-ax.set_xticklabels([g[1] for g in groups], fontsize=5.4, linespacing=1.1)
+ax.text(3.45, rs[0]["bar"] * 1.3, "solved", ha="right", va="bottom", fontsize=5.2, color=G1)
+ax.set(yscale="log", ylim=(1e-4, 150), xlim=(-0.5, 3.5), xticks=range(4), ylabel="final loss",
+       yticks=[1e-4, 1e-2, 1e0])
+ax.set_xticklabels([g[1] for g in groups], fontsize=5.8)
+under = blended_transform_factory(ax.transData, ax.transAxes)          # group labels below the ticks
+for x, text in ((0.5, "1 layer"), (2.5, "2 layers")):
+    ax.text(x, -0.2, text, transform=under, ha="center", va="top", fontsize=6)
+    ax.plot([x - 0.75, x + 0.75], [-0.17, -0.17], color=G2, lw=0.6, transform=under, clip_on=False)
 ax.minorticks_off()
 title(ax, "c", "Minimal circuit")
 
