@@ -136,23 +136,25 @@ rows = [  # (group, method, (score, where it comes from), during training, gradu
     ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", (OBS, SURGEON), "no", "no", "no", "no", score(ONESHOT)),
     (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "yes", "no", "no", "no",
      score(dict(supply="prune"))),
-    (None, "Learned gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "L0 penalty, best of 3"),
+    (None, "Learned gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
      "yes", "no", "no", "yes", gates[best_lam]),
-    ("Ablations of our rule (one part removed)", "no fade\n(instant closing)", (OBS, SURGEON), "yes", "no", "yes", "no",
+    ("Controls: our rule with one part removed", "no fade\n(instant closing)", (OBS, SURGEON), "yes", "no", "yes", "no",
      score(INSTANT)),
     (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", "no", score(OBD)),
     (None, "no score\n(random choice)", ("random head", ""), "yes", "yes", "yes", "no", score(RANDOM)),
 ]
 ax = fig.add_subplot(outer[1])
 ax.axis("off")
-COLS = dict(method=0.0, score=0.165, during=0.455, fade=0.522, reopen=0.589, learned=0.656, bars=0.735)
-BW = 0.15                                          # bar length for 100% of runs
+COLS = dict(method=0.0, score=0.165, during=0.47, fade=0.55, reopen=0.63, bars=0.72)
+BW = 0.17                                          # bar length for 100% of runs
 y = 0.0
 ax.text(0, y - 1.25, "Every method, same 30 runs", fontsize=7, va="top")
 AX_C, C_TITLE_Y = ax, y - 1.25
 for key, name in (("method", "Method"), ("score", "Head score"), ("during", "During\ntraining"), ("fade", "Gradual\nfade"),
-                  ("reopen", "Reopens"), ("learned", "Gate\nlearned")):
-    ax.text(COLS[key], y - 0.5, name, fontsize=6.3, fontweight="bold", va="center", linespacing=1.15)
+                  ("reopen", "Reopens")):
+    ha = "center" if key in ("during", "fade", "reopen") else "left"
+    ax.text(COLS[key] + (0.02 if ha == "center" else 0), y - 0.5, name, fontsize=6.3, fontweight="bold", va="center",
+            ha=ha, linespacing=1.15)
 ax.add_patch(Rectangle((COLS["bars"], y - 0.82), 0.018, 0.2, color=K, lw=0))
 ax.text(COLS["bars"] + 0.024, y - 0.72, "exact count", fontsize=6.3, fontweight="bold", va="center")
 ax.add_patch(Rectangle((COLS["bars"], y - 0.40), 0.018, 0.2, color=G2, lw=0))
@@ -167,20 +169,25 @@ for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
         y += 0.72
     ours = method.startswith("Collateral")
     c = RED if ours else K
+    if ours:                                       # light band behind our row
+        ax.add_patch(Rectangle((-0.005, y - 0.45), 1.005, 0.9, color="#fbeeee", lw=0, zorder=0))
     ax.text(COLS["method"], y, method, color=c, fontsize=6.2, va="center", linespacing=1.15)
     formula, source = sc
     ax.text(COLS["score"], y - (0.16 if source else 0), formula, color=c, fontsize=6.0, va="center")
     if source:
         ax.text(COLS["score"], y + 0.24, source, color=c if ours else G1, fontsize=5.2, va="center")
-    for key, v in (("during", during), ("fade", fade), ("reopen", reopen), ("learned", learned)):
-        ax.text(COLS[key] + 0.02, y, v, color=c if v == "yes" else G2, fontsize=6.2, va="center", ha="center")
+    for key, v in (("during", during), ("fade", fade), ("reopen", reopen)):  # a dot for yes, a dash for no
+        if v == "yes":
+            ax.plot(COLS[key] + 0.02, y, "o", color=c, ms=3.6, mew=0)
+        else:
+            ax.plot([COLS[key] + 0.012, COLS[key] + 0.028], [y, y], color=G2, lw=0.8)
     for dy, v, shade in ((-0.17, exact, RED if ours else K), (0.17, safe, "#e8a5a5" if ours else G2)):
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW * v / n, 0.26, color=shade, lw=0))
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW, 0.26, fill=False, edgecolor=G3, lw=0.4))
         ax.text(COLS["bars"] + BW + 0.008, y + dy, f"{v}/{n}", color=c, fontsize=5.6, va="center")
     y += 0.95
 ax.plot([0, 1], [y - 0.45, y - 0.45], color=K, lw=0.6)
-ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.", fontsize=5.6, color=G1, va="top")
+ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no", fontsize=5.6, color=G1, va="top")
 ax.set(xlim=(0, 1), ylim=(y + 0.2, -1.3))
 print("panel c:", [(m.replace(chr(10), " "), r) for _, m, _, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
@@ -217,20 +224,17 @@ def predict(R, p, price=0.03):
 
 
 ps = [0.0, 0.05, 0.1, 0.2, 0.3]
-for R, m in ((4, "o"), (2, "s")):
-    pred = [predict(R, p) for p in ps]
-    ax.fill_between(ps, R, pred, color=RED, alpha=0.10, lw=0, step=None)
-    ax.plot(ps, [R] * len(ps), color=G2, lw=0.6, ls=":")
-    ax.plot(ps, pred, color=G2, lw=0.9, ls="--", zorder=1, label="predicted before the runs" if R == 4 else None)
-    means = [np.mean([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) for p in ps]
-    ax.plot(ps, means, m, color=RED, ms=3.5, mfc=RED if R == 4 else "white", mew=0.8, ls="none",
-            label="measured" if R == 4 else None)
-    ax.text(0.31, R - 0.35 if R == 4 else R, f"needs {R}", va="center", fontsize=5.5, color=G1)
-ax.text(0.16, 4.45, "spares", fontsize=5.5, color=RED, ha="center")
-ax.set(xlabel="chance a head fails", ylabel="heads kept", ylim=(1, 8.6), xlim=(-0.02, 0.38),
-       xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[2, 4, 6, 8])
-ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0, fontsize=6)
-title(ax, "e", "Spare heads when heads can fail")
+R = 4                                              # one task, needing 4 heads; spares = heads kept - 4
+pred = [predict(R, p) - R for p in ps]
+ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="predicted before the runs")
+for i, p in enumerate(ps):
+    spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
+    jitter = rng.uniform(-0.012, 0.012, len(spares))
+    ax.plot(p + jitter, spares, "o", color=RED, ms=2.6, mew=0, alpha=0.75, label="measured (one dot per run)" if i == 0 else None)
+ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
+       xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
+ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)
+title(ax, "e", "Spare heads when heads fail ($k^*=4$)")
 
 # ---------------------------------------------------------------- f  what breaking looks like
 ax = fig.add_subplot(bottom[2])
