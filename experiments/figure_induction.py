@@ -83,8 +83,10 @@ with torch.no_grad():
     pred_off = model(tok, off).argmax(-1)[0]
 mask = predict_mask(starts, cfg)[0]
 
-fig = plt.figure(figsize=(7.2, 2.3))
-top = fig.add_gridspec(1, 2, width_ratios=[2.5, 1], wspace=0.22)
+fig = plt.figure(figsize=(7.2, 4.0))
+outer = fig.add_gridspec(2, 1, height_ratios=[0.62, 1], hspace=0.38)
+bot = outer[1].subgridspec(1, 3, width_ratios=[1, 0.25, 1], wspace=0)
+top = [outer[0].subgridspec(1, 2, width_ratios=[4, 1], wspace=0)[0], bot[0], bot[2]]   # a, b, c
 
 # ---------------------------------------------------------------- a  task and predictions
 ax = fig.add_subplot(top[0])
@@ -130,11 +132,32 @@ for r in pick(**METHODS[0][1]):
         ax.plot(led[:, cols].sum(1), color=color, lw=0.8, alpha=0.6,
                 label=label if r["cfg"]["seed"] == 0 else None)
 ax.axhline(1, color=G2, lw=0.7, ls="--", zorder=0)
-ax.text(5950, 1.25, "needed per layer", ha="right", va="bottom", fontsize=5.8, color=G1)
+ax.text(5950, 0.85, "needed per layer", ha="right", va="top", fontsize=5.8, color=G1)
 ax.set(xlim=(0, 6000), ylim=(0, 8.6), yticks=[0, 1, 2, 4, 8], xticks=[0, 3000, 6000],
        xticklabels=["0", "3k", "6k"], xlabel="training step", ylabel="open heads")
 ax.legend(loc="upper right", handlelength=1.2, borderaxespad=0, fontsize=6)
 title(ax, "b", "Heads closing (10 runs)")
+
+# ---------------------------------------------------------------- c  the minimal circuit: two layers, one head each
+# dense models trained from scratch with only the heads listed, 6000 steps, 10 seeds each
+ax = fig.add_subplot(top[2])
+rng = np.random.default_rng(2)
+groups = (((1, 0), "1 layer,\n1 head"), ((8, 0), "1 layer,\n8 heads"), ((1, 1), "2 layers,\n1 + 1"))
+names = []
+for i, (heads, name) in enumerate(groups):
+    rs = pick(heads=heads, rule="dense", steps=6000)
+    loss = np.array([r["final_loss"] for r in rs])
+    ok = loss <= rs[0]["bar"]
+    color = RED if heads == (1, 1) else K
+    ax.plot(i + rng.uniform(-0.15, 0.15, len(loss)), loss, "o", ms=4, mec=K, mew=0.8,
+            mfc=(0.698, 0.094, 0.169, 0.25) if heads == (1, 1) else (1, 1, 1, 0.6), ls="none")
+    names.append(f"{name}\n{ok.sum()}/{len(rs)} solved")
+ax.axhline(rs[0]["bar"], color=G2, lw=0.6, ls=":")
+ax.text(2.45, rs[0]["bar"] * 1.3, "solved", ha="right", va="bottom", fontsize=5.6, color=G1)
+ax.set(yscale="log", ylim=(3e-4, 20), xlim=(-0.5, 2.5), xticks=range(3), ylabel="final loss")
+ax.set_xticklabels(names, fontsize=6, linespacing=1.15)
+ax.minorticks_off()
+title(ax, "c", "Trained from scratch with only these heads")
 
 for ext in ("png", "pdf"):
     fig.savefig(os.path.join(ROOT, "figures", f"fig_induction.{ext}"), bbox_inches="tight", facecolor="white")

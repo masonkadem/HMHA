@@ -330,9 +330,9 @@ kept exactly in 21 of 24 runs and to within one head in the rest (Figure~\ref{fi
 
 \paragraph{Induction.} In a two-layer attention-only model with 8 + 8 heads, the minimal induction
 circuit is one previous-token head in layer 1 and one induction head in layer 2 \cite{olsson2022}.
-Our runs confirm this minimum in both directions. A dense model with 1 + 1 heads trained from
-scratch solved the task in 10 of 10 runs, and every run that ended with a layer empty failed to
-solve it (9 of 9). Hemodynamic attenuation kept 2 + 1 heads in 10 of 10 runs and never broke the
+Our runs confirm this minimum (Figure~\ref{fig:induction}c). A model with 1 + 1 heads trained
+from scratch solved the task in 10 of 10 runs, while a single layer failed in every run, whether
+it had 1 head or 8. The circuit needs depth, not more heads. Hemodynamic attenuation kept 2 + 1 heads in 10 of 10 runs and never broke the
 model. Layer 2 reached the needed single head, while layer 1 kept one head more than needed
 (Figure~\ref{fig:induction}b). Switching off the kept layer-2 head reduced next-token accuracy on
 the repeat to zero (Figure~\ref{fig:induction}a).
@@ -344,7 +344,9 @@ the repeat to zero (Figure~\ref{fig:induction}a).
 \textbf{a}, An example sequence and the model's predictions on the repeat, with all kept heads
 (7/7 correct) and with the layer-2 head switched off (0/7).
 \textbf{b}, Open heads in each layer during training, 10 runs. Layer 2 reaches the needed one head,
-and layer 1 stops at two.}
+and layer 1 stops at two.
+\textbf{c}, Final loss of models trained from scratch with only the heads shown, 10 runs each. One
+layer fails with 1 or 8 heads, and two layers with one head each solve the task.}
 \label{fig:induction}
 \end{figure}
 
