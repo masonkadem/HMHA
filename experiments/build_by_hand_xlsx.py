@@ -156,6 +156,13 @@ text(ws, 16, 2, "Why mod: without it p = 2 would need slot 5, which does not exi
 text(ws, 17, 2, "both answers inside the memory, and 'look 1 ahead' is the same rule at every position.")
 text(ws, 19, 2, "As matrices (used on the next sheets): memory row j = [one-hot of j | c_j], query row i = one-hot of p_i,")
 text(ws, 20, 2, "target row i = [c_(p+1) | c_(p+3)]. The real code adds a little noise to every vector.")
+text(ws, 22, 2, "What are 'memory' and 'slots'? Yes, the memory is just a list: [2, 1, -3, 6]. A slot is a position", bold=True)
+text(ws, 23, 2, "in that list (0, 1, 2, 3), like an index. In plain Python the whole task is:")
+text(ws, 24, 3, "memory = [2, 1, -3, 6];   answer(p) = (memory[(p + 1) % 4], memory[(p + 3) % 4])")
+text(ws, 25, 2, "So why the one-hot labels? Attention cannot see list positions: it compares the query with every row and")
+text(ws, 26, 2, "treats the rows like an unordered pile. So each memory row carries its own position as a code next to its")
+text(ws, 27, 2, "item (slot 2 = [0, 0, 1, 0 | -3]), the query carries a code for p, and the head learns to match codes.")
+text(ws, 28, 2, "The items change every example, so the model cannot memorise them; it can only learn WHERE to look.")
 
 
 # ===================================================================== a head, built by hand
@@ -430,8 +437,165 @@ for i, (Rv, pv, m) in enumerate(meas):
 text(ws, 40, 2, "Source: results/robust (experiments/run.py with --head_dropout). Put R and p above to compare.",
      italic=True, color="595959")
 
+# ===================================================================== side panels: real sizes and real code
+import inspect, sys, textwrap
+sys.path.insert(0, os.path.join(ROOT, "src"))
+from hemo import tasks as h_tasks, model as h_model, train as h_train
+
+PANEL = 16                                        # first column of the side panel
+CODE_FONT = Font(name="Consolas", size=9, color="1F1F1F")
+FILL_CODE = PatternFill("solid", fgColor="F7F7F7")
+
+
+def cut(lines, start=None, end=None, strip_doc=True):
+    """The lines from the one containing `start` to the one containing `end`, docstrings removed."""
+    if start:
+        lines = lines[next(i for i, l in enumerate(lines) if start in l):]
+    if end:
+        lines = lines[:next(i for i, l in enumerate(lines) if end in l) + 1]
+    if strip_doc:
+        out, inside = [], False
+        for l in lines:
+            s = l.strip()
+            if not inside and s.startswith('"""'):
+                inside = not (s.endswith('"""') and len(s) > 3)
+                continue
+            if inside:
+                inside = not s.endswith('"""')
+                continue
+            out.append(l)
+        lines = out
+    return textwrap.dedent("\n".join(lines)).splitlines()
+
+
+def src(obj, start=None, end=None):
+    return cut(inspect.getsource(obj).splitlines(), start, end)
+
+
+def file_src(rel, start, end):
+    return cut(open(os.path.join(ROOT, rel), encoding="utf-8").read().splitlines(), start, end)
+
+
+def side_panel(ws, dims, code):
+    """dims: rows of (object, tiny, real, note). code: list of (title, lines)."""
+    for c, w in zip(range(PANEL, PANEL + 6), (24, 16, 24, 46, 14, 14)):
+        ws.column_dimensions[COL(c)].width = w
+    text(ws, 5, PANEL, "Sizes: this tiny task vs the real experiments", bold=True, size=11)
+    for j, s in enumerate(("object", "tiny (this sheet)", "real experiments", "note")):
+        text(ws, 6, PANEL + j, s, bold=True)
+    for i, row in enumerate(dims):
+        for j, v in enumerate(row):
+            cell = ws.cell(7 + i, PANEL + j, v)
+            cell.font = Font(name=FONT, size=9, color="000000")
+            cell.fill, cell.border = (FILL_X if j < 3 else PatternFill()), (BOX if j < 3 else Border())
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+    r = 7 + len(dims) + 2
+    for title, lines in code:
+        text(ws, r, PANEL, title, bold=True, size=11)
+        r += 1
+        for line in lines:
+            for c in range(PANEL, PANEL + 6):
+                ws.cell(r, c).fill = FILL_CODE
+            cell = ws.cell(r, PANEL, line)
+            cell.font = CODE_FONT
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+            r += 1
+        r += 1
+
+
+B = "B = examples per batch (128 in training, 512 per probe, 1024 for validation)"
+side_panel(wb["0 Read me"], [
+    ("memory slots N", "4", "16", ""),
+    ("distances R (= heads needed)", "2: (1, 3)", "4: (1, 5, 9, 13)", ""),
+    ("numbers per item m", "1", "16", ""),
+    ("vector length d_model", "5", "128", "tiny: 4 label + 1 item; real: 16 label + 16 item + noise"),
+    ("heads H", "2 or 3", "32", ""),
+    ("head size d_k", "4 (1 for values)", "32", "the real code uses the same d_k for queries, keys and values"),
+    ("answer length R x m", "2", "64", ""),
+    ("training steps", "-", "4000", "Adam, learning rate 0.002, batch 128"),
+], [])
+
+side_panel(wb[TASK], [
+    ("query tokens per example", "4", "16", "one per position p"),
+    ("X (queries)", "(4, 4)", "(B, 16, 128)", B),
+    ("Y (memory)", "(4, 5)", "(B, 16, 128)", "row j = [one-hot of j | item | noise]"),
+    ("item c_j", "1 number", "16 numbers", "content = torch.randn(B, N, m)"),
+    ("T (targets)", "(4, 2)", "(B, 16, 64)", "R items of 16 numbers, side by side"),
+    ("offsets", "(1, 3)", "(1, 5, 9, 13)", "1 + r * N / R for r = 0 .. R-1"),
+], [("The code: src/hemo/tasks.py", src(h_tasks.offsets_for) + [""] +
+     src(h_tasks.make_batch, 'elif cfg.task == "multi_relation"', 'T = torch.cat'))])
+
+side_panel(wb["2 One head"], [
+    ("W_Q, one head", "(4, 4)", "(128, 32)", "all 32 heads stored together: W_q is 128 -> 1024"),
+    ("W_K, one head", "(5, 4)", "(128, 32)", "W_k: 128 -> 1024"),
+    ("W_V, one head", "(5, 1)", "(128, 32)", "W_v: 128 -> 1024"),
+    ("Q = X W_Q", "(4, 4)", "(B, 32, 16, 32)", "after _split: (examples, heads, tokens, d_k)"),
+    ("K = Y W_K", "(4, 4)", "(B, 32, 16, 32)", ""),
+    ("V = Y W_V", "(4, 1)", "(B, 32, 16, 32)", ""),
+    ("S = Q K^T", "(4, 4)", "(B, 32, 16, 16)", "every query against every slot, per head"),
+    ("attention", "(4, 4)", "(B, 32, 16, 16)", "each row adds up to 1"),
+    ("O = attention V", "(4, 1)", "(B, 32, 16, 32)", "one blend per head per query"),
+    ("sharpness", "10 (set by hand)", "1/sqrt(32) x learned", "real scores are scaled by 1/sqrt(d_k)"),
+], [("The code: src/hemo/model.py, class CrossAttn",
+     src(h_model.CrossAttn.__init__) + [""] + src(h_model.CrossAttn._split) + [""] + src(h_model.CrossAttn.heads))])
+
+side_panel(wb["3 Two heads"], [
+    ("heads", "2", "32", ""),
+    ("valves g", "(2,)", "(32,), copied to (B, 32)", "one gain per head"),
+    ("[g_1 O_1 | g_2 O_2]", "(4, 2)", "(B, 16, 1024)", "32 heads x 32 numbers, side by side"),
+    ("W_O", "(2, 2)", "(1024, 64)", ""),
+    ("prediction", "(4, 2)", "(B, 16, 64)", ""),
+    ("loss", "average of 8", "average of B x 16 x 64", "mean squared error"),
+], [("The code: src/hemo/model.py, CrossAttn.combine and forward",
+     src(h_model.CrossAttn.combine) + [""] + src(h_model.CrossAttn.forward))])
+
+side_panel(wb["4 Why R heads"], [
+    ("unknown items per query", "2", "4", "each 16 numbers long in the real task"),
+    ("heads needed", "2", "4", "one per distance"),
+    ("mixing matrix", "(2, 2)", "(heads used, 4)", "rows = the heads' recipes"),
+    ("re-fit data", "1 query", "16,384 rows", "1024 examples x 16 query tokens"),
+    ("re-fit design matrix", "-", "(16,384, 32k + 1)", "k heads x 32 numbers, plus a constant"),
+], [("The code: experiments/equations_test.py (the real check of one head, one equation)",
+     file_src("experiments/equations_test.py", "def head_outputs", "return float("))])
+
+side_panel(wb["5 Collateral value"], [
+    ("heads valued", "3 (A, B, C)", "32", "every 25 training steps"),
+    ("head outputs Z", "(4, 3)", "(8,192, 1,024)", "512 probe examples x 16 tokens; 32 heads x 32"),
+    ("Gram matrix A = Z^T Z / n", "(3, 3)", "(1,024, 1,024)", "plus a tiny ridge for stability"),
+    ("W_O re-fit", "(3, 2)", "(1,024, 64)", "W = M B, with M the inverse of A for open heads"),
+    ("value of head h", "re-fit by hand", "trace(W_J^T M_JJ^-1 W_J) / 64", "same number as re-fitting without h, without redoing it"),
+], [("The code: src/hemo/model.py, HemoAttn.probe_ischemia",
+     src(h_model.HemoAttn.probe_ischemia, "H, dk = self.H", "self.head_value.copy_(value"))])
+
+train_lines = [l for l in src(h_train.train) if any(k in l for k in (
+    "price = cfg.price_frac", "for step in range(total)", "model.relax_tone()",
+    "if (step - hold) % cfg.probe_every == 0", "model.probe_ischemia(*make_batch", "model.local_step(price)"))]
+side_panel(wb["6 The rule"], [
+    ("heads at the start", "3", "32", ""),
+    ("price", "1 (set by hand)", "0.03 x L_triv", "L_triv = loss of a model that always guesses the average"),
+    ("decisions", "2 rounds", "every 25 steps, step 400 to 4000", "one closure (or reopening) per decision"),
+    ("fade", "instant", "1/100 per step", "taper = 100"),
+    ("reopen", "not shown", "if worth > 2 x price", "so a head at the margin does not flicker"),
+], [("The code: src/hemo/model.py, HemoAttn.local_step and relax_tone",
+     src(h_model.HemoAttn.local_step) + [""] + src(h_model.HemoAttn.relax_tone)),
+    ("The code: src/hemo/train.py, the lines of train() that run the rule",
+     list(dict.fromkeys(l.strip() for l in train_lines)))])   # each line once (one-shot repeats two)
+
+side_panel(wb["7 Backup heads"], [
+    ("R", "set above", "2 or 4", ""),
+    ("failure chance p", "set above", "0.05, 0.1, 0.2, 0.3", "head_dropout"),
+    ("price", "set above", "0.03 x L_triv", ""),
+    ("failure patterns", "exact formula", "32 random patterns per probe", "probe_masks = 32"),
+], [("The code: src/hemo/model.py, HemoAttn._probe_under_damage",
+     src(h_model.HemoAttn._probe_under_damage))])
+
 for ws in wb.worksheets:
     ws.sheet_view.showGridLines = False
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
-wb.save(OUT)
+try:
+    wb.save(OUT)
+except PermissionError:                           # the file is open in Excel: save beside it
+    OUT = OUT.replace(".xlsx", " (new).xlsx")
+    wb.save(OUT)
+    print("hmha_by_hand.xlsx is open in Excel; close it and rerun to replace it")
 print("wrote", OUT)
