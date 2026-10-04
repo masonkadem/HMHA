@@ -69,10 +69,10 @@ score. Our contributions are:
 slots ahead (wrapping round), so 4 heads are needed.
 \textbf{b}, One attention layer with 32 heads; each head's output passes through a valve $g_h$
 before the output weights. Filled valves are open.
-\textbf{c}, Best loss with $k$ different heads, measured on a trained 4-head model with heads
-removed (dots) or replaced by copies of another (circles), against the prediction $1 - k/4$.
-\textbf{d}, Where the four heads kept by the rule attend, averaged over queries at each position.
-\textbf{e}, Which memory slot each of the model's answers points to (the nearest stored item).
+\textbf{c}, Best loss with $k$ different heads on, measured on a trained 4-head model with the other heads
+switched off (dots) or with all 4 on but some replaced by copies of another (circles), against the prediction
+$1 - k/4$: a copy adds nothing, each different head adds one answer.
+\textbf{d}, Which memory slot each of the model's answers points to (the nearest stored item).
 Grey squares are the right slots. With the 4 kept heads, every answer is right (100\% of 65{,}536
 held-out answers). With head 6 switched off, the answers for $p + 13$ become wrong (crosses),
 76\% right overall.}

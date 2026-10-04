@@ -54,9 +54,7 @@ kept = torch.nonzero(gate > 0).flatten().tolist()
 N, offs = cfg.seq_len, offsets_for(cfg)
 with torch.no_grad():
     X, Y, T, aux = val[0], val[1], val[2], val[3]
-    _, attn, _ = model.heads(X, Y)                                   # (batch, head, query, slot)
     p = aux["p"]
-    maps = torch.stack([torch.stack([attn[:, h][p == q].mean(0) for q in range(N)]) for h in kept]).cpu().numpy()
     pred = model(X, Y, gate=gate)[0]
     off = gate.clone()
     off[kept[0]] = 0
@@ -93,7 +91,7 @@ print(f"heads kept {kept}; loss {loss_on:.2e}; with head {kept[0]} switched off 
 fig = plt.figure(figsize=(7.2, 4.7))
 outer = fig.add_gridspec(2, 1, height_ratios=[0.8, 1.15], hspace=0.32)
 gs = outer[0].subgridspec(1, 4, wspace=0.55)
-bot = outer[1].subgridspec(1, 3, width_ratios=[1.25, 1.75, 3.2], wspace=0.38)
+bot = outer[1].subgridspec(1, 2, width_ratios=[1.5, 3.2], wspace=0.3)
 
 # ---------------------------------------------------------------- a  task
 ax = fig.add_subplot(gs[0, :2])
@@ -120,7 +118,7 @@ ax.text(7.5, -2.5, r"needs $k^*=4$ heads", ha="center", va="center", color=G1)
 
 # ---------------------------------------------------------------- b  model
 ax = fig.add_subplot(gs[0, 2:])
-title(ax, "b", "Model: one attention layer, 32 heads, each with a supply")
+title(ax, "b", "Model: one attention layer, 32 heads, each with a valve")
 ax.axis("off")
 ax.set(xlim=(-1.6, 10), ylim=(0, 6.6))
 
@@ -156,7 +154,7 @@ for i, x in enumerate(xs):
 ax.plot([xs[0] + 0.35, xs[-1] + 0.35], [1.75, 1.75], color=G1, lw=0.5)
 arrow(2.2, 0.95, 2.2, 1.75)
 arrow(7.8, 0.95, 7.8, 1.75)
-ax.text(-1.55, 3.75, "supply\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
+ax.text(-1.55, 3.75, "valve\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
 box(0.45, 4.8, 9.05, 0.9, r"$y = W_O\,\Sigma_h\; g_h\, \mathrm{softmax}(Q_h K_h^{\mathsf{T}})\, V_h$", fs=7)
 arrow(5.0, 5.75, 5.0, 6.35)
 ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
@@ -165,41 +163,19 @@ ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
 ax = fig.add_subplot(bot[0])
 E1 = pickle.load(open(os.path.join(ROOT, "results", "proposal", "equations.pkl"), "rb"))
 triv = E1["trivial"]
-ax.plot([0, 4], [triv, 0], color=G2, lw=0.8, ls="--", zorder=1, label="predicted")
+ax.plot([0, 4], [triv, 0], color=G2, lw=0.8, ls="--", zorder=1, label="predicted: $1 - k/4$")
 plain = [r for r in E1["rows"] if len(set(r["heads"])) == len(r["heads"])]
 copies = [r for r in E1["rows"] if len(set(r["heads"])) < len(r["heads"])]
-ax.plot([r["different"] for r in plain], [r["loss"] for r in plain], "o", color=K, ms=3, label="heads removed")
+ax.plot([r["different"] for r in plain], [r["loss"] for r in plain], "o", color=K, ms=3.5, label="only $k$ heads left on")
 ax.plot([r["different"] for r in copies], [r["loss"] for r in copies], "o", mfc="none", mec=RED,
-        ms=6.5, mew=0.8, label="one head copied")
-ax.set(xlabel="different heads", ylabel="loss", xticks=range(5), xlim=(-0.2, 4.3), ylim=(-0.05, 1.45),
+        ms=6.5, mew=0.8, label="4 heads on, some\nare copies")
+ax.set(xlabel="$k$ = different heads on", ylabel="loss", xticks=range(5), xlim=(-0.2, 4.3), ylim=(-0.05, 1.45),
        yticks=[0, 0.5, 1.0])
 ax.legend(loc="upper right", handletextpad=0.3, borderaxespad=0, labelspacing=0.3)
-title(ax, "c", "One head, one equation")
+title(ax, "c", "Each different head adds one answer")
 
-# ---------------------------------------------------------------- d  attention of the kept heads, 2 x 2
-sub = bot[1].subgridspec(2, 2, wspace=0.12, hspace=0.32)
-vmax = maps.max()
-for i, h in enumerate(kept):
-    a = fig.add_subplot(sub[i // 2, i % 2])
-    a.imshow(maps[i], cmap="Reds", vmin=0, vmax=vmax, interpolation="nearest")
-    a.set_xticks([0, 15]); a.set_yticks([0, 15])
-    a.tick_params(length=1.5, labelsize=5.5, pad=1)
-    for sp in a.spines.values():
-        sp.set_visible(True); sp.set_color(G2); sp.set_linewidth(0.5)
-    a.text(0.5, 1.03, f"head {h}", transform=a.transAxes, ha="center", va="bottom", fontsize=6, color=G1)
-    if i == 0:
-        title(a, "d", "Where the kept heads look", pad=11)
-    if i % 2 == 0:
-        a.set_ylabel("query $p$", fontsize=6.5, labelpad=1)
-    else:
-        a.set_yticklabels([])
-    if i // 2 == 1:
-        a.set_xlabel("slot", fontsize=6.5, labelpad=1)
-    else:
-        a.set_xticklabels([])
-
-# ---------------------------------------------------------------- e  which slot each answer points to
-sub = bot[2].subgridspec(1, 2, wspace=0.14)
+# ---------------------------------------------------------------- d  which slot each answer points to
+sub = bot[1].subgridspec(1, 2, wspace=0.14)
 GRID = "#c8c8c8"
 for i, (grid, name, acc) in enumerate(((grid_on, "4 kept heads", acc_on),
                                        (grid_off, f"head {kept[0]} switched off", acc_off))):
@@ -221,7 +197,7 @@ for i, (grid, name, acc) in enumerate(((grid_on, "4 kept heads", acc_on),
     a.text(0.5, 1.03, name, transform=a.transAxes, ha="center", va="bottom", fontsize=6.5)
     a.set_xlabel(f"slot\n{100 * acc:.0f}% of answers right", fontsize=6.5, labelpad=1)
     if i == 0:
-        title(a, "e", "Which slot each answer points to", pad=13)
+        title(a, "d", "Which slot each answer points to", pad=13)
         a.set_ylabel("query position $p$", fontsize=6.5, labelpad=1)
     else:
         a.set_yticklabels([])

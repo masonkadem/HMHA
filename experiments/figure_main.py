@@ -149,7 +149,7 @@ COLS = dict(method=0.0, score=0.27, train=0.585, fade=0.66, reopen=0.735, bars=0
 BW = 0.125                                         # bar length for 100% of runs
 FS, FS_SMALL = 7.0, 6.0
 y = 0.0
-for key, name in (("method", "Method"), ("score", "Head score"), ("train", "Prunes in\ntraining*"),
+for key, name in (("method", "Method"), ("score", "Head score"), ("train", "Prunes in\ntraining"),
                   ("fade", "Gradual\nfade"), ("reopen", "Reopens")):
     ha = "center" if key in ("train", "fade", "reopen") else "left"
     ax.text(COLS[key] + (0.022 if ha == "center" else 0), y - 0.55, name, fontsize=FS if ha == "left" else FS - 0.6,
@@ -164,7 +164,7 @@ y = 0.6
 for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
     if group:
         y += 0.22
-        ax.text(0, y, group, fontsize=FS_SMALL + 0.3, color=G1, style="italic", va="center")
+        ax.text(0, y, group, fontsize=FS_SMALL + 0.3, color=G1, va="center")
         ax.plot([0, 1], [y - 0.34, y - 0.34], color=G3, lw=0.5)
         y += 0.7
     ours = method.startswith("Hemodynamic")
@@ -187,8 +187,7 @@ for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
         ax.text(COLS["bars"] + BW + 0.01, y + dy, f"{v}/{n}", color=c, fontsize=FS_SMALL, va="center")
     y += 1.02
 ax.plot([0, 1], [y - 0.55, y - 0.55], color=K, lw=0.6)
-ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each; every method run the same way here.   "
-        "*as published.   \u25cf yes   \u2013 no", fontsize=FS_SMALL, color=G1, va="top")
+ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no", fontsize=FS_SMALL, color=G1, va="top")
 ax.set(xlim=(0, 1), ylim=(y + 0.1, -1.05))
 print("panel c:", [(m, r) for _, m, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
