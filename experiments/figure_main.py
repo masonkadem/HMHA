@@ -129,21 +129,24 @@ ONESHOT = {**RULE, "oneshot": 1, "budget_hold_frac": 0.3}
 OBD = {**RULE, "local_value": "ablate"}
 RANDOM = {**RULE, "local_value": "random"}
 INSTANT = {**RULE, "taper": 0}
-OBS = r"$\min_W L_{-h} - \min_W L$"
-rows = [  # (group, method, score, during training, gradual fade, reopens, gate learned, result)
-    (None, "Collateral rule (ours)", OBS + "  (OBS)", "yes", "yes", "yes", "no", score(RULE)),
-    ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", OBS + "  (OBS)", "no", "no", "no", "no", score(ONESHOT)),
-    (None, "Michel et al. 2019", r"$|\partial L / \partial g_h|$", "yes", "no", "no", "no", score(dict(supply="prune"))),
-    (None, "Learned gates\n(Voita et al. 2019)", r"$L + \lambda \sum_h P(g_h \neq 0)$", "yes", "no", "no*", "yes",
-     gates[best_lam]),
-    ("Ablations of our rule (one part removed)", "no fade\n(instant closing)", OBS, "yes", "no", "yes", "no", score(INSTANT)),
-    (None, "no re-fit (OBD score,\nLeCun et al. 1990)", r"$L_{-h}(W) - L(W)$", "yes", "yes", "yes", "no", score(OBD)),
-    (None, "no score\n(random choice)", "random head", "yes", "yes", "yes", "no", score(RANDOM)),
+OBS = r"$\mathrm{min}_W\, L_{-h} - \mathrm{min}_W\, L$"
+SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1990)"
+rows = [  # (group, method, (score, where it comes from), during training, gradual fade, reopens, gate learned, result)
+    (None, "Collateral rule (ours)", (OBS, SURGEON), "yes", "yes", "yes", "no", score(RULE)),
+    ("Published methods", "ZipLM-style\n(Kurtic et al. 2023)", (OBS, SURGEON), "no", "no", "no", "no", score(ONESHOT)),
+    (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "yes", "no", "no", "no",
+     score(dict(supply="prune"))),
+    (None, "Learned gates\n(Voita et al. 2019)", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "L0 penalty, best of 3"),
+     "yes", "no", "no", "yes", gates[best_lam]),
+    ("Ablations of our rule (one part removed)", "no fade\n(instant closing)", (OBS, SURGEON), "yes", "no", "yes", "no",
+     score(INSTANT)),
+    (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", "no", score(OBD)),
+    (None, "no score\n(random choice)", ("random head", ""), "yes", "yes", "yes", "no", score(RANDOM)),
 ]
 ax = fig.add_subplot(outer[1])
 ax.axis("off")
-COLS = dict(method=0.0, score=0.185, during=0.405, fade=0.475, reopen=0.545, learned=0.615, bars=0.70)
-BW = 0.17                                          # bar length for 100% of runs
+COLS = dict(method=0.0, score=0.165, during=0.455, fade=0.522, reopen=0.589, learned=0.656, bars=0.735)
+BW = 0.15                                          # bar length for 100% of runs
 y = 0.0
 ax.text(0, y - 1.25, "Every method, same 30 runs", fontsize=7, va="top")
 AX_C, C_TITLE_Y = ax, y - 1.25
@@ -165,21 +168,20 @@ for group, method, sc, during, fade, reopen, learned, (exact, safe, n) in rows:
     ours = method.startswith("Collateral")
     c = RED if ours else K
     ax.text(COLS["method"], y, method, color=c, fontsize=6.2, va="center", linespacing=1.15)
-    ax.text(COLS["score"], y, sc, color=c, fontsize=6.0, va="center")
+    formula, source = sc
+    ax.text(COLS["score"], y - (0.16 if source else 0), formula, color=c, fontsize=6.0, va="center")
+    if source:
+        ax.text(COLS["score"], y + 0.24, source, color=c if ours else G1, fontsize=5.2, va="center")
     for key, v in (("during", during), ("fade", fade), ("reopen", reopen), ("learned", learned)):
         ax.text(COLS[key] + 0.02, y, v, color=c if v == "yes" else G2, fontsize=6.2, va="center", ha="center")
     for dy, v, shade in ((-0.17, exact, RED if ours else K), (0.17, safe, "#e8a5a5" if ours else G2)):
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW * v / n, 0.26, color=shade, lw=0))
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.13), BW, 0.26, fill=False, edgecolor=G3, lw=0.4))
         ax.text(COLS["bars"] + BW + 0.008, y + dy, f"{v}/{n}", color=c, fontsize=5.6, va="center")
-    y += 0.85
-ax.plot([0, 1], [y - 0.4, y - 0.4], color=K, lw=0.6)
-ax.text(0, y - 0.25, "Every method on the same 30 runs (tasks needing 2, 4 and 8 heads, 10 seeds each). Exact count: heads left = "
-        "heads needed. Never broke: once solved, the loss never\nwent back above the solved bar. OBS = Optimal Brain Surgeon "
-        "(Hassibi & Stork 1993): the loss after removing head h, the others re-fitted. Learned gates: best of 3 penalties;\n"
-        "*a closed gate could reopen by gradient, but none of the 2,709 closed gates did.",
-        fontsize=5.4, color=G1, va="top", linespacing=1.3)
-ax.set(xlim=(0, 1), ylim=(y + 0.75, -1.3))
+    y += 0.95
+ax.plot([0, 1], [y - 0.45, y - 0.45], color=K, lw=0.6)
+ax.text(0, y - 0.3, "Tasks needing 2, 4 and 8 heads, 10 seeds each.", fontsize=5.6, color=G1, va="top")
+ax.set(xlim=(0, 1), ylim=(y + 0.2, -1.3))
 print("panel c:", [(m.replace(chr(10), " "), r) for _, m, _, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
 # ---------------------------------------------------------------- d  duplicated heads
