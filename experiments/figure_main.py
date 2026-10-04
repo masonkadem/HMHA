@@ -74,13 +74,13 @@ def compute(r):
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
 BAR = 0.02
-fig = plt.figure(figsize=(7.2, 10.2))
-outer = fig.add_gridspec(3, 1, height_ratios=[1.55, 1.75, 1.1], hspace=0.28)
+fig = plt.figure(figsize=(7.2, 8.9))
+outer = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.5, 1.1], hspace=0.2)
 bottom = outer[2].subgridspec(1, 3, wspace=0.5)
 
 # ---------------------------------------------------------------- a, b  training, small multiples
 show = (2, 4, 6, 8)
-cd = outer[0].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.16, wspace=0.55)
+cd = outer[0].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.12, wspace=0.5)
 for i, k in enumerate(show):
     r = sorted(runs(**RULE, n_rel=k), key=lambda r: get(r, "seed"))[0]
     d0 = next(d for d in dense(k) if d["cfg"]["seed"] == get(r, "seed"))
@@ -163,10 +163,10 @@ ax.plot([0, 1], [y - 0.05, y - 0.05], color=K, lw=0.6)
 y = 0.6
 for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
     if group:
-        y += 0.3
+        y += 0.22
         ax.text(0, y, group, fontsize=FS_SMALL + 0.3, color=G1, style="italic", va="center")
         ax.plot([0, 1], [y - 0.34, y - 0.34], color=G3, lw=0.5)
-        y += 0.8
+        y += 0.7
     ours = method.startswith("Hemodynamic")
     c = RED if ours else K
     if ours:                                       # light band behind our row
@@ -185,7 +185,7 @@ for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW * v / n, 0.3, color=shade, lw=0))
         ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW, 0.3, fill=False, edgecolor=G3, lw=0.4))
         ax.text(COLS["bars"] + BW + 0.01, y + dy, f"{v}/{n}", color=c, fontsize=FS_SMALL, va="center")
-    y += 1.15
+    y += 1.02
 ax.plot([0, 1], [y - 0.55, y - 0.55], color=K, lw=0.6)
 ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each; every method run the same way here.   "
         "*as published.   \u25cf yes   \u2013 no", fontsize=FS_SMALL, color=G1, va="top")
@@ -235,7 +235,7 @@ for i, p in enumerate(ps):
 ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
        xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
 ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)
-title(ax, "e", "Spare heads when heads fail ($k^*=4$)")
+title(ax, "e", "Predicting backup heads ($k^*=4$)")
 
 # ---------------------------------------------------------------- f  what breaking looks like
 ax = fig.add_subplot(bottom[2])
@@ -248,10 +248,10 @@ for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al. 2019"
     ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
 ax.axhline(BAR, color=G2, lw=0.6, ls=":")
 ax.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
-ax.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
+ax.set(yscale="log", ylim=(1e-7, 2), yticks=[1, 1e-2, 1e-4, 1e-6], xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
        xlabel="training step", ylabel="loss")
 ax.minorticks_off()
-ax.legend(loc="upper right", handlelength=1.4, borderaxespad=0, fontsize=5.8)
+ax.legend(loc="lower right", ncol=2, handlelength=1.4, columnspacing=0.8, borderaxespad=0.2, fontsize=5.8)
 title(ax, "f", "What breaking looks like ($k^*=4$)")
 
 X_LETTER = AX_A.get_position().x0 - 0.085           # one column for the left-hand panel letters
