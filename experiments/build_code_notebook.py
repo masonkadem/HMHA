@@ -119,7 +119,11 @@ class Attention(nn.Module):
         return weights @ v                             # (B, H, N, DK)  O = A V: each question's weighted average
 
     def forward(self, questions, memory, valves):      # valves: (H,), one number per head
-        out = self.head_outputs(questions, memory) * valves[None, :, None, None]   # (B, H, N, DK)  THE VALVE: g_h O_h
+        out = self.head_outputs(questions, memory)                                 # (B, H, N, DK)
+        valved = []
+        for h in range(self.H):                        # THE VALVE: head h's whole block times its number g_h
+            valved.append(out[:, h] * valves[h])       # (B, N, DK) x one number
+        out = torch.stack(valved, dim=1)                                           # (B, H, N, DK) again
         out = out.transpose(1, 2).reshape(len(questions), N, -1)                   # (B, N, H*DK)   heads side by side
         return self.W_o(out)                                                       # (B, N, R*M)    Y-hat: the answer
 """)
