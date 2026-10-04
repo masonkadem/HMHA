@@ -313,7 +313,10 @@ random head failure, and a two-layer induction task \cite{olsson2022}.
 \end{figure}
 
 \paragraph{Count and stability.} Hemodynamic attenuation kept exactly $\kstar$ heads in 29 of 30
-runs and never broke the model in 30 of 30. No other method achieved both
+runs and never broke the model in 30 of 30. The count does not depend on the price. Every price
+from $0.01$ to $0.1$ of $\Ltriv$ gave the exact count (9 runs each), because a needed head is worth
+at least $\Ltriv/\kstar$ and a redundant head close to zero, so any price between the two gives the
+same answer. No other method achieved both
 (Figure~\ref{fig:main}c). The method of Michel et al.\ stops when the loss crosses the solved
 threshold, so it breaks the model by design. Told the true number of heads instead, it stopped at
 that number but still broke the model in 28 of 30 runs. Without the fade the model broke in every
