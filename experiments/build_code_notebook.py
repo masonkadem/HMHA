@@ -159,17 +159,33 @@ much the loss goes up. A head whose job another head can do is worth about 0, ho
 code(r"""
 @torch.no_grad()
 def collateral_values(model, open_heads):
-    questions, memory, answer = make_batch(256)                # a fresh batch to judge on
-    outs = model.head_outputs(questions, memory).transpose(1, 2).reshape(-1, model.H, DK).double()
-    target = answer.reshape(-1, R * M).double()
+    # 1. run the model on a fresh batch and keep every head's output
+    questions, memory, answer = make_batch(256)
+    outs = model.head_outputs(questions, memory)              # (B, H, N, DK)
+    target = answer.reshape(-1, R * M).double()               # one row per question: (B*N, R*M)
 
-    def best_loss(heads):                                       # best read-out using only these heads
-        Z = torch.cat([outs[:, h] for h in heads] + [torch.ones(len(target), 1, dtype=target.dtype)], 1)
-        W = torch.linalg.lstsq(Z, target).solution
-        return ((Z @ W - target) ** 2).mean().item()
+    # 2. the best loss we can reach using only some heads: re-fit the read-out by least squares
+    def best_loss(heads):
+        columns = []
+        for h in heads:
+            head_out = outs[:, h].reshape(-1, DK).double()    # head h's output, one row per question
+            columns.append(head_out)
+        columns.append(torch.ones(len(target), 1, dtype=torch.double))   # a constant column (the bias)
+        Z = torch.cat(columns, dim=1)                         # the chosen heads side by side
+        W = torch.linalg.lstsq(Z, target).solution            # the best read-out weights
+        prediction = Z @ W
+        return ((prediction - target) ** 2).mean().item()
 
-    with_all = best_loss(open_heads)
-    return {h: best_loss([o for o in open_heads if o != h]) - with_all for h in open_heads}
+    # 3. a head's value = how much the best loss rises when it is left out
+    loss_with_all = best_loss(open_heads)
+    values = {}
+    for h in open_heads:
+        others = []
+        for o in open_heads:
+            if o != h:
+                others.append(o)
+        values[h] = best_loss(others) - loss_with_all
+    return values
 """)
 
 # ---------------------------------------------------------------- 5
@@ -185,24 +201,46 @@ code(r"""
 def train(heads, steps=2000, rule=False, price=0.03, warmup=400, every=25, fade=100, seed=0):
     torch.manual_seed(seed)
     model = Attention(heads)
-    opt = torch.optim.AdamW(model.parameters(), lr=2e-3)
-    valves, is_open = torch.ones(heads), torch.ones(heads)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=2e-3)
+    valves = torch.ones(heads)       # each head's valve: 1 = fully open, 0 = closed
+    is_open = torch.ones(heads)      # the rule's decision for each head: 1 = keep, 0 = close
     log = []
+
     for step in range(steps):
+        # --- an ordinary training step ---
         questions, memory, answer = make_batch(128)
-        loss = F.mse_loss(model(questions, memory, valves), answer)
-        opt.zero_grad()
+        prediction = model(questions, memory, valves)
+        loss = F.mse_loss(prediction, answer)
+        optimizer.zero_grad()
         loss.backward()
-        opt.step()
+        optimizer.step()
+
         if rule:
-            valves += (is_open - valves).clamp(-1 / fade, 1 / fade)            # fade toward open/closed
+            # --- a closed head's valve fades by 1/fade per step until it reaches 0 ---
+            for h in range(heads):
+                if is_open[h] == 0 and valves[h] > 0:
+                    valves[h] = max(float(valves[h]) - 1 / fade, 0.0)
+
+            # --- every `every` steps after the warm-up: value the open heads, maybe close one ---
             if step >= warmup and step % every == 0:
-                open_heads = [h for h in range(heads) if is_open[h] == 1]
+                open_heads = []
+                for h in range(heads):
+                    if is_open[h] == 1:
+                        open_heads.append(h)
+
                 values = collateral_values(model, open_heads)
-                cheapest = min(values, key=values.get)
+
+                cheapest = open_heads[0]                      # find the open head worth least
+                for h in open_heads:
+                    if values[h] < values[cheapest]:
+                        cheapest = h
+
                 if values[cheapest] < price and len(open_heads) > 1:
-                    is_open[cheapest] = 0                                      # close it
-        log.append((loss.item(), int((valves > 0).sum())))
+                    is_open[cheapest] = 0                     # close it: its valve starts fading
+
+        heads_on = int((valves > 0).sum())
+        log.append((loss.item(), heads_on))
+
     return model, valves, log
 """)
 
