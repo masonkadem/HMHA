@@ -240,8 +240,9 @@ $\kstar = R$ heads, and with $k < R$ heads the lowest achievable loss is
 \end{equation}
 where $\Ltriv$ is the loss of predicting the mean. Duplicate heads give the same equation and count
 once. Measured losses agree with Equation~\eqref{eq:law} to within 1\% (Figure~\ref{fig:setup}c).
-The task counts as solved when the loss is below $0.02\,\Ltriv$. Results are unchanged for any
-threshold from $0.01$ to $0.1$.
+The task counts as solved when the loss is below $0.02\,\Ltriv$. Since $\Ltriv$ is the variance of
+the targets, this is the same as $R^2 \ge 0.98$, the model explaining 98\% of the variance in the
+answers. Results are unchanged for any threshold from $0.01$ to $0.1$.
 
 \subsection{Model}
 
@@ -335,6 +336,8 @@ kept exactly in 21 of 24 runs and to within one head in the rest (Figure~\ref{fi
 
 \paragraph{Induction.} In a two-layer attention-only model with 8 + 8 heads, the minimal induction
 circuit is one previous-token head in layer 1 and one induction head in layer 2 \cite{olsson2022}.
+Here the task counts as solved when the loss is below 2\% of that of random guessing among the 64
+tokens, which corresponds to about 99\% of the predictable tokens correct.
 Our runs confirm this minimum (Figure~\ref{fig:induction}c). A model with 1 + 1 heads trained
 from scratch solved the task in 10 of 10 runs, while a single layer failed in every run, whether
 it had 1 head or 8. The circuit needs depth, not more heads. A model with 2 + 1 heads also
