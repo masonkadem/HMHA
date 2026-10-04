@@ -339,7 +339,11 @@ Our runs confirm this minimum (Figure~\ref{fig:induction}c). A model with 1 + 1 
 from scratch solved the task in 10 of 10 runs, while a single layer failed in every run, whether
 it had 1 head or 8. The circuit needs depth, not more heads. Hemodynamic attenuation kept 2 + 1 heads in 10 of 10 runs and never broke the
 model. Layer 2 reached the needed single head, while layer 1 kept one head more than needed
-(Figure~\ref{fig:induction}b). Switching off the kept layer-2 head reduced next-token accuracy on
+(Figure~\ref{fig:induction}b). In one run examined in detail, the two layer-1 heads had each learned
+a weak version of the previous-token job, placing 28\% of their attention on the previous token.
+Together they gave 99.9\% correct predictions on the repeat, either one alone 86 to 88\%, and
+neither 6\%. Closing either head would have cost far more than the price, so the rule kept both
+rather than break the model while the remaining head sharpened. Switching off the kept layer-2 head reduced next-token accuracy on
 the repeat to zero (Figure~\ref{fig:induction}a).
 
 \begin{figure}[t]
