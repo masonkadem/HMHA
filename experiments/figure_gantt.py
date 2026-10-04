@@ -16,12 +16,12 @@ plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "
 
 MONTHS = "ONDJFMAMJJASOND"                      # October 2026 ... December 2027
 TASKS = [  # (label, first month, last month), months counted from 0 = October 2026
-    ("Proposal, comprehensive exam, preliminary results", 0, 1),
-    ("qSA-Cross: compare with Chapter 4 heads", 2, 4),
-    ("Cross-Site Transformer on WildPPG", 4, 6),
-    ("Attenuate, then audit a blood pressure model", 5, 7),
-    ("Scaling to large language models", 7, 9),
-    ("Paper writing and submission", 9, 10),
+    ("Proposal and comprehensive exam", 0, 1),
+    ("Attenuate, then audit a blood pressure model", 0, 2),
+    ("Small language models from scratch, layer-wise values", 1, 4),
+    ("Chapter 4 models: qSA-Cross and WildPPG", 3, 4),
+    ("GPT-2 small: compare with its known circuit", 5, 7),
+    ("Paper writing and submission", 8, 10),
     ("Thesis writing and defence", 11, 14),
 ]
 

@@ -351,17 +351,6 @@ and layer 1 stops at two.
 \paragraph{Cost.} The final loss was 2 to 7 times the dense model's, well below the threshold, using
 0.31 to 0.45 of its head-steps. The saving is nominal, since closed heads are still computed.
 
-\subsection{Proposed work}
-
-The rule currently values a head by re-fitting only the final read-out. Between layers, one layer's
-heads change what the next layer attends to, and a re-fit at the output cannot repair that. This is
-why layer 1 of the induction model keeps one head more than needed. The proposed extension values a
-head at its own layer, by asking the other heads of that layer to rebuild what the next layer reads,
-the same layer-wise approach used to prune large language models \cite{ziplm}. The same extension is
-needed to apply the rule at scale. We will then test the rule on qSA-Cross, asking whether it keeps
-the two causal heads found in Chapter~4, and on the Cross-Site Transformer with WildPPG, asking
-whether the same heads are kept across all sixteen leave-one-subject-out folds.
-
 \subsection{Joint experiment: attenuate, then audit}
 \label{sec:joint}
 
@@ -372,6 +361,26 @@ of the few heads that remain. If the model computes pressure from transit time, 
 find it in a small number of named heads, and switching those heads off should move the predicted
 pressure in the direction the physics requires. If no surviving head carries transit time, the
 model is accurate for another reason, and the audit has caught it with far fewer heads to check.
+
+\subsection{Proposed work}
+
+The proposed work follows the timeline in Figure~\ref{fig:timeline}. It begins with the joint
+experiment of Section~\ref{sec:joint}, which trains a blood pressure model with hemodynamic
+attenuation and audits the heads that remain.
+
+The rule currently values a head by re-fitting only the final read-out. Between layers, one layer's
+heads change what the next layer attends to, and a re-fit at the output cannot repair that. This is
+why layer 1 of the induction model keeps one head more than needed. The proposed extension values a
+head at its own layer, by asking the other heads of that layer to rebuild what the next layer reads,
+the same layer-wise approach used to prune large language models \cite{ziplm}. It will be developed
+on small language models trained from scratch, where accuracy can be measured against the number of
+open heads, and checked on the induction task, where it should reach the needed 1 + 1 heads.
+
+The rule will then be applied to the models of Chapter~4, asking whether it keeps the two causal
+heads found in qSA-Cross, and whether the same heads are kept across all sixteen
+leave-one-subject-out folds of the Cross-Site Transformer on WildPPG. Finally, it will be applied
+while fine-tuning GPT-2 small on indirect object identification, a task whose circuit in that model
+is known \cite{wang2023}, asking whether the heads the rule keeps overlap with that circuit.
 
 %=========================================================================================
 \section{Timeline}
@@ -438,6 +447,8 @@ stable circuits are across training methods, and will be reported as such.
   \emph{ACL}, 2019.
 \bibitem{olsson2022} C.~Olsson et al. In-context learning and induction heads.
   \emph{Transformer Circuits Thread}, 2022.
+\bibitem{wang2023} K.~Wang, A.~Variengien, A.~Conmy, B.~Shlegeris, J.~Steinhardt. Interpretability
+  in the wild: a circuit for indirect object identification in GPT-2 small. \emph{ICLR}, 2023.
 \end{thebibliography}
 
 \end{document}
