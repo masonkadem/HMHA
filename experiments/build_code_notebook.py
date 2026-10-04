@@ -18,9 +18,10 @@ md(r"""
 
 **The story.** The memory is a list of N items. A question names an index *p* and asks for the
 items at index p + 1 and p + 5 (wrapping round to the start, mod N). An attention head is a
-helper that can fetch from one fixed distance, so this task needs exactly **2 helpers**. We start
-with **8**, and while training we keep asking of each helper: *if it went home, could the others
-cover its job?* If yes, it fades out. The goal: end with exactly 2, without ever breaking the model.
+helper that can fetch from one fixed distance, so this task needs exactly **2 helpers** (one per
+distance). We start with **8**, and while training we keep asking of each helper: *if it went home,
+could the others cover its job?* If yes, it fades out. The goal: end with exactly 2, without ever
+breaking the model. (These are the starting sizes; section 1 shows how to change them.)
 
 The code below is written to be read. It does the same thing as the project code in `src/hemo/`
 (the last section lists the small differences).
@@ -37,14 +38,29 @@ torch.set_num_threads(4)
 # ---------------------------------------------------------------- 1
 md(r"""
 ## 1. The sizes
+
+Change **N**, **R** or **M**, then run the notebook from the top (Run All). The vector length D, the
+distances and the number of starting heads are worked out from them. A smaller version that still
+behaves like the real task: `N = 4, R = 2, M = 4`. Keep R at most N/2, so the distances differ.
+
+**Keep M at 4 or more.** With tiny items (try `M = 1`), one head can cheat: it lets the item values
+steer its own attention, so the attention weight itself carries information, and one head almost
+solves a two-distance task. "One head, one equation" only holds when items are big enough that this
+trick cannot carry them. The real experiments use M = 16.
 """)
 code(r"""
+# change these three ...
 N = 8                # length of the memory list: positions with index 0 to 7
 R = 2                # how many distances to look ahead; this is also how many heads the task needs
 M = 4                # how many numbers make up each item in the list
-D = 16               # length of every vector: 8 for the label + 4 for the item + 4 of noise
-DK = 8               # size of each head: how many numbers each head works with
-DISTANCES = [1, 5]   # the R distances: fetch the items at index p + 1 and p + 5
+
+# ... and everything below follows from them
+NOISE = 4                                      # extra noise numbers in every vector (can be 0)
+D = N + M + NOISE                              # length of every vector: label + item + noise
+DK = 8                                         # size of each head: how many numbers each head works with
+HEADS = 4 * R                                  # heads the model starts with: 4 times what it needs
+DISTANCES = [1 + r * (N // R) for r in range(R)]   # R distances spread evenly round the list
+print(f"memory of {N}, {R} distances {DISTANCES}, items of {M}, vectors of {D}, starting with {HEADS} heads")
 """)
 
 # ---------------------------------------------------------------- 2
@@ -69,9 +85,10 @@ code(r"""
 questions, memory, answer = make_batch(1)
 print("memory", tuple(memory.shape), "questions", tuple(questions.shape), "answer", tuple(answer.shape))
 p = int(questions[0, 0, :N].argmax())                          # the index question 0 asks about
-print(f"question 0 asks about index {p}: needs the items at index {(p + 1) % N} and {(p + 5) % N}")
-print("its answer is exactly those two items:",
-      torch.equal(answer[0, 0], torch.cat([memory[0, (p + 1) % N, N:N + M], memory[0, (p + 5) % N, N:N + M]])))
+needed = [(p + d) % N for d in DISTANCES]                     # the indices this question needs
+print(f"question 0 asks about index {p}: needs the items at index {needed}")
+print("its answer is exactly those items:",
+      torch.equal(answer[0, 0], torch.cat([memory[0, j, N:N + M] for j in needed])))
 """)
 
 # ---------------------------------------------------------------- 3
@@ -165,20 +182,21 @@ md(r"""
 First, how many heads does the task really need? Train with 1 head and with 2 (no rule).
 """)
 code(r"""
-for heads in (1, 2):
+for heads in range(1, R + 1):                                 # 1 head, 2 heads, ... up to R
     _, _, log = train(heads)
     print(f"{heads} head(s): final loss {sum(l for l, _ in log[-100:]) / 100:.4f}")
 """)
 md(r"""
-One head cannot do it (a head fetches from one distance; the task has two). Two heads solve it.
-Now start with **8 heads** and let the rule decide, three times with different random starts:
+With fewer than R heads the loss stays high (a head fetches from one distance; the task has R).
+With R heads it is solved. Now start with `HEADS` heads (4 times too many) and let the rule decide,
+three times with different random starts:
 """)
 code(r"""
 logs = []
 for seed in range(3):
-    _, valves, log = train(8, rule=True, seed=seed)
+    _, valves, log = train(HEADS, rule=True, seed=seed)
     logs.append(log)
-    print(f"seed {seed}: heads left {int((valves > 0).sum())} of 8,  final loss "
+    print(f"seed {seed}: heads left {int((valves > 0).sum())} of {HEADS} (task needs {R}),  final loss "
           f"{sum(l for l, _ in log[-100:]) / 100:.4f},  worst loss after step 1000 {max(l for l, _ in log[1000:]):.4f}")
 """)
 code(r"""
@@ -186,13 +204,13 @@ loss, heads = zip(*logs[0])
 fig, ax = plt.subplots(2, 1, figsize=(6, 3.6), sharex=True)
 ax[0].semilogy(loss, color="#b2182b", lw=0.5); ax[0].set_ylabel("loss")
 ax[0].axhline(0.02, color="#888", ls=":", lw=0.8)              # the 'solved' bar
-ax[1].plot(heads, color="#b2182b"); ax[1].axhline(2, color="#888", ls=":")
+ax[1].plot(heads, color="#b2182b"); ax[1].axhline(R, color="#888", ls=":")
 ax[1].set_ylabel("heads open"); ax[1].set_xlabel("training step")
 plt.tight_layout(); plt.show()
 """)
 md(r"""
-Every run ends with exactly the 2 heads the task needs, and the loss stays far below the solved bar
-(dotted) the whole way down.
+With the starting sizes, every run ends with exactly the R = 2 heads the task needs, and the loss
+stays far below the solved bar (dotted) the whole way down. Try other sizes in section 1.
 """)
 
 # ---------------------------------------------------------------- 7
