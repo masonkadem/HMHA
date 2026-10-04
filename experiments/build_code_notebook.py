@@ -16,8 +16,8 @@ code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip("\n")))
 md(r"""
 # The whole project in about 80 lines
 
-**The story.** A row of lockers, each holding a random number. A question names a locker *p* and
-asks for what is in the lockers 1 and 5 to the right (wrapping round). An attention head is a
+**The story.** The memory is a list of N items. A question names an index *p* and asks for the
+items at index p + 1 and p + 5 (wrapping round to the start, mod N). An attention head is a
 helper that can fetch from one fixed distance, so this task needs exactly **2 helpers**. We start
 with **8**, and while training we keep asking of each helper: *if it went home, could the others
 cover its job?* If yes, it fades out. The goal: end with exactly 2, without ever breaking the model.
@@ -39,38 +39,38 @@ md(r"""
 ## 1. The sizes
 """)
 code(r"""
-N = 8                # how many lockers (memory slots)
+N = 8                # length of the memory list: positions with index 0 to 7
 R = 2                # how many distances to look ahead; this is also how many heads the task needs
-M = 4                # how many numbers are stored in each locker (the item)
+M = 4                # how many numbers make up each item in the list
 D = 16               # length of every vector: 8 for the label + 4 for the item + 4 of noise
 DK = 8               # size of each head: how many numbers each head works with
-DISTANCES = [1, 5]   # the R distances: look 1 locker ahead, and 5 lockers ahead
+DISTANCES = [1, 5]   # the R distances: fetch the items at index p + 1 and p + 5
 """)
 
 # ---------------------------------------------------------------- 2
 md(r"""
 ## 2. The task
 
-Each locker is one vector: `[its number as a one-hot label | its item | a little noise]`. Each
-question is `[the one-hot of p | noise]`. The answer is the items 1 and 5 lockers ahead of p.
+Each position in the memory is one vector: `[its index as a one-hot label | its item | a little noise]`.
+Each question is `[the one-hot of p | noise]`. The answer is the items at index p + 1 and p + 5 (mod N).
 """)
 code(r"""
 def make_batch(B):
-    labels = torch.eye(N).expand(B, N, N)                      # locker j's label = one-hot of j
-    items = torch.randn(B, N, M)                               # a random item in every locker
+    labels = torch.eye(N).expand(B, N, N)                      # position j's label = one-hot of its index j
+    items = torch.randn(B, N, M)                               # a random item at every position
     memory = torch.cat([labels, items, 0.1 * torch.randn(B, N, D - N - M)], -1)
-    p = torch.randint(0, N, (B, N))                            # each question asks about a locker p
+    p = torch.randint(0, N, (B, N))                            # each question asks about an index p
     questions = torch.cat([F.one_hot(p, N).float(), 0.1 * torch.randn(B, N, D - N)], -1)
     rows = torch.arange(B)[:, None]
-    answer = torch.cat([items[rows, (p + d) % N] for d in DISTANCES], -1)   # items d lockers ahead
+    answer = torch.cat([items[rows, (p + d) % N] for d in DISTANCES], -1)   # the items at index (p + d) mod N
     return questions, memory, answer
 """)
 code(r"""
 questions, memory, answer = make_batch(1)
 print("memory", tuple(memory.shape), "questions", tuple(questions.shape), "answer", tuple(answer.shape))
-p = int(questions[0, 0, :N].argmax())                          # the locker question 0 asks about
-print(f"question 0 asks about locker {p}: needs lockers {(p + 1) % N} and {(p + 5) % N}")
-print("its answer is those lockers' items:",
+p = int(questions[0, 0, :N].argmax())                          # the index question 0 asks about
+print(f"question 0 asks about index {p}: needs the items at index {(p + 1) % N} and {(p + 5) % N}")
+print("its answer is exactly those two items:",
       torch.equal(answer[0, 0], torch.cat([memory[0, (p + 1) % N, N:N + M], memory[0, (p + 5) % N, N:N + M]])))
 """)
 
@@ -78,8 +78,8 @@ print("its answer is those lockers' items:",
 md(r"""
 ## 3. Attention heads, each with a valve
 
-Every head scores each locker against the question, turns the scores into weights that add up to 1
-(softmax), and returns the weighted average of the lockers. Each head's output is then multiplied by
+Every head scores each position against the question, turns the scores into weights that add up to 1
+(softmax), and returns the weighted average of the items. Each head's output is then multiplied by
 its **valve** (1 = open, 0 = closed) before the output weights `W_o` combine the heads.
 """)
 code(r"""
@@ -206,7 +206,7 @@ md(r"""
 | `collateral_values` | `HemoAttn.probe_ischemia` | the project gets the same numbers with one matrix inverse instead of one re-fit per head (faster) |
 | the `if rule:` block | `HemoAttn.local_step`, `relax_tone` | the project also **reopens** a closed head worth more than twice the price |
 | `train` | `train.train` | the project adds a learning-rate schedule and gradient clipping |
-| sizes 8 / 2 / 8 heads | `Cfg` | the experiments use 16 lockers, 4 distances, 32 heads, 4000 steps |
+| sizes 8 / 2 / 8 heads | `Cfg` | the experiments use a memory of 16, 4 distances, 32 heads, 4000 steps |
 
 The full experiments (hundreds of runs, see `walkthrough_by_hand.ipynb` section 8 and the paper)
 found the same as here, at full size: the rule kept exactly the needed number of heads in 47 of 50
