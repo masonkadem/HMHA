@@ -52,14 +52,17 @@ wall, and the stiffness of the wall depends on pressure in a way that differs be
 a benchmark while computing nothing related to pulse propagation, and accuracy alone cannot reveal
 this.
 
-Chapter~3 constrained what a model sees. Chapter~4 used the macrocirculation to constrain the macro
+Chapter~3 constrained what a model sees and how it decides, restricting the inputs to
+hemodynamic and motion sensors and reducing a gradient-boosted model to a cascade a person can
+read. Chapter~4 used the macrocirculation to constrain the macro
 architecture of a model, at the level of cross-attention between measurement sites. This chapter
 moves inside the model. Project~3A (Section~\ref{sec:audit}) uses the physics of the large arteries
 to verify a model: a mechanistic audit tests whether an estimator's prediction depends on transit
 time in the way the physics requires, with preliminary results on a synthetic testbed. Project~3B
 (Section~\ref{sec:3b}) uses the regulation of the microcirculation to build the model: a rule we
 call hemodynamic attenuation closes attention heads during training, the way unneeded vessels
-regress, until only the circuit the task needs remains. The two meet in a joint experiment. A blood
+regress, until only the circuit the task needs remains, bringing a deep model closer to the
+readability of the Chapter~3 cascade. The two meet in a joint experiment. A blood
 pressure model trained with hemodynamic attenuation keeps only a few heads, and the audit of 3A can
 then ask which of them, if any, carries transit time (Section~\ref{sec:joint}).
 
