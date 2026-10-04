@@ -91,6 +91,38 @@ def show(func, notes):                             # print one function from the
 print("ready")
 """)
 
+md(r"""
+### The settings: `cfg`
+
+Every number the task, the model and the training use lives in ONE settings object, `Cfg`, in
+`src/hemo/config.py`. The notebook does not copy it (two copies could drift apart, and then the
+notebook would no longer run what the experiments ran). It imports `Cfg` and changes a few numbers
+with `replace` to make the small version `SMALL`. Wherever the code says `cfg.something`, it reads
+one of these settings. The cell below prints the ones this notebook uses, next to the real
+experiments' values.
+""")
+
+code(r"""
+REAL = Cfg()                                        # the settings of the real experiments
+settings = [                                        # (name in the code, what it means)
+    ("seq_len", "N: memory slots"),
+    ("n_rel", "R: distances = heads the task needs"),
+    ("m_content", "m: numbers per stored item"),
+    ("d_model", "d: length of every vector (label + item + noise)"),
+    ("num_heads", "heads the model starts with"),
+    ("d_k", "size of each head"),
+    ("batch_size", "examples per training step"),
+    ("steps", "training steps"),
+    ("lr", "learning rate"),
+]
+print(f"{'cfg.' + 'name':<16}{'SMALL':>8}{'real':>8}   meaning")
+for name, meaning in settings:                      # one line per setting
+    print(f"{'cfg.' + name:<16}{getattr(SMALL, name):>8}{getattr(REAL, name):>8}   {meaning}")
+print()
+print("The collateral rule's own settings (price, fade, first decision) are set where the rule is used: section 7.")
+print("To try a different size, make another copy:  mine = replace(SMALL, seq_len=4, n_rel=2)")
+""")
+
 # ------------------------------------------------------------------ 0
 md(r"""
 ## 0. PyTorch, one function at a time
