@@ -71,14 +71,14 @@ Each position in the memory is one vector: `[its index as a one-hot label | its 
 Each question is `[the one-hot of p | noise]`. The answer is the items at index p + 1 and p + 5 (mod N).
 """)
 code(r"""
-def make_batch(B):
-    labels = torch.eye(N).expand(B, N, N)                      # position j's label = one-hot of its index j
-    items = torch.randn(B, N, M)                               # a random item at every position
-    memory = torch.cat([labels, items, 0.1 * torch.randn(B, N, D - N - M)], -1)
-    p = torch.randint(0, N, (B, N))                            # each question asks about an index p
-    questions = torch.cat([F.one_hot(p, N).float(), 0.1 * torch.randn(B, N, D - N)], -1)
-    rows = torch.arange(B)[:, None]
-    answer = torch.cat([items[rows, (p + d) % N] for d in DISTANCES], -1)   # the items at index (p + d) mod N
+def make_batch(B):                                             # B examples at once
+    labels = torch.eye(N).expand(B, N, N)                      # (B, N, N)   position j's label = one-hot of j
+    items = torch.randn(B, N, M)                               # (B, N, M)   a random item at every position
+    memory = torch.cat([labels, items, 0.1 * torch.randn(B, N, D - N - M)], -1)   # (B, N, D)  X_m
+    p = torch.randint(0, N, (B, N))                            # (B, N)      the index each question asks about
+    questions = torch.cat([F.one_hot(p, N).float(), 0.1 * torch.randn(B, N, D - N)], -1)   # (B, N, D)  X_q
+    rows = torch.arange(B)[:, None]                            # (B, 1)      example b reads its own memory
+    answer = torch.cat([items[rows, (p + d) % N] for d in DISTANCES], -1)   # (B, N, R*M)  Y: the items at (p+d) mod N
     return questions, memory, answer
 """)
 code(r"""
@@ -104,18 +104,49 @@ class Attention(nn.Module):
     def __init__(self, heads):
         super().__init__()
         self.H = heads
-        self.W_q, self.W_k, self.W_v = (nn.Linear(D, heads * DK) for _ in range(3))
-        self.W_o = nn.Linear(heads * DK, R * M)
+        self.W_q = nn.Linear(D, heads * DK)            # D -> H*DK   every head's W_Q, stored side by side
+        self.W_k = nn.Linear(D, heads * DK)            # D -> H*DK   every head's W_K
+        self.W_v = nn.Linear(D, heads * DK)            # D -> H*DK   every head's W_V
+        self.W_o = nn.Linear(heads * DK, R * M)        # H*DK -> R*M  combines the heads into the answer
 
-    def head_outputs(self, questions, memory):                 # every head's weighted average
-        split = lambda t: t.view(t.shape[0], N, self.H, DK).transpose(1, 2)      # cut into heads
-        q, k, v = split(self.W_q(questions)), split(self.W_k(memory)), split(self.W_v(memory))
-        weights = torch.softmax(q @ k.transpose(-2, -1) / DK ** 0.5, dim=-1)     # scores -> weights
-        return weights @ v
+    def head_outputs(self, questions, memory):         # questions X_q, memory X_m: (B, N, D)
+        split = lambda t: t.view(t.shape[0], N, self.H, DK).transpose(1, 2)   # (B, N, H*DK) -> (B, H, N, DK)
+        q = split(self.W_q(questions))                 # (B, H, N, DK)  Q = X_q W_Q: what each question looks for
+        k = split(self.W_k(memory))                    # (B, H, N, DK)  K = X_m W_K: each position's key
+        v = split(self.W_v(memory))                    # (B, H, N, DK)  V = X_m W_V: each position's value
+        scores = q @ k.transpose(-2, -1) / DK ** 0.5   # (B, H, N, N)   S = Q K^T / sqrt(DK): question i vs position j
+        weights = torch.softmax(scores, dim=-1)        # (B, H, N, N)   A = softmax(S): each row adds up to 1
+        return weights @ v                             # (B, H, N, DK)  O = A V: each question's weighted average
 
-    def forward(self, questions, memory, valves):
-        out = self.head_outputs(questions, memory) * valves[None, :, None, None]  # THE VALVE
-        return self.W_o(out.transpose(1, 2).reshape(len(questions), N, -1))
+    def forward(self, questions, memory, valves):      # valves: (H,), one number per head
+        out = self.head_outputs(questions, memory) * valves[None, :, None, None]   # (B, H, N, DK)  THE VALVE: g_h O_h
+        out = out.transpose(1, 2).reshape(len(questions), N, -1)                   # (B, N, H*DK)   heads side by side
+        return self.W_o(out)                                                       # (B, N, R*M)    Y-hat: the answer
+""")
+
+md(r"""
+**Every step's size, for one example.** Letters: B examples, H heads, N questions (= memory
+positions), D vector length, DK head size, R*M answer length. Read `(B, H, N, DK)` as "for every
+example, for every head, an N x DK matrix".
+""")
+code(r"""
+model = Attention(HEADS)
+questions, memory, answer = make_batch(1)                       # one example: B = 1
+split = lambda t: t.view(1, N, HEADS, DK).transpose(1, 2)
+q, k, v = split(model.W_q(questions)), split(model.W_k(memory)), split(model.W_v(memory))
+scores = q @ k.transpose(-2, -1) / DK ** 0.5
+weights = torch.softmax(scores, dim=-1)
+out = weights @ v
+side_by_side = out.transpose(1, 2).reshape(1, N, -1)
+prediction = model.W_o(side_by_side)
+steps = [("X_q  questions", questions, "(B, N, D)"), ("X_m  memory", memory, "(B, N, D)"),
+         ("Q = X_q W_Q", q, "(B, H, N, DK)"), ("K = X_m W_K", k, "(B, H, N, DK)"), ("V = X_m W_V", v, "(B, H, N, DK)"),
+         ("S = Q K^T / sqrt(DK)", scores, "(B, H, N, N)"), ("A = softmax(S)", weights, "(B, H, N, N)"),
+         ("O = A V", out, "(B, H, N, DK)"), ("[O_1 | ... | O_H]", side_by_side, "(B, N, H*DK)"),
+         ("Y-hat = [...] W_o", prediction, "(B, N, R*M)"), ("Y  answer key", answer, "(B, N, R*M)")]
+for name, t, letters in steps:
+    print(f"{name:<22}{letters:<16}= {tuple(t.shape)}")
+print("same as model(...):", torch.allclose(prediction, model(questions, memory, torch.ones(HEADS))))
 """)
 
 # ---------------------------------------------------------------- 4
