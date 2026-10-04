@@ -1,4 +1,4 @@
-% Project 3B: hemodynamic attenuation. Standalone-compilable; to drop into the thesis, keep the
+% Project 3B: hemodynamic attenuation. Standalone-compilable. To drop into the thesis, keep the
 % body and merge the \bibitem entries into the thesis bibliography.
 %
 % Numbers come from the runs in results/ (figures drawn by experiments/figure_main.py,
@@ -26,9 +26,10 @@
 %=========================================================================================
 \section{Introduction}
 
-Earlier chapters used blood flow as data, training models to read hemodynamic signals. This
-chapter uses blood flow as a design principle: the way the brain decides which vessels to keep
-is used to decide which attention heads a transformer keeps.
+The previous chapter used blood flow principles to constrain the macro architecture of a
+model, at the level of cross-attention between measurement sites. This chapter applies brain
+blood flow principles to the micro architecture, at the level of individual attention heads. The
+way the brain decides which vessels to keep is used to decide which heads a transformer keeps.
 
 In Chapter~4, a trained transformer carried its causal computation in two of forty heads, but
 this was found only after training, by ablating each head in turn, and the number of heads to
@@ -49,12 +50,12 @@ Four properties of cerebral blood supply motivate the rule:
       A head is valued by what is lost when it closes and the other heads compensate, its
       collateral value.
 \item Maintaining a vessel has a metabolic cost \cite{murray1926}. Each open head has a fixed
-      price; there is no target number of heads.
+      price, and there is no target number of heads.
 \item Unneeded vessels regress gradually \cite{chen2012,franco2015}, and collaterals can enlarge
       when a route is blocked \cite{faber2014}. Closing heads fade out over 100 steps and can
       be reopened.
 \end{enumerate}
-The biology motivates the design; no claim is made about the brain.
+The biology motivates the design, and no claim is made about the brain.
 
 \subsection{Astrocytes and attention}
 
@@ -80,7 +81,7 @@ the softmax and the astrocyte its denominator.
 
 Michel et al.\ \cite{michel2019sixteen} remove heads by a gradient score, and Voita et al.\
 \cite{voita2019analyzing} learn head gates with an $L_0$ penalty. Optimal Brain Damage \cite{obd}
-scores a parameter by the loss increase when it is removed; Optimal Brain Surgeon \cite{obs} by
+scores a parameter by the loss increase when it is removed, and Optimal Brain Surgeon \cite{obs} by
 the increase after the remaining parameters are re-fitted. ZipLM \cite{ziplm} applies the latter to
 whole heads of trained language models. All of these prune after training, to a size chosen by
 the user.
@@ -94,9 +95,9 @@ the user.
 \centering
 \includegraphics[width=\linewidth]{fig_setup.pdf}
 \caption{Task and model.
-\textbf{a}, A query carries a position $p$; the target is the items stored $1, 5, 9, 13$ slots
+\textbf{a}, A query carries a position $p$, and the target is the items stored $1, 5, 9, 13$ slots
 ahead, so 4 heads are needed.
-\textbf{b}, One attention layer with 32 heads, each with a valve $g_h$; filled valves are open.
+\textbf{b}, One attention layer with 32 heads, each with a valve $g_h$. Filled valves are open.
 \textbf{c}, Loss with $k$ different heads on a trained 4-head model, against the prediction
 $1 - k/4$.
 \textbf{d}, The slot each answer points to: all correct with the 4 kept heads, 76\% with head 6
@@ -194,13 +195,13 @@ $W^{*} = \frac{1}{n} TZ^{\top}A^{-1}$, $M = A^{-1}$ and $J$ the rows of head $h$
 v_h = \tfrac{1}{d_{\text{out}}}\,
 \operatorname{tr}\!\big( W^{*}_J \,(M_{JJ})^{-1} W^{*\top}_J \big),
 \end{equation}
-one inverse for all heads. This is the block Optimal Brain Surgeon score \cite{obs,ziplm}; the
+one inverse for all heads. This is the block Optimal Brain Surgeon score \cite{obs,ziplm}. The
 contribution is its use during training, with a price, a gradual fade, and reopening.
 
 The re-fit is what makes a copy worthless. If $z_2 = z_1$ and the target is $z_1$, removing head 2
 without re-fitting raises the loss by $0.25\,\mathrm{var}(z_1)$ when the weights are
-$(0.5, 0.5)$; with re-fitting head 1 takes weight 1 and $v_2 = 0$. Computing the values added
-about 5\% to training compute. In one layer $A$ is the exact curvature; deeper models would need a
+$(0.5, 0.5)$. With re-fitting, head 1 takes weight 1 and $v_2 = 0$. Computing the values added
+about 5\% to training compute. In one layer $A$ is the exact curvature, and deeper models would need a
 layer-wise approximation \cite{ziplm}.
 
 \subsection{Baselines and evaluation}
@@ -224,11 +225,11 @@ failure, and a two-layer induction task \cite{olsson2022}.
 \includegraphics[width=\linewidth]{fig_main.pdf}
 \caption{Hemodynamic attenuation during training.
 \textbf{a}, Loss of the dense model (black) and with hemodynamic attenuation (red).
-\textbf{b}, Open heads; dotted line, $\kstar$.
+\textbf{b}, Open heads, with $\kstar$ dotted.
 \textbf{c}, All methods on the same 30 runs.
 \textbf{d}, Runs in which every head starts with an identical copy.
 \textbf{e}, Spare heads kept under random failure, against the prediction.
-\textbf{f}, One run per method; only hemodynamic attenuation stays below the solved threshold.}
+\textbf{f}, One run per method. Only hemodynamic attenuation stays below the solved threshold.}
 \label{fig:main}
 \end{figure}
 
@@ -255,12 +256,12 @@ No score (random)                      & 30/30 & 6/30 \\
 \end{table}
 
 \paragraph{Count and stability.} Hemodynamic attenuation kept exactly $\kstar$ heads in 29 of 30
-runs and never broke the model in 30 of 30; no other method achieved both
-(Table~\ref{tab:results}). Without the fade the model broke in every run; without the re-fit it
-kept too many heads; with random choice it broke in 24 of 30 runs.
+runs and never broke the model in 30 of 30. No other method achieved both
+(Table~\ref{tab:results}). Without the fade the model broke in every run. Without the re-fit it
+kept too many heads. With random choice it broke in 24 of 30 runs.
 
 \paragraph{Duplicated heads.} With every head starting as a copy of another, the rule kept 4 heads
-and never both members of a pair; without the re-fit, 8 to 15 heads and 4 to 7 pairs were kept
+and never both members of a pair. Without the re-fit, 8 to 15 heads and 4 to 7 pairs were kept
 (Figure~\ref{fig:main}d).
 
 \paragraph{Backup heads.} If each head fails with probability $p$, a head's value with $B$ heads
@@ -275,7 +276,7 @@ the experiments, matched 21 of 24 runs exactly and the rest to within one head
 \paragraph{Induction.} In a two-layer attention-only model with 8 + 8 heads, trained to predict
 the token that followed an earlier copy of the current token, the minimal circuit is one
 previous-token head and one induction head \cite{olsson2022}. Hemodynamic attenuation kept
-2 + 1 heads in 10 of 10 runs, one more than the minimum, and never broke the model; the kept heads
+2 + 1 heads in 10 of 10 runs, one more than the minimum, and never broke the model. The kept heads
 had the expected roles in all 10 runs, and switching off the induction head reduced next-token
 accuracy on the repeat to zero (Figure~\ref{fig:induction}). On this task every method kept the
 same 2 + 1 heads, so only stability separated them: the method of Michel et al.\ broke the model
@@ -287,7 +288,7 @@ in all 10 runs, while the controls without re-fit or with random choice did not.
 \caption{Two-layer induction.
 \textbf{a}, An example sequence and the model's predictions on the repeat, with all kept heads
 (7/7 correct) and with the layer-2 head switched off (0/7).
-\textbf{b}, Heads kept in one run; numbers give how much more than chance each head attends to the
+\textbf{b}, Heads kept in one run. Numbers give how much more than chance each head attends to the
 position its role requires.
 \textbf{c}, Runs that never broke, 10 per method, all with the same settings. Every run kept 2 + 1
 heads.
@@ -305,7 +306,7 @@ A rule built from how vessels are maintained and pruned recovered a known minima
 a single training run, without being given its size and without the model leaving the solved
 regime. Removing any one of its components lost either the count or stability.
 
-The tasks are small and the main model has one layer, which is what makes the answer known; the
+The tasks are small and the main model has one layer, which is what makes the answer known, but the
 results do not yet extend to large language models. The collateral value is exact only for one
 layer, and the compute saving requires skipping closed heads in code. The biology motivates the
 rule but is not evidence for it.
