@@ -1,0 +1,292 @@
+% Mathematical extension for the thesis chapter on hemodynamically constrained
+% attention. Self-contained: \input this into a document with amsmath, amsthm, amssymb.
+%
+% Every numerical value quoted in the remarks is produced by
+%   python experiments/aggregate.py --readme README.md
+% and appears in the generated block of README.md. Nothing here is hand-entered.
+
+\section{Conserved supply as a gain field on attention heads}
+
+\subsection{Notation}
+
+We follow the matrix conventions of Kozachkov, Kastanenka and Krotov
+\cite{kozachkov2023}. Let $X \in \mathbb{R}^{d \times N}$ collect $N$ token
+embeddings of dimension $d$, and let a cross-attention layer with $H$ heads and
+head width $d_k$ produce, for head $h \in [H]$,
+\begin{equation}
+  Q_h = W_Q^{(h)} X, \qquad K_h = W_K^{(h)} Y, \qquad V_h = W_V^{(h)} Y,
+  \qquad
+  A_h = \operatorname{softmax}\!\left( \frac{Q_h^{\top} K_h}{\sqrt{d_k}} \right),
+\end{equation}
+with per-head output $O_h = V_h A_h^{\top} \in \mathbb{R}^{d_k \times N}$. Write
+$W_O^{(h)} \in \mathbb{R}^{d_{\mathrm{out}} \times d_k}$ for the $h$-th column block
+of the output projection, so that the unconstrained layer computes
+\begin{equation}
+  \label{eq:dense}
+  \mathcal{T}(X) \;=\; \sum_{h=1}^{H} W_O^{(h)} O_h .
+\end{equation}
+
+\subsection{The supply operator}
+
+\begin{definition}[Conserved supply]
+\label{def:supply}
+A \emph{supply rule} is a map $\mathcal{S} : \mathbb{R}^{H} \to \mathbb{R}_{\ge 0}^{H}$
+from a demand vector $d$ to a gain vector $g = \mathcal{S}(d)$ subject to the
+conservation constraint
+\begin{equation}
+  \label{eq:conservation}
+  \sum_{h=1}^{H} g_h \;=\; H .
+\end{equation}
+The gated layer is
+\begin{equation}
+  \label{eq:gated}
+  \mathcal{T}_g(X) \;=\; \sum_{h=1}^{H} g_h\, W_O^{(h)} O_h .
+\end{equation}
+\end{definition}
+
+Constraint \eqref{eq:conservation} is what makes the construction a \emph{supply}
+problem rather than a pruning problem: total flow is redistributed, never destroyed,
+and $g \equiv \mathbf{1}$ recovers the dense layer \eqref{eq:dense} exactly. All rules
+below are of the form
+\begin{equation}
+  \label{eq:equalshare}
+  g_h \;=\; \frac{H}{|S|}\,\mathbf{1}[h \in S], \qquad S \subseteq [H], \; S \neq \emptyset,
+\end{equation}
+that is, an equal share among a \emph{perfused set} $S$, with the rules differing only
+in how $S$ is selected from $d$. We write $B \equiv |S|$ for the perfused count.
+
+\subsection{Why the surviving circuit is the whole circuit}
+
+The following is elementary but it is the statement that licenses mechanistic analysis
+of the starved model, and it is the precise sense in which the method yields something
+``small enough to verify''.
+
+\begin{proposition}[Exact reduction]
+\label{prop:reduction}
+Let $g$ be of the form \eqref{eq:equalshare} with perfused set $S$, $|S| = B$. Then
+$\mathcal{T}_g$ is \emph{identical}, not merely close, to a $B$-head layer:
+\begin{equation}
+  \mathcal{T}_g(X) \;=\; \sum_{h \in S} \widetilde{W}_O^{(h)} O_h,
+  \qquad \widetilde{W}_O^{(h)} \;=\; \frac{H}{B}\, W_O^{(h)} .
+\end{equation}
+Moreover $\partial \mathcal{T}_g / \partial \theta_h = 0$ for every parameter $\theta_h$
+belonging to a head $h \notin S$, so starved heads receive no gradient through this path
+and cannot carry function.
+\end{proposition}
+
+\begin{proof}
+Substituting \eqref{eq:equalshare} into \eqref{eq:gated} annihilates every term with
+$h \notin S$ and scales the remainder by $H/B$; absorbing that scalar into $W_O^{(h)}$
+gives the stated form, which is \eqref{eq:dense} with $H$ replaced by $B$. The gradient
+claim follows since $\mathcal{T}_g$ depends on $\theta_h$ only through the product
+$g_h W_O^{(h)} O_h$, and $g_h = 0$.
+\end{proof}
+
+\begin{remark}[Verification cost]
+Proposition~\ref{prop:reduction} converts a claim about approximation into a claim about
+identity. An analyst auditing the starved model need examine $B$ heads, not $H$, and
+$\binom{B}{2}$ rather than $\binom{H}{2}$ pairwise interactions, with no residual term to
+bound. At $H = 32$ and $B = 4$ this is an $8\times$ reduction in single-head hypotheses
+and an $83\times$ reduction in pairwise ones. The reduction is exact only when the leak is
+zero; with leak $\lambda > 0$ the discarded mass is $\lambda(H - B)$ and
+Proposition~\ref{prop:reduction} holds up to a term of that order.
+\end{remark}
+
+\subsection{Relation to astrocytic normalization}
+
+Kozachkov et al.\ construct a neuron--astrocyte network whose reading phase computes
+\begin{equation}
+  \label{eq:koz}
+  \ell_t \;=\; \frac{1}{p}\, H\varphi(q_t) + x_t,
+  \qquad
+  p \;=\; \frac{1}{m} \sum_{j=1}^{N} \varphi(k_j)^{\top} \varphi(q_t),
+\end{equation}
+where $\varphi$ is an approximate feature map for the exponential dot-product kernel.
+Because the astrocyte process activations are spatially averaged before they act
+(their Eq.~8), the modulation $\widetilde{P}_{i\ell} = 1/p$ is a \emph{single scalar gain
+shared by every synapse in the astrocyte's domain}, and that scalar is the reciprocal of
+pooled presynaptic drive. Equation \eqref{eq:koz} is therefore a divisive gain field of
+exactly the algebraic type in Definition~\ref{def:supply}: a pooled demand statistic is
+inverted and applied uniformly across an index set, with the pooling enforcing a
+conservation law. In their case the index set is the synapses of one astrocyte domain and
+the conserved quantity is the softmax partition function; in ours the index set is the
+attention heads and the conserved quantity is total flow.
+
+This correspondence extends to the pooling parameter. Writing $\beta \in [0,1]$ for the
+degree to which demand is averaged within a territory,
+\begin{equation}
+  d^{(\beta)}_h \;=\; (1-\beta)\, d_h \;+\; \beta \,
+  \frac{1}{|\mathcal{N}(h)|} \sum_{h' \in \mathcal{N}(h)} d_{h'},
+\end{equation}
+the construction of \cite{kozachkov2023} is the fully pooled endpoint $\beta = 1$, in
+which every element of the domain sees the same demand and hence the same gain.
+
+\begin{remark}[Scope of the correspondence]
+\label{rem:scope}
+The correspondence above is \emph{algebraic and nothing more}. Kozachkov et al.\ show
+that astrocytes furnish a plausible substrate for the normalization in attention; they do
+not model, measure or test metabolic gating, and their astrocyte gain is a function of
+presynaptic drive, not of blood supply. Citing that work as biological evidence
+\emph{for} supply-based head gating would conflate substrate with mechanism. What it
+legitimately supplies is the observation that a conserved divisive gain field over a
+shared pool is already the operative algebra in one biologically grounded account of
+attention, which motivates asking what a second such field, indexed over heads, would do.
+Any physiological claim about metabolic regulation of attention requires its own
+evidence, which is not offered here.
+\end{remark}
+
+\subsection{An impossibility result for fixed-quantile supply}
+
+Let $k^\star$ denote the task's true minimal head count. The natural question is whether
+$B$ discovers $k^\star$. The next proposition shows that one large family of supply rules
+cannot, for reasons that have nothing to do with training.
+
+\begin{theorem}[Fixed-quantile rules do not track $k^\star$]
+\label{thm:impossible}
+Let the demand be standardized, $\frac{1}{H}\sum_h d_h = 0$ and
+$\frac{1}{H}\sum_h d_h^2 = 1$, and let the perfused set be
+$S_\kappa = \{ h : d_h > \kappa \}$ for a fixed $\kappa$. Let $F_d$ be the empirical
+distribution function of $d$. Then
+\begin{equation}
+  \label{eq:quantile}
+  B \;=\; H\bigl(1 - F_d(\kappa)\bigr),
+\end{equation}
+so $B$ is a functional of $(\kappa, H)$ and the \emph{shape} of $F_d$ alone. Consequently
+\begin{equation}
+  \frac{\mathrm{d}B}{\mathrm{d}k^\star}
+  \;=\; -H \, \frac{\partial F_d}{\partial k^\star}(\kappa),
+\end{equation}
+and $B$ tracks $k^\star$ only if the demand distribution deforms with $k^\star$ at
+precisely the rate $\partial F_d / \partial k^\star = -1/H$ at the operating point. No
+property of the rule can enforce this, because the rule has no access to $k^\star$ or to
+any quantity that depends on it.
+\end{theorem}
+
+\begin{proof}
+Immediate from the definition of $F_d$: the number of coordinates exceeding $\kappa$ is
+$H(1 - F_d(\kappa))$. Standardization removes location and scale, so the count depends on
+$d$ only through its shape. Differentiating in $k^\star$ gives the second claim.
+\end{proof}
+
+\begin{remark}[Empirical confirmation]
+\label{rem:impossible}
+Theorem~\ref{thm:impossible} predicts a slope near zero whenever the shape of $F_d$ is
+approximately invariant across tasks, which is the generic case when $d$ is a
+standardized statistic of an architecture held fixed. Sweeping the true circuit size over
+$k^\star \in \{2,3,4,6,8\}$ at fixed $\kappa$ on the \texttt{multi\_relation} benchmark
+gives a fitted $\mathrm{d}B/\mathrm{d}k^\star = 0.29$ against the ideal $1.00$, with mean
+absolute error $1.53$ heads and $B$ saturating at $4$ for every $k^\star \ge 4$. At
+$k^\star \in \{6,8\}$ the starved model fails the task outright, at losses $0.34$ and
+$0.50$ against a trivial baseline of $1.007$, while passing \emph{through} the correct
+perfusion level earlier in annealing with the task solved to $8\times 10^{-5}$. The rule
+discards the information required to stop.
+\end{remark}
+
+\subsection{Autoregulated supply}
+
+Theorem~\ref{thm:impossible} indicates the repair: the operating point must be set by a
+quantity that depends on task difficulty. We close the loop on a metabolic deficit, in
+the manner of functional hyperemia, where flow answers to a demand signal that rises when
+supply is inadequate.
+
+\begin{definition}[Autoregulated supply]
+\label{def:autoreg}
+Fix a target loss $L^\star$. Let $\widehat{L}_t$ be a smoothed estimate of the running
+loss. The threshold is a state variable evolving as
+\begin{equation}
+  \label{eq:loop}
+  \kappa_{t+1} \;=\; \Pi_{[\kappa_-, \kappa_+]}\Bigl(
+    \kappa_t + \eta \bigl( \log L^\star - \log \widehat{L}_t \bigr) \Bigr),
+\end{equation}
+with $\Pi$ the projection onto the admissible interval, and $S = S_{\kappa_t}$ as before.
+The control error is a log ratio, so the loop is invariant to the scale of the loss; the
+target is taken as a fixed fraction of the trivial baseline, so it is invariant across
+tasks.
+\end{definition}
+
+Let $L_B$ denote the smallest loss achievable with $B$ perfused heads, a nonincreasing
+function of $B$. Because the head count is an integer, $\{L_B\}$ is a staircase.
+
+\begin{theorem}[The loop selects the minimal sufficient circuit]
+\label{thm:autoreg}
+Suppose $L_B$ is nonincreasing in $B$ and that $\kappa \mapsto B(\kappa)$ is nonincreasing
+(more ischemia perfuses no more heads). Then any fixed point of \eqref{eq:loop} in the
+interior of $[\kappa_-, \kappa_+]$ satisfies $\widehat{L} = L^\star$, and the selected
+perfusion is
+\begin{equation}
+  B^\star(L^\star) \;=\; \min \{\, B : L_B \le L^\star \,\}.
+\end{equation}
+In particular, if the target lies in the staircase gap at $k^\star$,
+\begin{equation}
+  \label{eq:gap}
+  L_{k^\star} \;<\; L^\star \;<\; L_{k^\star - 1},
+\end{equation}
+then $B^\star(L^\star) = k^\star$, and this holds for \emph{every} $L^\star$ in that
+interval.
+\end{theorem}
+
+\begin{proof}
+At an interior fixed point the increment in \eqref{eq:loop} vanishes, so
+$\log L^\star = \log \widehat{L}$. Monotonicity of $L_B$ in $B$ and of $B$ in $\kappa$
+makes the composed map $\kappa \mapsto L_{B(\kappa)}$ nondecreasing, so the loop is a
+scalar monotone feedback and its fixed point is the least $B$ meeting the target.
+Condition \eqref{eq:gap} places that least $B$ at $k^\star$ by definition of the
+staircase.
+\end{proof}
+
+\begin{remark}[Why this is not a tuned hyperparameter]
+\label{rem:notuning}
+Theorem~\ref{thm:autoreg} makes a sharp, falsifiable prediction: the selected count is
+constant in $L^\star$ throughout the interval \eqref{eq:gap}, and changes only when the
+target crosses a stair. The width of that interval is a property of the benchmark, not of
+the method. On \texttt{multi\_relation} at $R = 4$ the measured staircase is
+$L_1 = 0.755$, $L_2 = 0.503$, $L_4 = 2\times 10^{-5}$ against a trivial baseline of
+$1.007$, so the admissible interval spans roughly four orders of magnitude. This
+distinguishes Theorem~\ref{thm:autoreg} from the fixed-$\kappa$ rule, whose successful
+setting was a single point. The corresponding control, sweeping $L^\star$ over a
+$40\times$ range, is the experiment that decides whether the prediction holds.
+\end{remark}
+
+\begin{remark}[Measured behaviour]
+\label{rem:autoreg}
+With the loop slowed so that its time constant exceeds that of the learner, the perfused
+count settles at $B = k^\star$ for every $k^\star \in \{2,3,4,6,8\}$ and every seed, with
+interquartile spread $0$ or $1$ over the held phase: fitted
+$\mathrm{d}B/\mathrm{d}k^\star = 1.00$ and mean absolute error $0.00$ heads, against
+$0.29$ and $1.53$ for the fixed-quantile rule. At $k^\star \in \{6,8\}$, where the
+fixed rule saturated and failed, the loop reaches $6$ and $8$ heads and solves the task.
+Two caveats are recorded here because they bear on the interpretation. First, at
+$k^\star = 3$ the count is exactly correct while the loss remains at $0.284$: the right
+size is selected for a model that has not solved the task, so Theorem~\ref{thm:autoreg}
+describes the selection and not the optimization. Second, role coverage does not return
+to unity above $k^\star = 2$, so recovering the correct head \emph{count} is weaker than
+recovering the correct head \emph{roles}. An undamped loop, with gain large enough that
+the controller is faster than the learner, instead limit-cycles between $4$ and $32$
+heads; the requirement is a separation of timescales, not the feedback alone.
+\end{remark}
+
+\subsection{What is and is not claimed}
+
+Theorem~\ref{thm:autoreg} states that a conserved supply field steered by a metabolic
+deficit selects the minimal head count sufficient for a target, and
+Proposition~\ref{prop:reduction} states that the resulting model \emph{is} a model of
+that size, exactly. Together these give a circuit that is both minimal and faithfully
+analysable, which is the requirement mechanistic interpretability places on any reduction.
+
+Three limitations are load-bearing. First, $B^\star(L^\star)$ coincides with $k^\star$ by
+virtue of \eqref{eq:gap}, so the method finds the minimal \emph{sufficient} circuit rather
+than discovering circuit size from metabolic principles alone; the substantive content is
+that one run of a feedback loop returns what otherwise requires a sweep over $B$ and a
+training run at each value. Second, Theorem~\ref{thm:impossible} is a statement about
+fixed-quantile rules and does not exclude other open-loop rules that read the shape of
+$F_d$. Third, and per Remark~\ref{rem:scope}, no part of this argument draws evidential
+support from the astrocyte literature; the relation established in \eqref{eq:koz} is an
+identity of algebraic form, and the physiological question of whether attention in
+biological tissue is metabolically gated is untouched by it.
+
+\begin{thebibliography}{9}
+\bibitem{kozachkov2023}
+L.~Kozachkov, K.~V.~Kastanenka, and D.~Krotov,
+\emph{Building transformers from neurons and astrocytes},
+Proc.\ Natl.\ Acad.\ Sci.\ U.S.A.\ \textbf{120}(34), e2219150120 (2023).
+\end{thebibliography}

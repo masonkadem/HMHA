@@ -1,10 +1,12 @@
 """Main figure (publication style). Every number is read from the result pickles.
 
   Figure 2 (results). (a) loss and (b) heads during training for k* = 2, 4, 6, 8, collateral
-  rule against the dense model  (c) count and stability  (d) final loss  (e) duplicated
-  heads  (f) backup heads under damage. The task and model are in figure_setup.py.
+  rule against the dense model  (c) table: every method on the same 30 runs (k* = 2, 4, 8, 10 seeds),
+  score, use, exact count, never broke  (d) duplicated heads  (e) spare heads under failure  (f) one run per method.
+  The task and model are in figure_setup.py; the full comparison table in figure_compare.py.
 
-  python experiments/figure_main.py   ->  figures/fig_main.png and figures/fig_main.pdf
+  python experiments/figure_main.py         ->  figures/fig_main.png and figures/fig_main.pdf
+  python experiments/figure_main.py --abc   ->  figures/fig_main_abc.png and .pdf (panels a, b, c only)
 """
 import glob, os, pickle, sys
 from math import comb
@@ -13,12 +15,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.transforms import blended_transform_factory, offset_copy
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(ROOT, "src"))
 from hemo.config import Cfg
 
-RED = "#b2182b"                       # the collateral rule (blood)
+RED = "#b2182b"                       # hemodynamic attenuation (blood)
 K, G1, G2, G3 = "#111111", "#6b6b6b", "#a8a8a8", "#e4e4e4"
 plt.rcParams.update({
     "font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
@@ -32,7 +35,8 @@ plt.rcParams.update({
     "legend.frameon": False, "savefig.dpi": 450, "pdf.fonttype": 42})
 
 RUNS = []
-for d in ("results", "results/proposal", "results/confirm"):
+for d in ("results", "results/proposal", "results/confirm", "results/l0", "results/review", "results/equal",
+          "results/instant"):
     for p in glob.glob(os.path.join(ROOT, d, "*.pkl")):
         r = pickle.load(open(p, "rb"))
         if isinstance(r, dict) and "hist" in r and "cfg" in r and "ledger" in r["hist"]:
@@ -43,7 +47,8 @@ PINNED = dict(task="multi_relation", steps=4000, d_k=32, demand="outnorm_ema", k
               target_frac=0.02, delay=0, pool_beta=0.0, leak=0.0, n_territories=8,
               stall_gate=0.0, autoreg_gain=0.003, precondition=0.0, flow_exponent=4.0,
               price_frac=0.01, probe_every=25, taper=0, budget_hold_frac=0.25, prune_stop=1,
-              conserve=1, local_value="refit", plant_copies=0, head_dropout=0.0, probe_masks=32)
+              conserve=1, local_value="refit", plant_copies=0, head_dropout=0.0, probe_masks=32,
+              copy_noise=0.0, oneshot=0, trial=0, l0_lambda=0.01)
 get = lambda r, k: r["cfg"].get(k, getattr(DEFAULT, k))
 runs = lambda **w: [r for r in RUNS if all(get(r, k) == v for k, v in {**PINNED, **w}.items())]
 dense = lambda R: [d for d in DENSE if d["cfg"]["n_rel"] == R]
@@ -55,9 +60,8 @@ def kept(r):
     return float(np.median(on[int((get(r, "budget_hold_frac") + get(r, "budget_anneal_frac")) * len(on)):]))
 
 
-def stayed_solved(r):
-    h, bar = r["hist"], 0.02 * r["trivial"]
-    ls = [l for s, l in zip(h["val_step"], h["val_loss"]) if s >= get(r, "budget_hold_frac") * get(r, "steps")]
+def stayed_solved(r):              # once first solved, the loss never goes back above the solved bar
+    ls, bar = r["hist"]["val_loss"], 0.02 * r["trivial"]
     first = next((i for i, l in enumerate(ls) if l < bar), None)
     return first is not None and max(ls[first:]) <= bar
 
@@ -71,18 +75,24 @@ def compute(r):
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
 BAR = 0.02
-fig = plt.figure(figsize=(7.2, 6.4))
-gs = fig.add_gridspec(3, 4, height_ratios=[0.85, 0.7, 1.1], hspace=0.45, wspace=0.55)
+ABC = "--abc" in sys.argv            # only panels a, b and c  ->  figures/fig_main_abc.png and .pdf
+if ABC:
+    fig = plt.figure(figsize=(7.2, 6.6))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.5, 1.5], hspace=0.2)
+else:
+    fig = plt.figure(figsize=(7.2, 8.9))
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.5, 1.1], hspace=0.2)
+    bottom = outer[2].subgridspec(1, 3, wspace=0.5)
 
-# ---------------------------------------------------------------- c, d  training, small multiples
+# ---------------------------------------------------------------- a, b  training, small multiples
 show = (2, 4, 6, 8)
-cd = gs[0:2, :].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.16, wspace=0.55)
+cd = outer[0].subgridspec(2, 4, height_ratios=[0.85, 0.7], hspace=0.12, wspace=0.5)
 for i, k in enumerate(show):
     r = sorted(runs(**RULE, n_rel=k), key=lambda r: get(r, "seed"))[0]
     d0 = next(d for d in dense(k) if d["cfg"]["seed"] == get(r, "seed"))
     axl = fig.add_subplot(cd[0, i])
     axl.plot(d0["hist"]["val_step"], d0["hist"]["val_loss"], color=K, lw=0.9, label="dense")
-    axl.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=RED, lw=0.9, label="collateral")
+    axl.plot(r["hist"]["val_step"], r["hist"]["val_loss"], color=RED, lw=0.9, label="ours")
     axl.axhline(BAR, color=G2, lw=0.6, ls=":")
     axl.set(yscale="log", ylim=(3e-6, 2), xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=[])
     axl.minorticks_off()
@@ -96,11 +106,13 @@ for i, k in enumerate(show):
     axh.minorticks_off()
     axh.text(3950, 22, f"compute {compute(r):.2f}", ha="right", fontsize=6, color=RED)
     if i == 0:
-        title(axl, "a", f"$k^*={k}$")
-        axh.text(-0.42, 1.0, r"$\mathbf{b}$", transform=axh.transAxes, fontsize=7, va="bottom")
+        axl.set_title(f"$k^*={k}$", pad=4)
+        AX_A, AX_B = axl, axh
         axl.set_ylabel("loss")
         axh.set_ylabel("heads")
         axl.legend(loc="upper right", handlelength=1.2, borderaxespad=0)
+        axl.text(1450, 2.2e-3, "heads\nclosing", fontsize=5.5, color=G1, va="bottom")
+        axl.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
     else:
         axl.set_title(f"$k^*={k}$", pad=4)
         axl.set_yticklabels([])
@@ -108,76 +120,155 @@ for i, k in enumerate(show):
     if i == 1:
         axh.set_xlabel("training step", x=1.15)
 
-# ---------------------------------------------------------------- e  count and stability
-ax = fig.add_subplot(gs[2, 0])
-arms = [("collateral", RULE, SIZES, RED, "o"),
-        ("pruning", dict(supply="prune"), SIZES, K, "s"),
-        ("importance", {**RULE, "local_value": "ablate"}, (2, 4, 8), K, "D"),
-        ("random", {**RULE, "local_value": "random"}, (2, 4, 8), K, "v")]
-for name, kw, sizes, color, m in arms:
-    rs = [x for k in sizes for x in runs(**kw, n_rel=k)]
-    ax.plot(100 * np.mean([kept(x) == get(x, "n_rel") for x in rs]), 100 * np.mean([stayed_solved(x) for x in rs]),
-            m, color=color, ms=4.5, mfc=color if color == RED else "white", mew=0.8, ls="none", label=name)
-ax.set(xlim=(-5, 106), ylim=(-6, 108), xticks=[0, 50, 100], yticks=[0, 50, 100],
-       xlabel="exact count (% runs)", ylabel="stays solved (% runs)")
-ax.legend(loc="center left", bbox_to_anchor=(0.02, 0.5), handletextpad=0.2, borderaxespad=0)
-title(ax, "c", "Count and stability")
-
-# ---------------------------------------------------------------- f  final loss
-ax = fig.add_subplot(gs[2, 1])
-rng = np.random.default_rng(1)
-for i, k in enumerate(SIZES):
-    dl = [d["hist"]["val_loss"][-1] for d in dense(k)]
-    cl = [x["final_loss"] for x in runs(**RULE, n_rel=k)]
-    ax.plot(i - 0.18 + rng.uniform(-0.06, 0.06, len(dl)), dl, "o", ms=2.3, mfc="white", mec=K, mew=0.5,
-            label="dense" if i == 0 else None)
-    ax.plot(i + 0.18 + rng.uniform(-0.06, 0.06, len(cl)), cl, "o", ms=2.3, color=RED,
-            label="collateral" if i == 0 else None)
-ax.axhline(BAR, color=G2, lw=0.6, ls=":")
-ax.set(yscale="log", ylim=(3e-6, 0.1), xticks=range(len(SIZES)), xticklabels=[str(k) for k in SIZES],
-       xlabel="$k^*$", ylabel="final loss")
-ax.minorticks_off()
-ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.55), handletextpad=0.1, borderaxespad=0)
-title(ax, "d", "Final loss")
-
-# ---------------------------------------------------------------- g  duplicated heads
-ax = fig.add_subplot(gs[2, 2])
-res = {}
-for value in ("refit", "ablate"):
-    res[value] = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16))
-                           for o in (x["hist"]["ledger"][-1] > 0
-                                     for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value))])
-for i, (value, face, label) in enumerate((("refit", RED, "collateral"), ("ablate", "white", "importance"))):
-    v = res[value]
-    ax.bar(i, v.mean(), 0.6, color=face, edgecolor=K if face == "white" else face, lw=0.6)
-    ax.plot(i + rng.uniform(-0.15, 0.15, len(v)), v, ".", color=G1, ms=2.5, zorder=3)
-ax.set(xticks=[0, 1], ylim=(0, 8), xlim=(-0.6, 1.6), ylabel="copy pairs both kept")
-ax.set_xticklabels(["collateral", "importance"])
-title(ax, "e", "Start with every head copied")
-
-# ---------------------------------------------------------------- h  damage
-ax = fig.add_subplot(gs[2, 3])
+# ---------------------------------------------------------------- c  the comparison, as a table with bars
+EQUAL = (2, 4, 8)                                  # tasks needing 2, 4 and 8 heads, 10 seeds each
 
 
-def predict(R, p, price=0.03):
-    q = 1 - p
-    val = lambda B: q * sum(comb(B - 1, a) * q ** a * p ** (B - 1 - a) for a in range(min(R - 1, B - 1) + 1)) / R
-    return max(B for B in range(1, 33) if val(B) >= price)
+def score(kw):
+    rs = [x for k in EQUAL for x in runs(**kw, n_rel=k) if get(x, "seed") < 10]
+    return sum(kept(x) == get(x, "n_rel") for x in rs), sum(stayed_solved(x) for x in rs), len(rs)
 
 
-ps = [0.0, 0.05, 0.1, 0.2, 0.3]
-for R, m in ((4, "o"), (2, "s")):
-    ax.plot(ps, [predict(R, p) for p in ps], color=G2, lw=0.9, ls="--", zorder=1,
-            label="predicted" if R == 4 else None)
-    means = [np.mean([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) for p in ps]
-    ax.plot(ps, means, m, color=RED, ms=3.5, mfc=RED if R == 4 else "white", mew=0.8, ls="none",
-            label="measured" if R == 4 else None)
-    ax.text(0.325, predict(R, 0.3), f"$k^*={R}$", va="center", fontsize=6, color=G1)
-ax.set(xlabel="chance a head fails", ylabel="heads kept", ylim=(1, 8), xlim=(-0.02, 0.385),
-       xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[2, 4, 6, 8])
-ax.legend(loc="upper left", handletextpad=0.3, borderaxespad=0)
-title(ax, "f", "Backup heads")
+gates = {lam: score(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam)) for lam in (0.05, 0.2, 1.0)}
+best_lam = max(gates, key=lambda lam: gates[lam][0] + gates[lam][1])
+ONESHOT = {**RULE, "oneshot": 1, "budget_hold_frac": 0.3}
+OBD = {**RULE, "local_value": "ablate"}
+RANDOM = {**RULE, "local_value": "random"}
+INSTANT = {**RULE, "taper": 0}
+OBS = r"$\mathrm{min}_W\, L_{-h} - \mathrm{min}_W\, L$"
+SURGEON, DAMAGE = "Optimal Brain Surgeon (Hassibi & Stork 1993)", "Optimal Brain Damage (LeCun et al. 1989)"
+rows = [  # (group, method, (score, source), prunes during training as published, sets its own size (no target
+          #  count, fraction, speed-up or penalty chosen to reach a size), reopens, result)
+    (None, "Hemodynamic attenuation (ours)", (OBS, SURGEON), "yes", "yes", "yes", score(RULE)),
+    ("Published methods", "Kurtic et al. 2023 (ZipLM)", (OBS, SURGEON), "no", "no", "no", score(ONESHOT)),
+    (None, "Michel et al. 2019", (r"$|\partial L / \partial g_h|$", "gradient of the head gate"), "no", "no", "no",
+     score(dict(supply="prune"))),
+    (None, "Voita et al. 2019", (r"$L + \lambda\, \Sigma_h\, P(g_h \neq 0)$", "a learned gate per head (L0 penalty)"),
+     "no", "no", "no", gates[best_lam]),
+    ("Controls: our method with one part removed", "no fade (instant closing)", (OBS, SURGEON), "yes", "yes", "yes",
+     score(INSTANT)),
+    (None, "no re-fit", (r"$L_{-h}(W) - L(W)$", DAMAGE), "yes", "yes", "yes", score(OBD)),
+    (None, "no score (random choice)", ("random head", ""), "yes", "yes", "yes", score(RANDOM)),
+]
+ax = fig.add_subplot(outer[1])
+ax.axis("off")
+COLS = dict(method=0.0, score=0.27, train=0.585, fade=0.66, reopen=0.735, bars=0.80)
+BW = 0.125                                         # bar length for 100% of runs
+FS, FS_SMALL = 7.0, 6.0
+y = 0.0
+for key, name in (("method", "Method"), ("score", "Head score"), ("train", "During\ntraining"),
+                  ("fade", "Sets own\nsize"), ("reopen", "Reopens")):
+    ha = "center" if key in ("train", "fade", "reopen") else "left"
+    ax.text(COLS[key] + (0.022 if ha == "center" else 0), y - 0.55, name, fontsize=FS if ha == "left" else FS - 0.6,
+            fontweight="bold", va="center", ha=ha, linespacing=1.15)
+AX_C, C_TITLE_Y = ax, y - 0.95
+ax.add_patch(Rectangle((COLS["bars"], y - 0.93), 0.018, 0.22, color=K, lw=0))
+ax.text(COLS["bars"] + 0.026, y - 0.82, "exact count", fontsize=FS - 0.6, fontweight="bold", va="center")
+ax.add_patch(Rectangle((COLS["bars"], y - 0.43), 0.018, 0.22, color=G2, lw=0))
+ax.text(COLS["bars"] + 0.026, y - 0.32, "never broke", fontsize=FS - 0.6, fontweight="bold", va="center")
+ax.plot([0, 1], [y - 0.05, y - 0.05], color=K, lw=0.6)
+y = 0.6
+for group, method, sc, train_, fade, reopen, (exact, safe, n) in rows:
+    if group:
+        y += 0.22
+        ax.text(0, y, group, fontsize=FS_SMALL + 0.3, color=G1, va="center")
+        ax.plot([0, 1], [y - 0.34, y - 0.34], color=G3, lw=0.5)
+        y += 0.7
+    ours = method.startswith("Hemodynamic")
+    c = RED if ours else K
+    if ours:                                       # light band behind our row
+        ax.add_patch(Rectangle((-0.005, y - 0.55), 1.005, 1.1, color="#fbeeee", lw=0, zorder=0))
+    ax.text(COLS["method"], y, method, color=c, fontsize=FS, va="center")
+    formula, source = sc
+    ax.text(COLS["score"], y - (0.2 if source else 0), formula, color=c, fontsize=FS - 0.3, va="center")
+    if source:
+        ax.text(COLS["score"], y + 0.28, source, color=c if ours else G1, fontsize=FS_SMALL - 0.3, va="center")
+    for key, v in (("train", train_), ("fade", fade), ("reopen", reopen)):  # a dot for yes, a dash for no
+        if v == "yes":
+            ax.plot(COLS[key] + 0.022, y, "o", color=c, ms=4.2, mew=0)
+        else:
+            ax.plot([COLS[key] + 0.012, COLS[key] + 0.032], [y, y], color=G2, lw=0.9)
+    for dy, v, shade in ((-0.2, exact, RED if ours else K), (0.2, safe, "#e8a5a5" if ours else G2)):
+        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW * v / n, 0.3, color=shade, lw=0))
+        ax.add_patch(Rectangle((COLS["bars"], y + dy - 0.15), BW, 0.3, fill=False, edgecolor=G3, lw=0.4))
+        ax.text(COLS["bars"] + BW + 0.01, y + dy, f"{v}/{n}", color=c, fontsize=FS_SMALL, va="center")
+    y += 1.02
+ax.plot([0, 1], [y - 0.55, y - 0.55], color=K, lw=0.6)
+ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf yes   \u2013 no", fontsize=FS_SMALL, color=G1, va="top")
+ax.set(xlim=(0, 1), ylim=(y + 0.1, -1.05))
+print("panel c:", [(m, r) for _, m, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
+if not ABC:
+    # ---------------------------------------------------------------- d  duplicated heads
+    # every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its copy,
+    # so it should be removed. One circle per run: heads kept; below, how many pairs kept both twins.
+    ax = fig.add_subplot(bottom[0])
+    rng = np.random.default_rng(1)
+    for i, (value, color) in enumerate((("refit", RED), ("ablate", K))):
+        L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
+        n_kept = np.array([o.sum() for o in L])
+        twins = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16)) for o in L])
+        fill = (0.698, 0.094, 0.169, 0.25) if color == RED else (1, 1, 1, 0.6)
+        ax.plot(i + rng.uniform(-0.17, 0.17, len(n_kept)), n_kept, "o", ms=5, mfc=fill, mec=K, mew=0.9, ls="none", zorder=3)
+        lo, hi = twins.min(), twins.max()
+        ax.text(i, 0.9, f"twin pairs\nkept: {lo}" if lo == hi else f"twin pairs\nkept: {lo}\u2013{hi}", ha="center",
+                va="bottom", fontsize=6, color=color, linespacing=1.15)
+    ax.axhline(4, color=G2, lw=0.7, ls="--", zorder=0)
+    ax.text(1.55, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="right")
+    ax.set(xticks=[0, 1], ylim=(0, 17), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
+    ax.set_xticklabels(["hemodynamic\nattenuation", "OBD-style"])
+    ax.set_title("Every head given a twin", pad=4)
+    AX_D = ax
+
+    # ---------------------------------------------------------------- e  spare heads under failure
+    ax = fig.add_subplot(bottom[1])
+
+
+    def predict(R, p, price=0.03):
+        q = 1 - p
+        val = lambda B: q * sum(comb(B - 1, a) * q ** a * p ** (B - 1 - a) for a in range(min(R - 1, B - 1) + 1)) / R
+        return max(B for B in range(1, 33) if val(B) >= price)
+
+
+    ps = [0.0, 0.05, 0.1, 0.2, 0.3]
+    R = 4                                              # one task, needing 4 heads; spares = heads kept - 4
+    pred = [predict(R, p) - R for p in ps]
+    ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="predicted before the runs")
+    for i, p in enumerate(ps):
+        spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
+        jitter = rng.uniform(-0.009, 0.009, len(spares))
+        ax.plot(p + jitter, spares, "o", ms=5, mfc=(0.698, 0.094, 0.169, 0.25), mec=K, mew=0.9, ls="none",
+                label="measured (one circle per run)" if i == 0 else None)
+    ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
+           xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
+    ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)
+    title(ax, "e", "Predicting backup heads ($k^*=4$)")
+
+    # ---------------------------------------------------------------- f  what breaking looks like
+    ax = fig.add_subplot(bottom[2])
+    first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
+    for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al. 2019"),
+                                 (ONESHOT, G1, "-", "Kurtic et al. 2023"),
+                                 (RANDOM, G2, "--", "random"),
+                                 (RULE, RED, "-", "ours")):
+        x = first(kw)
+        ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
+    ax.axhline(BAR, color=G2, lw=0.6, ls=":")
+    ax.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
+    ax.set(yscale="log", ylim=(1e-7, 2), yticks=[1, 1e-2, 1e-4, 1e-6], xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
+           xlabel="training step", ylabel="loss")
+    ax.minorticks_off()
+    ax.legend(loc="lower right", ncol=2, handlelength=1.4, columnspacing=0.8, borderaxespad=0.2, fontsize=5.8)
+    title(ax, "f", "What breaking looks like ($k^*=4$)")
+
+X_LETTER = AX_A.get_position().x0 - 0.085           # one column for the left-hand panel letters
+for letter, axis in (("a", AX_A), ("b", AX_B)) + (() if ABC else (("d", AX_D),)):
+    tr = offset_copy(blended_transform_factory(fig.transFigure, axis.transAxes), fig=fig, y=4, units="points")
+    fig.text(X_LETTER, 1.0, letter, transform=tr, fontsize=7, fontweight="bold", va="baseline")
+fig.text(X_LETTER, C_TITLE_Y, "c", transform=blended_transform_factory(fig.transFigure, AX_C.transData),
+         fontsize=7, fontweight="bold", va="center")
+
+name = "fig_main_abc" if ABC else "fig_main"
 for ext in ("png", "pdf"):
-    fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
-print("wrote figures/fig_main.png and figures/fig_main.pdf")
+    fig.savefig(os.path.join(ROOT, "figures", f"{name}.{ext}"), bbox_inches="tight", facecolor="white")
+print(f"wrote figures/{name}.png and figures/{name}.pdf")

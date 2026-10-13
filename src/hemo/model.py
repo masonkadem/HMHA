@@ -167,12 +167,15 @@ class HemoAttn(CrossAttn):
         """Make head h + H/2 an exact copy of head h, read-out included. Copies get equal
         gradients, so they stay copies until one is closed."""
         half, dk = self.H // 2, self.d_k
+        noise = float(getattr(self.cfg, "copy_noise", 0.0))
+        g = torch.Generator().manual_seed(self.cfg.seed + 11)
+        jitter = lambda w: w + noise * w.std() * torch.randn(w.shape, generator=g).to(w) if noise else w
         for h in range(half):
             src, dst = slice(h * dk, (h + 1) * dk), slice((h + half) * dk, (h + half + 1) * dk)
             for lin in (self.W_q, self.W_k, self.W_v):
-                lin.weight[dst] = lin.weight[src]
+                lin.weight[dst] = jitter(lin.weight[src])
                 lin.bias[dst] = lin.bias[src]
-            self.W_o.weight[:, dst] = self.W_o.weight[:, src]
+            self.W_o.weight[:, dst] = jitter(self.W_o.weight[:, src])
 
     # ---------------- demand ----------------
     def needs_gate_grad(self):

@@ -1,0 +1,139 @@
+% Section to follow paper/math_extension.tex. Requires amsmath, amsthm, amssymb.
+% Numbers in the remarks come from experiments/aggregate.py; none are entered by hand.
+
+\section{Stall-gated autoregulation}
+
+\subsection{The layer as a matrix product}
+
+Collect the per-head outputs $O_h \in \mathbb{R}^{d_k \times N}$ into the stacked matrix
+$O = [\,O_1^{\top} \cdots O_H^{\top}\,]^{\top} \in \mathbb{R}^{H d_k \times N}$, and let
+$G = \operatorname{diag}(g) \in \mathbb{R}^{H \times H}$ be the supply field. The gated
+layer of Definition~\ref{def:supply} is then a single product,
+\begin{equation}
+  \label{eq:kron}
+  \mathcal{T}_g(X) \;=\; W_O \,\bigl( G \otimes I_{d_k} \bigr)\, O,
+  \qquad \operatorname{tr} G = H,
+\end{equation}
+with $\otimes$ the Kronecker product. Conservation is the trace constraint, and the
+dense layer is $G = I_H$. Writing it this way makes the reduction transparent: for a
+perfused set $S$ with $|S| = B$ and zero leak, $g = (H/B)\mathbf{1}_S$ gives
+$G = (H/B) P_S$ with $P_S$ the diagonal $0/1$ projector onto $S$, so
+\begin{equation}
+  \mathcal{T}_g(X)
+  \;=\; \frac{H}{B}\, W_O \,(P_S \otimes I_{d_k})\, O
+  \;=\; \widetilde{W}_{O,S}\, O_S ,
+\end{equation}
+which is Proposition~\ref{prop:reduction}: the layer \emph{is} a $B$-head layer, and
+\begin{equation}
+  \operatorname{rank} \mathcal{T}_g(X) \;\le\; B \, d_k .
+\end{equation}
+The projector $P_S$ is what the supply rule chooses; everything below concerns how.
+
+\subsection{The controller as a scalar dynamical system}
+
+Let $B(\kappa) = |\{h : d_h > \kappa\}|$, nonincreasing in $\kappa$, and let
+$L_\infty(B)$ be the loss the model converges to when held at $B$ perfused heads,
+nonincreasing in $B$. Plain autoregulation (Definition~\ref{def:autoreg}) is the scalar
+recursion
+\begin{equation}
+  \label{eq:plain}
+  \kappa_{t+1} \;=\; \Pi\bigl(\kappa_t + \eta\,e_t\bigr),
+  \qquad e_t \;=\; \log L^\star - \log \widehat{L}_t .
+\end{equation}
+The difficulty is that $e_t$ is built from the \emph{instantaneous} loss
+$\widehat{L}_t$, whereas Theorem~\ref{thm:autoreg} is a statement about
+$L_\infty(B)$. Early in training $\widehat{L}_t \gg L_\infty(B_t)$ for every $B_t$, so
+$e_t < 0$ persistently and \eqref{eq:plain} integrates downward,
+\begin{equation}
+  \kappa_t \;\approx\; \kappa_0 - \eta \sum_{s<t} |e_s| \;\longrightarrow\; \kappa_-,
+\end{equation}
+driving $B \to H$ before the learner has had a chance to reveal what $B$ was
+sufficient. This is not a tuning failure but a specification failure: the loop is
+controlling the wrong quantity.
+
+\subsection{The stall gate}
+
+Let $\bar{L}_t$ be a slower exponential average of the loss than $\widehat{L}_t$, and
+define the \emph{relative improvement rate}
+\begin{equation}
+  \rho_t \;=\; \frac{\bar{L}_t - \widehat{L}_t}{\bar{L}_t} \;\;\ge 0 \text{ while the
+  learner is still descending.}
+\end{equation}
+
+\begin{definition}[Stall-gated autoregulation]
+\label{def:stall}
+Fix $\varepsilon > 0$. The loop is
+\begin{equation}
+  \label{eq:stall}
+  \kappa_{t+1} \;=\; \Pi\bigl(\kappa_t + \eta\,\phi_t\, e_t\bigr),
+  \qquad
+  \phi_t \;=\;
+  \begin{cases}
+    0, & e_t < 0 \text{ and } \rho_t > \varepsilon,\\
+    1, & \text{otherwise.}
+  \end{cases}
+\end{equation}
+Dilation is admitted only when the deficit is \emph{chronic}: the loss is above target
+\emph{and} has stopped improving. Constriction, $e_t \ge 0$, is never gated.
+\end{definition}
+
+The asymmetry is the content. In tissue the vasodilatory signal is the accumulation of a
+metabolic byproduct, which requires the shortfall to persist; a transient dip does not
+dilate a vessel. Equation \eqref{eq:stall} is that, and its effect is to change the
+controlled variable.
+
+\begin{proposition}[The gate restores the theorem's hypothesis]
+\label{prop:stall}
+Suppose the learner, held at a fixed perfused set, satisfies
+$\widehat{L}_t \downarrow L_\infty(B)$ with $\rho_t \to 0$. Then along the trajectory of
+\eqref{eq:stall} every dilation step occurs at a time $t$ with $\rho_t \le
+\varepsilon$, so the error acting on $\kappa$ is
+\begin{equation}
+  e_t \;=\; \log L^\star - \log \widehat{L}_t
+  \;=\; \log L^\star - \log L_\infty(B_t) \;+\; O(\varepsilon),
+\end{equation}
+and \eqref{eq:stall} is, to first order in $\varepsilon$, the recursion
+\eqref{eq:plain} driven by $L_\infty(B_t)$ rather than by $\widehat{L}_t$. Its fixed
+points are therefore those of Theorem~\ref{thm:autoreg}, and the selected perfusion is
+$B^\star(L^\star) = \min\{B : L_\infty(B) \le L^\star\}$.
+\end{proposition}
+
+\begin{proof}
+By construction $\phi_t = 0$ whenever $e_t < 0$ and $\rho_t > \varepsilon$, so any step
+that decreases $\kappa$ has $\rho_t \le \varepsilon$. Since $\rho_t$ measures the
+relative descent of $\widehat{L}$ toward its limit, $\rho_t \le \varepsilon$ gives
+$\widehat{L}_t = L_\infty(B_t)(1 + O(\varepsilon))$, and the logarithm converts the
+multiplicative error into the additive one stated.
+\end{proof}
+
+\begin{remark}[Two timescales, enforced rather than hoped for]
+\label{rem:timescales}
+Proposition~\ref{prop:stall} is a separation-of-timescales argument. The plain loop
+attains the same separation only by taking $\eta$ small enough that the controller is
+slower than the learner everywhere, which is a single global constant asked to respect a
+rate that varies over training. The stall gate enforces the separation \emph{adaptively}:
+the loop waits exactly as long as the learner needs at that point in training, and no
+longer. The control that distinguishes the two is plain autoregulation at
+$\eta/10$; if sluggishness alone sufficed, that arm would match the gated one.
+\end{remark}
+
+\begin{remark}[What must be validated]
+\label{rem:validate}
+The gate introduces $\varepsilon$, so the obvious objection is that the tuned target has
+merely been replaced by a tuned threshold. Proposition~\ref{prop:stall} predicts
+otherwise: $\varepsilon$ enters only as an $O(\varepsilon)$ perturbation of the control
+error, so the selected $B$ should be insensitive to it over any range in which the
+learner's descent is resolvable, whereas $L^\star$ enters the fixed point directly.
+Three experiments follow, and all three are necessary:
+\begin{enumerate}
+  \item $B$ against $k^\star$ over $k^\star \in \{2,3,4,6,8\}$, the tracking test;
+  \item $B$ against $L^\star$ over a $40\times$ range, the test that plain
+        autoregulation failed, where the prediction is now that the staircase gap of
+        Theorem~\ref{thm:autoreg} is recovered;
+  \item $B$ against $\varepsilon$, where the prediction is insensitivity, and where a
+        strong dependence would show the hyperparameter has only moved.
+\end{enumerate}
+A fourth, the second benchmark \texttt{qsa\_cross}, tests whether the result survives a
+change in \emph{why} the circuit has a minimum size: there $k^\star$ is set by capacity,
+$k^\star = \lceil q \log_2 N / d_k \rceil$, rather than by function.
+\end{remark}

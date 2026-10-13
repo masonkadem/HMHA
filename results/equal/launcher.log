@@ -1,0 +1,16 @@
+done (0): --n_rel 2 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (0): --n_rel 2 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (0): --n_rel 2 --seed 5 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (0): --n_rel 2 --seed 6 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 2 --seed 7 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 2 --seed 8 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 2 --seed 9 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 4 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 4 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 4 --seed 5 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 4 --seed 6 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (127): --n_rel 4 --seed 7 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (1): --n_rel 4 --seed 8 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (1): --n_rel 4 --seed 9 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (1): --n_rel 8 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+done (1): --n_rel 8 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1

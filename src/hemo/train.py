@@ -132,6 +132,19 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
                     elif step - t0 >= cfg.trial_taper + cfg.trial_settle:
                         h["trials"].append((h_t, t0, step, True))
                         model.trial_head, quiet = None, 0
+                elif local and cfg.oneshot:
+                    # CONTROL: post-hoc pruning. At the hold step only, close heads one at a
+                    # time with a fresh value each time until none is below the price; the
+                    # tone snaps (no fading). Afterwards the open set never changes.
+                    if step == hold:
+                        for _ in range(H):
+                            before = model.open_mask.clone()
+                            model.probe_ischemia(*make_batch(cfg.probe_batch, cfg, device)[:3])
+                            h["n_probes"] += 1
+                            model.local_step(price)
+                            if torch.equal(before, model.open_mask):
+                                break
+                        model.tone.copy_(model.open_mask.to(model.tone.dtype))
                 elif local:
                     before = model.open_mask.clone()
                     model.probe_ischemia(*make_batch(cfg.probe_batch, cfg, device)[:3])

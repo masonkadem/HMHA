@@ -55,6 +55,8 @@ class ICfg:
     price_frac: float = 0.03        # price of a head, fraction of the trivial readout error
     probe: str = "mse"              # mse: linear read-out of the one-hot next token (first batch)
                                     # logit: re-fit to reproduce the logits, value in nats
+                                    # logit_local: as logit, but the removed head's own layer
+                                    #   is re-fitted first (see residual_local_refit)
     trial: int = 0                  # 1 = TRIAL CLOSURE: once the rule has been quiet for trial_wait
                                     # probes, close the cheapest open head even if it looks
                                     # essential, fading it over trial_taper steps; reopen it at
@@ -68,6 +70,11 @@ class ICfg:
                                     # (checked every step on the smoothed training loss too)
     trial_max_fail: int = 1000      # stop trying after this many failed trials
     trial_stop: float = 1.0         # no new trials after this fraction of training
+    trial_mode: str = "fade"        # fade: the trial head just fades out
+                                    # transfer: as it fades, the same share of its OV circuit is
+                                    #   moved into the open head of its layer with the most
+                                    #   similar attention (parallel vessels: flow shifts to the
+                                    #   partner); reverted if the trial is undone
     squeeze_at: float = 0.0         # TEST: at this fraction of training force one more layer-1
                                     # head shut (0 = never); see train()
     price_mode: str = "absolute"    # absolute: close if value < price_frac * trivial error
@@ -132,15 +139,20 @@ class AttnLayer(nn.Module):
         self.W_v = nn.Linear(d_model, H * d_head, bias=False)
         self.W_o = nn.Parameter(torch.randn(H, d_head, d_model) / math.sqrt(H * d_head))
 
-    def forward(self, x):
-        """Per-head contributions to the residual stream (B, H, T, d_model), and attention."""
+    def heads(self, x):
+        """Per-head outputs before W_o (B, H, T, d_head), and attention."""
         B, T, _ = x.shape
         split = lambda t: t.view(B, T, self.H, self.d_head).transpose(1, 2)
         q, k, v = split(self.W_q(x)), split(self.W_k(x)), split(self.W_v(x))
         scores = q @ k.transpose(-2, -1) / math.sqrt(self.d_head)
         mask = torch.ones(T, T, dtype=torch.bool, device=x.device).tril()
         attn = F.softmax(scores.masked_fill(~mask, float("-inf")), dim=-1)
-        return torch.einsum("bhtd,hdm->bhtm", attn @ v, self.W_o), attn
+        return attn @ v, attn
+
+    def forward(self, x):
+        """Per-head contributions to the residual stream (B, H, T, d_model), and attention."""
+        z, attn = self.heads(x)
+        return torch.einsum("bhtd,hdm->bhtm", z, self.W_o), attn
 
 
 class InductionNet(nn.Module):
@@ -244,7 +256,7 @@ def probe_values(model, tokens, second, cfg, open_mask, ridge=1e-3):
 
 
 @torch.no_grad()
-def probe_values_logit(model, tokens, second, cfg, open_mask, ridge=1e-4, tone=None):
+def probe_values_logit(model, tokens, second, cfg, open_mask, ridge=1e-4, tone=None, local=False):
     """Collateral values in real loss units (nats). For an open head h: remove it, recompute
     everything after it, re-fit a linear read-out (least squares) so the remaining residual
     stream reproduces the model's current logits as closely as it can, and measure the
@@ -275,7 +287,39 @@ def probe_values_logit(model, tokens, second, cfg, open_mask, ridge=1e-4, tone=N
         z = model.residual(tokens, g)[0][m]
         value[h] = refit_loss(z) - E0
         ablate[h] = float(F.cross_entropy(model.unembed(z), nxt)) - E0
+        if local:
+            value[h] = refit_loss(residual_local_refit(model, tokens, base, h, ridge)[m]) - E0
     return value, ablate, trivial_loss(cfg), E0
+
+
+@torch.no_grad()
+def residual_local_refit(model, tokens, base, h, ridge):
+    """Final residual stream with head h removed and ITS OWN LAYER re-fitted: the other open
+    heads of that layer get new output weights (least squares over every position) so the
+    layer writes as nearly as it can what it wrote with h, then every later layer is
+    recomputed. A copy inside a layer is then fully covered before anything downstream sees
+    the change, which a re-fit of the final read-out alone cannot do."""
+    x = model.embed(tokens) + model.pos[: tokens.size(1)]
+    i = 0
+    for layer in model.layers:
+        z, _ = layer.heads(x)                                   # (B, H, T, d_head)
+        g = base[i:i + layer.H]
+        write = torch.einsum("bhtd,hdm->btm", z * g[None, :, None, None], layer.W_o)
+        if i <= h < i + layer.H:
+            keep = [j for j in range(layer.H) if g[j] > 0 and j != h - i]
+            if keep:
+                Z = (z[:, keep] * g[keep][None, :, None, None]).permute(0, 2, 1, 3)
+                Z = Z.reshape(-1, len(keep) * layer.d_head).double()
+                t = write.reshape(-1, write.size(-1)).double()
+                A = Z.T @ Z / len(Z)
+                A += ridge * torch.diagonal(A).mean() * torch.eye(A.size(0), dtype=A.dtype, device=A.device)
+                W = torch.linalg.solve(A, Z.T @ t / len(Z))
+                write = (Z @ W).to(x.dtype).view_as(write)
+            else:
+                write = torch.zeros_like(write)
+        x = x + write
+        i += layer.H
+    return x
 
 
 # ------------------------------------------------------------------ training
@@ -283,6 +327,49 @@ def pick_device(cfg):
     if cfg.device != "auto":
         return torch.device(cfg.device)
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+@torch.no_grad()
+def _transfer_start(model, tokens, h, open_mask, hist):
+    """Pick the partner for a transfer trial: the open head in h's layer whose attention
+    pattern is most similar (cosine over a batch). None if h has no open partner."""
+    li, j = (0, h) if h < model.sizes[0] else (1, h - model.sizes[0])
+    off = 0 if li == 0 else model.sizes[0]
+    others = [k for k in range(model.sizes[li]) if k != j and open_mask[off + k]]
+    if not others:
+        return None
+    _, attns = model.residual(tokens, keep_attn=True)
+    a = attns[li].flatten(2)                                     # (B, H, T*T)
+    sim = [float(F.cosine_similarity(a[:, j], a[:, k], dim=-1).mean()) for k in others]
+    p = others[int(np.argmax(sim))]
+    L, dh = model.layers[li], model.layers[li].d_head
+    ov = L.W_v.weight[j * dh:(j + 1) * dh].T @ L.W_o[j]
+    Wv = L.W_v.weight[p * dh:(p + 1) * dh]
+    captured = float((Wv.T @ (torch.linalg.pinv(Wv.T) @ ov)).norm() / ov.norm())
+    hist["transfer"].append((h, off + p, max(sim), captured))
+    return (li, j, p, torch.zeros_like(L.W_o[p]))
+
+
+@torch.no_grad()
+def _transfer_step(model, xfer, share):
+    """Move `share` of the trial head's current OV circuit into the partner: the change to
+    the partner's W_o that best reproduces it through the partner's own W_v."""
+    li, j, p, moved = xfer
+    if share <= 0:
+        return
+    L, dh = model.layers[li], model.layers[li].d_head
+    ov = L.W_v.weight[j * dh:(j + 1) * dh].T @ L.W_o[j]
+    d = share * (torch.linalg.pinv(L.W_v.weight[p * dh:(p + 1) * dh].T) @ ov)
+    L.W_o[p] += d
+    moved += d
+
+
+@torch.no_grad()
+def _transfer_undo(model, xfer):
+    if xfer is not None:
+        li, j, p, moved = xfer
+        model.layers[li].W_o[p] -= moved
+    return None
 
 
 @torch.no_grad()
@@ -310,6 +397,8 @@ def train(cfg, verbose=False):
     smooth, removed, since, done = None, None, 0, False
     closed_order, value = [], None
     trial, quiet, cooldown = None, 0, {}
+    xfer = None                                  # (layer, local trial head, local partner, moved W_o)
+    hist["transfer"] = []
     hist["trials"] = []
     assert not cfg.trial or cfg.probe.startswith("logit"), "trial closure needs the loss-based probe"
     gated = cfg.rule in ("collateral", "ablate", "random")
@@ -335,10 +424,13 @@ def train(cfg, verbose=False):
             cooldown[h_t] = hist["n_probes"] + cfg.trial_cooldown
             hist["trials"].append((h_t, t0, step, False))
             trial, quiet = None, 0
+            xfer = _transfer_undo(model, xfer)
         if gated and step >= start and (step - start) % cfg.probe_every == 0:
             ptok, psec = make_batch(cfg.probe_batch, cfg, device=dev)
             if cfg.probe == "logit_tone":
                 value, abl, e_triv, e_now = probe_values_logit(model, ptok, psec, cfg, open_mask, tone=tone)
+            elif cfg.probe == "logit_local":
+                value, abl, e_triv, e_now = probe_values_logit(model, ptok, psec, cfg, open_mask, local=True)
             else:
                 probe = probe_values_logit if cfg.probe == "logit" else probe_values
                 value, abl, e_triv, e_now = probe(model, ptok, psec, cfg, open_mask)
@@ -355,8 +447,10 @@ def train(cfg, verbose=False):
                     cooldown[h_t] = n_probe + cfg.trial_cooldown
                     hist["trials"].append((h_t, t0, step, False))
                     trial, quiet = None, 0
+                    xfer = _transfer_undo(model, xfer)
                 elif step - t0 >= cfg.trial_taper + cfg.trial_settle:
                     hist["trials"].append((h_t, t0, step, True))
+                    xfer = None
                     trial, quiet = None, 0
             else:
                 score = abl if cfg.rule == "ablate" else value
@@ -395,6 +489,8 @@ def train(cfg, verbose=False):
                         h_t = min(cand, key=lambda i: value[i])
                         open_mask[h_t] = False
                         trial, quiet = (h_t, step), 0
+                        if cfg.trial_mode == "transfer":
+                            xfer = _transfer_start(model, ptok, h_t, open_mask, hist)
         if cfg.squeeze_at > 0 and step == int(cfg.squeeze_at * cfg.steps):
             # TEST, not part of the rule: force one more layer-1 head shut (the one the last
             # probe valued least) and let training continue, to see whether the network can
@@ -421,7 +517,10 @@ def train(cfg, verbose=False):
             speed = torch.full((H,), 1.0 / cfg.taper if cfg.taper > 0 else 1.0, device=dev)
             if trial is not None:
                 speed[trial[0]] = 1.0 / cfg.trial_taper           # a trial head fades slowly
+            before = tone.clone()
             tone.add_(torch.maximum(torch.minimum(open_mask.float() - tone, speed), -speed))
+            if xfer is not None and trial is not None:
+                _transfer_step(model, xfer, float(before[trial[0]] - tone[trial[0]]))
         if cfg.rule == "prune":
             tone = open_mask.float()
 

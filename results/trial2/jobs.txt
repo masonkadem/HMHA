@@ -1,0 +1,15 @@
+--n_rel 2 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 2 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 2 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 2 --seed 3 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 2 --seed 4 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 8 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 8 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 8 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 8 --seed 3 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75
+--n_rel 8 --seed 4 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --trial 1 --trial_undo 0.5 --trial_max_fail 3 --trial_stop 0.75

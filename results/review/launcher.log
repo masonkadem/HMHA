@@ -1,0 +1,65 @@
+done (0): --n_rel 2 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 8 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 8 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 8 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 8 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 8 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --oneshot 1
+done (0): --n_rel 2 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 2 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 2 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 2 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 8 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 8 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 8 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 8 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 2 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 2 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+done (0): --n_rel 2 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 2 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 2 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 8 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.5 --oneshot 1
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value refit
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value refit
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value refit
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value refit
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value refit
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value ablate
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value ablate
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value ablate
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value ablate
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.1 --local_value ablate
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value refit
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value refit
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value refit
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value refit
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value refit
+done (0): --n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value ablate
+done (0): --n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value ablate
+done (0): --n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value ablate
+done (0): --n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value ablate
+done (0): --n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.1 --plant_copies 1 --copy_noise 0.5 --local_value ablate

@@ -1,0 +1,78 @@
+--n_rel 2 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 5 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 6 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 7 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 8 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 9 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 5 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 6 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 7 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 8 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 4 --seed 9 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 3 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 4 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 5 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 6 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 7 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 8 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 8 --seed 9 --supply l0 --l0_lambda 0.05 --budget_hold_frac 0.1
+--n_rel 2 --seed 3 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 4 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 5 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 6 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 7 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 8 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 9 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 3 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 4 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 5 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 6 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 7 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 8 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 4 --seed 9 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 3 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 4 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 5 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 6 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 7 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 8 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 8 --seed 9 --supply l0 --l0_lambda 0.2 --budget_hold_frac 0.1
+--n_rel 2 --seed 3 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 4 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 5 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 6 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 7 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 8 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 9 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 3 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 4 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 5 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 6 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 7 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 8 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 4 --seed 9 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 3 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 4 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 5 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 6 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 7 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 8 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 8 --seed 9 --supply l0 --l0_lambda 1.0 --budget_hold_frac 0.1
+--n_rel 2 --seed 5 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 2 --seed 6 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 2 --seed 7 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 2 --seed 8 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 2 --seed 9 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 4 --seed 5 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 4 --seed 6 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 4 --seed 7 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 4 --seed 8 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 4 --seed 9 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 8 --seed 5 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 8 --seed 6 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 8 --seed 7 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 8 --seed 8 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1
+--n_rel 8 --seed 9 --supply local --price_frac 0.03 --taper 100 --conserve 0 --budget_hold_frac 0.3 --oneshot 1

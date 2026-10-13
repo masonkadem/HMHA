@@ -125,6 +125,14 @@ class Cfg:
                                         # Reopening always uses the re-fit gain.
     plant_copies: int = 0               # 1 = start with head h and head h + H/2 identical,
                                         # so every head has an exact duplicate.
+    copy_noise: float = 0.0             # with plant_copies: add noise of this size (relative
+                                        # to each weight block's spread) to every copy, so the
+                                        # twins are near-duplicates and drift apart in training.
+    oneshot: int = 0                    # local only. CONTROL: prune AFTER training instead of
+                                        # during it. Train with every head until the hold step,
+                                        # then close heads one at a time (fresh value each time,
+                                        # same price) until none is below the price, with no
+                                        # fading, then fine-tune. No probes afterwards.
     # --- trial closure (local only): once the rule has been quiet for trial_wait probes,
     # close the cheapest open head even if it looks essential, fade it over trial_taper
     # steps, reopen it at once if the smoothed loss leaves the solved bar (target_frac), keep
