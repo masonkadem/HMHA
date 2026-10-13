@@ -31,7 +31,7 @@ Each part follows the same pattern:
 | Part | Topic | Time |
 |---|---|---|
 | A | PyTorch in ten minutes: tensors, shapes, matrix products, softmax, gradients, a training loop | 30 min |
-| B | Matrix algebra the project uses: products, one-hot, rank, inverse, least squares, re-fitting, curvature | 60 min |
+| B | Matrix algebra the project uses: products, one-hot, rank, inverse, least squares, re-fitting (with a slow step-by-step head value, B.6b), curvature | 90 min |
 | C | Attention from scratch, the valve, and the astrocyte view of softmax | 40 min |
 | D | The retrieval task and why it needs exactly R heads | 30 min |
 | E | The collateral value of a head | 20 min |
@@ -348,6 +348,317 @@ print("remove z2, re-fit z1 alone:", round(mse(Zc[:, :1] @ w_one), 4))
 code(r"""
 no_refit_loss = None
 check("loss after removing a copy without re-fitting", no_refit_loss, mse(Zc[:, :1] * w_both[0]), tol=0.02)
+""")
+
+md(r"""
+## B.6b Valuing a head slowly: one example, every step
+
+B.7 gives a formula for a head's value. This section builds it from nothing, on numbers small enough
+to do on paper. The question is always the same:
+
+> **If we remove head 2 and let the other heads adjust as well as they can, how much worse does the
+> best prediction get?**
+
+The example has two heads, each giving one number per token, and three tokens. First, three small tools.
+
+### Tool 1: dot product and squared length
+
+The dot product of two vectors multiplies them entry by entry and adds: $(1,1,0)\cdot(1,0,1) = 1 + 0 + 0 = 1$.
+A vector dotted with itself is its **squared length**: $(1,0,1)\cdot(1,0,1) = 2$.
+
+**By hand.** $(1,1,0)\cdot(3,2,1)$ and $(1,0,1)\cdot(1,0,1)$.
+""")
+code(r"""
+head1 = torch.tensor([1., 1., 0.], dtype=torch.double)
+head2 = torch.tensor([1., 0., 1.], dtype=torch.double)
+y     = torch.tensor([3., 2., 1.], dtype=torch.double)
+my_dot = None            # head1 . y
+my_len2 = None           # head2 . head2
+check("head1 . y", my_dot, head1 @ y)
+check("head2 . head2", my_len2, head2 @ head2)
+""")
+
+md(r"""
+### Tool 2: the best weight when you may use only one feature
+
+If you must predict $y$ from one feature $z$ alone, the best weight is
+
+$$w = \frac{z \cdot y}{z \cdot z}.$$
+
+This is B.5 with a single column: $Z^\top Z$ is just the number $z\cdot z$, so "invert" means "divide".
+
+**By hand.** The best weight on head 1 alone, to predict $y = (3, 2, 1)$.
+""")
+code(r"""
+w_alone = (head1 @ y) / (head1 @ head1)
+my_w = None              # (head1 . y) / (head1 . head1)
+check("best weight on head 1 alone", my_w, w_alone)
+""")
+
+md(r"""
+### Tool 3: the leftover, the part another vector cannot copy
+
+How much of head 2 "looks like" head 1? By Tool 2, the best copy of head 2 made from head 1 is
+$\frac{\text{head1}\cdot\text{head2}}{\text{head1}\cdot\text{head1}}\,\text{head1}$. What remains is the **leftover**:
+
+$$\text{leftover} = \text{head2} - \frac{\text{head1}\cdot\text{head2}}{\text{head1}\cdot\text{head1}}\,\text{head1}.$$
+
+It is the part of head 2 that head 1 can never reproduce, however you weight it. A check: the leftover
+has nothing left that looks like head 1, so leftover $\cdot$ head1 $= 0$.
+
+**By hand.** $\text{head1}\cdot\text{head2} = 1$ and $\text{head1}\cdot\text{head1} = 2$, so
+leftover $= (1,0,1) - \tfrac12(1,1,0)$. Then its squared length.
+""")
+code(r"""
+leftover = head2 - (head1 @ head2) / (head1 @ head1) * head1
+print("leftover =", leftover, "   leftover . head1 =", (leftover @ head1).item())
+my_leftover = None       # three numbers, e.g. [a, b, c]
+my_leftover_len2 = None  # leftover . leftover
+check("leftover", my_leftover, leftover)
+check("squared length of the leftover", my_leftover_len2, leftover @ leftover)
+""")
+
+md(r"""
+### Step 1. The data
+
+Each **column** is one head's output, each **row** is one token:
+
+$$Z = \begin{pmatrix} 1 & 1 \\ 1 & 0 \\ 0 & 1 \end{pmatrix} \quad (\text{head 1},\ \text{head 2}),
+\qquad y = \begin{pmatrix} 3 \\ 2 \\ 1 \end{pmatrix}.$$
+
+### Step 2. $A = Z^\top Z$: every entry is a dot product (Tool 1)
+
+$$A = \begin{pmatrix} \text{head1}\cdot\text{head1} & \text{head1}\cdot\text{head2} \\
+\text{head2}\cdot\text{head1} & \text{head2}\cdot\text{head2} \end{pmatrix}.$$
+
+The diagonal says how big each head is on its own. The off-diagonal says how much the two heads
+**overlap**. That overlap is what will let head 1 cover for head 2.
+
+### Step 3. $b = Z^\top y$: each head dotted with the target
+
+**By hand.** All four entries of $A$, and both entries of $b$.
+""")
+code(r"""
+Z = torch.stack([head1, head2], 1)
+A = Z.T @ Z
+b = Z.T @ y
+print("Z =\n", Z, "\nA =\n", A, "\nb =", b)
+my_A = None              # [[a, b], [c, d]]
+my_b = None              # [b1, b2]
+check("A = Z^T Z", my_A, A)
+check("b = Z^T y", my_b, b)
+""")
+
+md(r"""
+### Step 4. Invert $A$ once (B.4)
+
+With $A = \begin{pmatrix} 2 & 1 \\ 1 & 2\end{pmatrix}$: $\det = 2\cdot2 - 1\cdot1 = 3$, so
+
+$$M = A^{-1} = \frac13 \begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix}.$$
+
+Keep the $\tfrac13$ outside until the end; the numbers stay whole.
+
+### Step 5. The best weights for both heads together: $W = M\,b$
+
+Multiply the whole-number matrix first, then divide by 3:
+$\begin{pmatrix} 2 & -1 \\ -1 & 2 \end{pmatrix}\begin{pmatrix} 5 \\ 4 \end{pmatrix} = \begin{pmatrix} 6 \\ 3 \end{pmatrix}$,
+so $W = (2, 1)$. The prediction is $2\cdot\text{head1} + 1\cdot\text{head2}$.
+
+**By hand.** $M_{22}$ (the bottom-right entry of $M$), $W$, and the prediction.
+""")
+code(r"""
+M = torch.linalg.inv(A)
+W = M @ b
+pred = Z @ W
+print("M =\n", M, "\nW =", W, "\nprediction =", pred, "  loss =", ((y - pred) ** 2).sum().item())
+my_M22 = None
+my_W = None              # [W1, W2]
+my_pred = None           # three numbers
+check("M_22", my_M22, M[1, 1])
+check("W", my_W, W)
+check("prediction with both heads", my_pred, pred)
+""")
+
+md(r"""
+With both heads the prediction is exactly $y$, so the loss is 0. Every loss below is "how much worse
+than 0". (Loss here is the **sum** of squared errors, to keep the numbers whole.)
+
+### Step 6. Remove head 2, and nobody adjusts
+
+Head 1 keeps its weight 2. Everything head 2 contributed, $W_2\cdot\text{head2}$, becomes error:
+
+$$\text{residual} = W_2\,\text{head2}, \qquad \text{loss} = W_2^2\,(\text{head2}\cdot\text{head2}) = W_2^2\,A_{22}.$$
+
+$W_2$ is squared because the error is squared: double the weight, four times the loss.
+
+**By hand.** The residual $y - 2\cdot\text{head1}$, and the loss.
+""")
+code(r"""
+pred_noref = W[0] * head1
+loss_noref = ((y - pred_noref) ** 2).sum()
+print("residual =", y - pred_noref, "  loss =", loss_noref.item(), "  W2^2 * A22 =", (W[1] ** 2 * A[1, 1]).item())
+my_loss_noref = None
+check("loss without re-fitting", my_loss_noref, loss_noref)
+""")
+
+md(r"""
+### Step 7. Remove head 2, and let head 1 re-fit
+
+Now head 1 may choose its best weight alone, which is Tool 2: $w_1 = \frac{\text{head1}\cdot y}{\text{head1}\cdot\text{head1}} = \frac52 = 2.5$.
+
+**By hand.** The prediction $2.5\cdot\text{head1}$, the residual, and the loss.
+""")
+code(r"""
+w1_new = (head1 @ y) / (head1 @ head1)
+pred_ref = w1_new * head1
+loss_ref = ((y - pred_ref) ** 2).sum()
+print("new weight =", w1_new.item(), "  residual =", y - pred_ref, "  loss =", loss_ref.item())
+my_loss_ref = None
+check("loss with re-fitting", my_loss_ref, loss_ref)
+""")
+
+md(r"""
+The re-fit loss (1.5) is smaller than the no-re-fit loss (2). Head 1 raised its weight from 2 to 2.5 and
+took over **part** of head 2's job. It could only do that because the heads overlap.
+
+### Step 8. Why exactly 1.5? The leftover (Tool 3)
+
+Compare the residual from Step 7 with the leftover from Tool 3. They are the **same vector**,
+$(0.5, -0.5, 1)$, times $W_2 = 1$. After head 1 has copied all it can, what remains of head 2's job is
+$W_2$ times the part of head 2 that head 1 cannot copy. So
+
+$$\text{value of head 2} = W_2^2 \times (\text{leftover}\cdot\text{leftover}) = 1 \times 1.5 = 1.5.$$
+
+Read it as: **how strongly the model used head 2, squared, times how much of head 2 nobody else can
+reproduce.**
+""")
+code(r"""
+print("residual after re-fit:", y - pred_ref)
+print("W2 * leftover:        ", W[1] * leftover)
+print("W2^2 * (leftover . leftover) =", (W[1] ** 2 * (leftover @ leftover)).item())
+""")
+
+md(r"""
+### Step 9. The shortcut: $1/M_{22}$ is the leftover's squared length
+
+Here is the fact that makes everything fast: $1/M_{22} = 1/(2/3) = 1.5$, the same number as the
+leftover's squared length. So the value can be read straight off Steps 4 and 5, **without re-fitting
+anything**:
+
+$$\text{value of head 2} = \frac{W_2^2}{M_{22}}.$$
+
+With many heads this matters: invert $A$ once, then each head's value is one division. You do not need
+to prove the fact; the cell below checks it.
+
+**By hand.** $W_2^2 / M_{22}$ from your Step 5 numbers.
+""")
+code(r"""
+shortcut = W[1] ** 2 / M[1, 1]
+print("1 / M22 =", (1 / M[1, 1]).item(), "  leftover . leftover =", (leftover @ leftover).item())
+my_shortcut = None
+check("W2^2 / M22", my_shortcut, shortcut)
+check("the shortcut equals the re-fit loss", shortcut.item(), loss_ref)
+""")
+
+md(r"""
+### Step 10. Your turn: head 1
+
+Same two numbers for head 1. Without re-fitting: $W_1^2 A_{11}$. With re-fitting: $W_1^2 / M_{11}$.
+Then confirm the second one the slow way: re-fit head 2 alone (Tool 2) and compute the loss.
+""")
+code(r"""
+noref_1 = W[0] ** 2 * A[0, 0]
+ref_1 = W[0] ** 2 / M[0, 0]
+w2_alone = (head2 @ y) / (head2 @ head2)
+slow_1 = ((y - w2_alone * head2) ** 2).sum()
+my_noref_1 = None        # W1^2 * A11
+my_ref_1 = None          # W1^2 / M11
+check("head 1 without re-fitting", my_noref_1, noref_1)
+check("head 1 with re-fitting", my_ref_1, ref_1)
+check("the slow way agrees", ref_1.item(), slow_1)
+""")
+
+md(r"""
+### Step 11. The case that matters: an exact copy
+
+Let head 2 be a copy of head 1, $(1, 1, 0)$, and the target $y = \text{head1} + \text{head2} = (2, 2, 0)$.
+
+* **No re-fit**, weights $(1, 1)$: removing head 2 leaves $1\cdot\text{head1} = (1,1,0)$, residual
+  $(1, 1, 0)$, loss 2. The copy **looks important**.
+* **Re-fit**: the leftover of a copy is $\text{head2} - 1\cdot\text{head1} = 0$. Nothing of it is
+  irreplaceable, so its value is **0**. Head 1 simply takes weight 2.
+
+One snag: with a copy, $\det A = 2\cdot2 - 2\cdot2 = 0$ and $A$ has no inverse (B.3: dependent columns).
+The code adds a tiny number to the diagonal (a **ridge**, B.4's matrix made invertible), as the
+project's code does.
+
+**By hand.** The loss after removing the copy without re-fitting.
+""")
+code(r"""
+twin = head1.clone()
+yc = head1 + twin
+Zc2 = torch.stack([head1, twin], 1)
+Ac = Zc2.T @ Zc2 + 1e-9 * torch.eye(2, dtype=torch.double)       # tiny ridge so it can be inverted
+Wc = torch.linalg.solve(Ac, Zc2.T @ yc)
+Mc = torch.linalg.inv(Ac)
+noref_c = ((yc - Wc[0] * head1) ** 2).sum()
+print("weights with both:", Wc, "\nno re-fit loss:", round(noref_c.item(), 4),
+      "  re-fit value W2^2 / M22:", round((Wc[1] ** 2 / Mc[1, 1]).item(), 6))
+my_noref_c = None
+check("removing a copy without re-fitting", my_noref_c, noref_c)
+""")
+
+md(r"""
+**This is the whole project's score in one picture.** Ordinary importance (no re-fit) says the copy
+matters. The re-fitted value says it is worth nothing, because its twin covers all of it.
+
+| the other head | no re-fit | re-fit (our value) |
+|---|---|---|
+| no overlap | some loss | the same loss |
+| some overlap (Steps 6 to 9) | 2 | 1.5 |
+| an exact copy (Step 11) | 2 | 0 |
+
+### Step 12. From one number per head to 32
+
+In the real model each head gives **32 numbers** per token, not 1. So a head is 32 columns of $Z$, a
+$32\times32$ block of $A$, and 32 rows of $W$. Every step above carries over with blocks in place of
+numbers:
+
+| one number per head | the real model |
+|---|---|
+| $A_{22}$, a number | head 2's $32\times32$ block of $A$ |
+| $M_{22}$, a number | head 2's $32\times32$ block of $M = A^{-1}$ |
+| $W_2$, a number | head 2's 32 rows of $W$ |
+| $W_2^2 / M_{22}$ | $\mathrm{tr}\big(W_2^\top M_{22}^{-1} W_2\big)$: "divide" becomes "solve with the block" |
+| remove row 2 and column 2 of $A$ | remove head 2's block row and block column |
+
+The cell below does it with 4 heads of 2 numbers each, head 3 a copy of head 0. "Slow" deletes the
+head's columns and re-fits; "fast" uses the block of $M$. They agree, and both copies are worth 0.
+B.7 is this same cell, written as one formula.
+""")
+code(r"""
+rng = np.random.default_rng(0)
+H, dk, n_tok, d_out = 4, 2, 200, 3
+Zb = rng.normal(size=(n_tok, H * dk))
+Zb[:, 6:8] = Zb[:, 0:2]                                            # head 3 is a copy of head 0
+yb = Zb[:, 0:6] @ rng.normal(size=(6, d_out)) + 0.1 * rng.normal(size=(n_tok, d_out))
+cols = lambda h: list(range(h * dk, (h + 1) * dk))
+
+def best_loss_np(Zs):
+    As = Zs.T @ Zs + 1e-6 * np.eye(Zs.shape[1])
+    Ws = np.linalg.solve(As, Zs.T @ yb)
+    return ((yb - Zs @ Ws) ** 2).sum()
+
+Ab = Zb.T @ Zb + 1e-6 * np.eye(H * dk)
+Wb = np.linalg.solve(Ab, Zb.T @ yb)                                # best weights, all heads
+Mb = np.linalg.inv(Ab)                                             # invert ONCE
+base = ((yb - Zb @ Wb) ** 2).sum()
+for h in range(H):
+    J = cols(h)
+    slow = best_loss_np(Zb[:, [c for c in range(H * dk) if c not in J]]) - base
+    fast = np.trace(Wb[J].T @ np.linalg.solve(Mb[np.ix_(J, J)], Wb[J]))
+    noref = ((yb - (Zb @ Wb - Zb[:, J] @ Wb[J])) ** 2).sum() - base
+    print(f"head {h}:  slow re-fit {slow:8.2f}   fast (block of M) {fast:8.2f}   no re-fit {noref:8.2f}")
 """)
 
 md(r"""
