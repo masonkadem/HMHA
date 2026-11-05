@@ -1,0 +1,20 @@
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 5 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 6 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 7 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 8 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 9 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000
+--n_rel 4 --seed 0 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 1 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 2 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 3 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 4 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 5 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 6 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 7 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 8 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4
+--n_rel 4 --seed 9 --supply local --price_frac 0.03 --taper 100 --budget_hold_frac 0.1 --conserve 0 --phases 242 --steps 6000 --sprout 4

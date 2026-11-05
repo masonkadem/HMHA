@@ -32,9 +32,12 @@ plt.rcParams.update({
 
 
 def load(dirs):
-    out = []
+    out, seen = [], set()
     for d in dirs:
         for p in glob.glob(os.path.join(ROOT, d, "*.pkl")):
+            if os.path.basename(p) in seen:          # the same run saved in two folders counts once
+                continue
+            seen.add(os.path.basename(p))
             r = pickle.load(open(p, "rb"))
             if isinstance(r, dict) and "hist" in r and "cfg" in r and "ledger" in r["hist"]:
                 out.append(r)
@@ -138,7 +141,7 @@ ax.axvline(1.0, color=G2, lw=0.6, ls="--")
 ax.set(xscale="log", yscale="log", ylim=(0.8, 12), yticks=[1, 2, 4, 8], yticklabels=["1", "2", "4", "8"],
        xlabel="upkeep / value of\none needed head", ylabel="heads kept")
 ax.minorticks_off()
-ax.text(0.92, 11, "predicted\ncollapse", fontsize=5.5, color=G1, va="top", ha="right")
+ax.text(0.85, 1.25, "predicted\ncollapse", fontsize=5.5, color=G1, va="center", ha="right")
 ax.set_title(r"$\mathbf{c}$   Upkeep", pad=4)
 
 # ---------------------------------------------------------------- d  changing demand
