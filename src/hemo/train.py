@@ -76,8 +76,22 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
     price = cfg.price_frac * trivial_loss(val)
     smooth, h["n_probes"] = None, 0
     quiet, cooldown, trial_start, h["trials"] = 0, {}, 0, []
+    # changing demand: one cfg and one validation set per phase. The price stays the one
+    # computed on the full task, as a vessel costs the same whatever it carries.
+    from dataclasses import replace as _replace
+    from .tasks import make_val
+    phases = [int(c) for c in cfg.phases] if cfg.phases else None
+    if phases:
+        cfgs = {a: _replace(cfg, n_active=a) for a in set(phases)}
+        vals = {a: make_val(cfgs[a], device) for a in cfgs}
+        bars = {a: 0.02 * trivial_loss(vals[a]) for a in cfgs}
+        h["n_active"], h["sprouts"] = [], []
+    base_cfg, base_val, starve = cfg, val, 0
 
     for step in range(total):
+        if phases:
+            a_now = phases[min(len(phases) - 1, step * len(phases) // total)]
+            cfg, val = cfgs[a_now], vals[a_now]
         X, Y, T, _ = make_batch(cfg.batch_size, cfg, device)
         if hemo:
             kappa, B = schedule(step, cfg, H, total)
@@ -151,6 +165,16 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
                     h["n_probes"] += 1
                     model.local_step(price)
                     quiet = quiet + 1 if torch.equal(before, model.open_mask) else 0
+                    if cfg.sprout and phases:
+                        starve = starve + 1 if smooth > bars[a_now] else 0
+                        shut = ~model.open_mask
+                        if starve >= cfg.sprout and bool(shut.any()):
+                            v = torch.where(shut, model.head_value,
+                                            torch.full_like(model.head_value, -float("inf")))
+                            h_s = int(v.argmax())
+                            model.open_mask[h_s] = True
+                            h["sprouts"].append((step, h_s))
+                            starve = 0
                     n_fail = sum(1 for tr in h["trials"] if not tr[3])
                     if (cfg.trial and quiet >= cfg.trial_wait and int(model.open_mask.sum()) > 1
                             and n_fail < cfg.trial_max_fail and step < cfg.trial_stop * total):
@@ -183,9 +207,12 @@ def train(cfg, val, device, hemo=True, num_heads=None, steps=None, desc="", verb
             h["budget"].append(B)
             h["kappa"].append(float(model.kappa_state) if autoreg else kappa)
             h["n_perfused"].append(nper)
+            if phases:
+                h["n_active"].append(a_now)
             if verbose:
                 print(f"    {desc} step {step:>5} loss {h['val_loss'][-1]:.5f} "
                       f"perfused {nper}/{H}")
+    cfg, val = base_cfg, base_val
     h["ledger"] = np.array(h["ledger"]) if hemo else None
     h["final_perfused"] = prev if hemo else H
     h["final_gate"] = (model.l0_gate(sample=False) if hemo and cfg.supply == "l0" else g[0]).detach().cpu().numpy()

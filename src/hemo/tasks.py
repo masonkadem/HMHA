@@ -61,6 +61,9 @@ def make_batch(B, cfg, device, gen=None):
         for off in offsets_for(cfg):
             j = (p + off) % N
             blocks.append(torch.gather(content, 1, j.unsqueeze(-1).expand(-1, -1, m)))
+        n_act = getattr(cfg, "n_active", 0)
+        if 0 < n_act < len(blocks):          # inactive offsets: constant zero target
+            blocks = blocks[:n_act] + [torch.zeros_like(b) for b in blocks[n_act:]]
         T = torch.cat(blocks, dim=-1)
         aux = {"p": p, "offsets": torch.tensor(offsets_for(cfg), device=dev)}
     else:

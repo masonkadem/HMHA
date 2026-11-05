@@ -133,6 +133,15 @@ class Cfg:
                                         # then close heads one at a time (fresh value each time,
                                         # same price) until none is below the price, with no
                                         # fading, then fine-tune. No probes afterwards.
+    # --- changing demand (multi_relation only). The training run is split into equal
+    # phases, one per digit; each digit is how many of the R offsets are active, and the
+    # targets of the inactive offsets are zero. phases="242" needs 2 heads, then 4, then 2. ---
+    phases: str = ""
+    n_active: int = 0                   # set per phase by train(); 0 = all R active
+    sprout: int = 0                     # local only. ANGIOGENESIS: if the smoothed loss stays
+                                        # above the solved bar for this many probes, open the
+                                        # most valuable closed head even below 2 x price, so
+                                        # it can learn. 0 = off.
     # --- trial closure (local only): once the rule has been quiet for trial_wait probes,
     # close the cheapest open head even if it looks essential, fade it over trial_taper
     # steps, reopen it at once if the smoothed loss leaves the solved bar (target_frac), keep

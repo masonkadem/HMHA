@@ -30,7 +30,7 @@ TAG_ABBR = {"n_rel": "R", "seq_len": "N", "d_k": "dk", "steps": "st",
             "head_dropout": "hd", "probe_masks": "pm", "trial": "tr", "trial_taper": "tt",
             "trial_settle": "ts", "trial_wait": "tw", "trial_cooldown": "tc", "trial_undo": "tu",
             "trial_max_fail": "tm", "trial_stop": "tst", "l0_lambda": "l0l", "l0_init": "l0i",
-            "copy_noise": "cn", "oneshot": "os"}
+            "copy_noise": "cn", "oneshot": "os", "phases": "ph", "sprout": "sp"}
 # Swept only occasionally. These appear in the tag ONLY when they differ from the
 # default, so adding one here does not rename every result already on disk.
 TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
@@ -40,7 +40,7 @@ TAG_OPTIONAL = ["autoreg_gain", "target_frac", "autoreg_every", "loss_ema",
                 "taper", "budget_hold_frac", "conserve", "local_value", "plant_copies",
                 "head_dropout", "probe_masks", "trial", "trial_taper", "trial_settle",
                 "trial_wait", "trial_cooldown", "trial_undo", "trial_max_fail", "trial_stop", "l0_lambda", "l0_init",
-                "copy_noise", "oneshot"]
+                "copy_noise", "oneshot", "phases", "sprout"]
 
 
 def _fmt(a, v):
