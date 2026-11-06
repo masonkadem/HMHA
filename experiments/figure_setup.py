@@ -5,7 +5,9 @@ the model's answers points to, with all kept heads and with one switched off).
 Trains one hemodynamic-attenuation model (k* = 4, seed 0, the settings of the confirmation runs)
 and caches its weights in figures/solved_model.pt; later runs reuse the cache.
 
-  python experiments/figure_setup.py   ->  figures/fig_setup.png and figures/fig_setup.pdf
+  python experiments/figure_setup.py           ->  figures/fig_setup.png and figures/fig_setup.pdf
+  python experiments/figure_setup.py --paper   ->  paper/neuroai/fig_task.pdf (panels a-c on one row)
+  python experiments/figure_setup.py --column  ->  paper/neuroai/fig_task_col.pdf (task and rank law, one column)
 """
 import os, pickle, sys
 import numpy as np
@@ -88,79 +90,95 @@ loss_off = evaluate(model, val, gate=off)
 print(f"heads kept {kept}; loss {loss_on:.2e}; with head {kept[0]} switched off {loss_off:.3f}; "
       f"trivial {trivial_loss(val):.3f}")
 
-fig = plt.figure(figsize=(7.2, 4.7))
-outer = fig.add_gridspec(2, 1, height_ratios=[0.8, 1.15], hspace=0.32)
-gs = outer[0].subgridspec(1, 4, wspace=0.55)
-bot = outer[1].subgridspec(1, 2, width_ratios=[1.5, 3.2], wspace=0.3)
+# --paper: one row (task, model, rank law) for the workshop paper, written to paper/neuroai/fig_task
+# --column: task and rank law only, one column wide, written to paper/neuroai/fig_task_col
+COLUMN = "--column" in sys.argv
+PAPER = "--paper" in sys.argv or COLUMN
+if COLUMN:
+    fig = plt.figure(figsize=(3.35, 1.45))
+    row = fig.add_gridspec(1, 2, width_ratios=[1.5, 0.85], wspace=0.32)
+    SLOT_A, SLOT_B, SLOT_C = row[0], None, row[1]
+elif PAPER:
+    fig = plt.figure(figsize=(7.0, 1.6))
+    row = fig.add_gridspec(1, 3, width_ratios=[1.25, 1.6, 0.75], wspace=0.2)
+    SLOT_A, SLOT_B, SLOT_C = row[0], row[1], row[2]
+else:
+    fig = plt.figure(figsize=(7.2, 4.7))
+    outer = fig.add_gridspec(2, 1, height_ratios=[0.8, 1.15], hspace=0.32)
+    gs = outer[0].subgridspec(1, 4, wspace=0.55)
+    bot = outer[1].subgridspec(1, 2, width_ratios=[1.5, 3.2], wspace=0.3)
+    SLOT_A, SLOT_B, SLOT_C = gs[0, :2], gs[0, 2:], bot[0]
 
 # ---------------------------------------------------------------- a  task
-ax = fig.add_subplot(gs[0, :2])
+ax = fig.add_subplot(SLOT_A)
 title(ax, "a", "Task")
 ax.axis("off")
 pq = 8
-ax.set(xlim=(-4.2, 16), ylim=(-2.9, 2.4))
+ax.set(xlim=(-6.6 if COLUMN else -5.6 if PAPER else -4.2, 16), ylim=(-2.9, 2.4))
 ax.add_patch(Rectangle((pq - 0.42, 1.45), 0.84, 0.72, facecolor="white", edgecolor=K, lw=0.7))
 ax.text(pq, 1.81, "$p$", ha="center", va="center")
-ax.text(-4.1, 1.81, "query", color=G1, va="center")
-ax.text(-4.1, 0, "memory", color=G1, va="center")
+ax.text(-6.5 if COLUMN else -5.5 if PAPER else -4.1, 1.81, "query", color=G1, va="center")
+ax.text(-6.5 if COLUMN else -5.5 if PAPER else -4.1, 0, "memory", color=G1, va="center")
 targets = [(pq + d) % N for d in offs]
 for j in range(N):
     hit = j in targets
     ax.add_patch(Rectangle((j - 0.42, -0.36), 0.84, 0.72, facecolor=G3 if hit else "white",
                            edgecolor=K if hit else G2, lw=0.7))
-    ax.text(j, 0, str(j), ha="center", va="center", fontsize=5.5, color=K if hit else G1)
+    ax.text(j, 0, str(j), ha="center", va="center", fontsize=4.2 if PAPER else 5.5, color=K if hit else G1)
 for j in targets:
     ax.annotate("", xy=(j, 0.42), xytext=(pq, 1.42),
                 arrowprops=dict(arrowstyle="-|>", color=K, lw=0.6, mutation_scale=6, shrinkA=0, shrinkB=0))
-ax.text(-4.1, -1.5, "target", color=G1, va="center")
-ax.text(7.5, -1.5, r"$y=(c_{p+1},\ c_{p+5},\ c_{p+9},\ c_{p+13})$", ha="center", va="center", fontsize=7.5)
+ax.text(-6.5 if COLUMN else -5.5 if PAPER else -4.1, -1.5, "target", color=G1, va="center")
+ax.text(8.3 if COLUMN else 7.5, -1.5, r"$y=(c_{p+1},\ c_{p+5},\ c_{p+9},\ c_{p+13})$", ha="center", va="center", fontsize=6 if COLUMN else 7.5)
 ax.text(7.5, -2.5, r"needs $k^*=4$ heads", ha="center", va="center", color=G1)
 
-# ---------------------------------------------------------------- b  model
-ax = fig.add_subplot(gs[0, 2:])
-title(ax, "b", "Model: one attention layer, 32 heads, each with a valve")
-ax.axis("off")
-ax.set(xlim=(-1.6, 10), ylim=(0, 6.6))
+if not COLUMN:
+    # ---------------------------------------------------------------- b  model
+    ax = fig.add_subplot(SLOT_B)
+    title(ax, "b", "Model: 32 heads, each with a valve" if PAPER else "Model: one attention layer, 32 heads, each with a valve")
+    ax.axis("off")
+    ax.set(xlim=(-1.6, 10), ylim=(0, 6.6))
 
 
-def box(x, y, w, h, text, face="white", edge=K, lw=0.7, ls="-", color=K, fs=6.5):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.12",
-                                facecolor=face, edgecolor=edge, lw=lw, ls=ls))
-    if text:
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs, color=color)
+    def box(x, y, w, h, text, face="white", edge=K, lw=0.7, ls="-", color=K, fs=6.5):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.12",
+                                    facecolor=face, edgecolor=edge, lw=lw, ls=ls))
+        if text:
+            ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs, color=color)
 
 
-def arrow(x0, y0, x1, y1):
-    ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
-                arrowprops=dict(arrowstyle="-|>", color=K, lw=0.6, mutation_scale=6, shrinkA=0, shrinkB=0))
+    def arrow(x0, y0, x1, y1):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="-|>", color=K, lw=0.6, mutation_scale=6, shrinkA=0, shrinkB=0))
 
 
-box(0.9, 0.2, 2.6, 0.7, "query $X$")
-box(6.5, 0.2, 2.6, 0.7, "memory $Y$")
-xs = [0.55 + 1.05 * i for i in range(9)]
-alive = {0, 2, 3, 7}                                  # drawn pattern: most heads starved, a few fed
-for i, x in enumerate(xs):
-    if i == 5:
-        ax.text(x + 0.35, 2.55, r"$\cdots$", ha="center", va="center", fontsize=8, color=G1)
-        continue
-    on = i in alive
-    box(x, 2.15, 0.7, 0.8, "", edge=K if on else G2, ls="-" if on else (0, (2, 1.5)))
-    ax.text(x + 0.35, 2.55, "head", ha="center", va="center", fontsize=5, color=K if on else G2)
-    ax.add_patch(Rectangle((x + 0.2, 3.3), 0.3, 0.9, facecolor=RED if on else "white",
-                           edgecolor=RED if on else G2, lw=0.5))
-    ax.plot([x + 0.35, x + 0.35], [2.95, 3.3], color=K if on else G2, lw=0.5)
-    ax.plot([x + 0.35, x + 0.35], [4.2, 4.8], color=K if on else G2, lw=0.5)
-    ax.plot([x + 0.35, x + 0.35], [1.75, 2.15], color=G1, lw=0.5)
-ax.plot([xs[0] + 0.35, xs[-1] + 0.35], [1.75, 1.75], color=G1, lw=0.5)
-arrow(2.2, 0.95, 2.2, 1.75)
-arrow(7.8, 0.95, 7.8, 1.75)
-ax.text(-1.55, 3.75, "valve\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
-box(0.45, 4.8, 9.05, 0.9, r"$y = W_O\,\Sigma_h\; g_h\, \mathrm{softmax}(Q_h K_h^{\mathsf{T}})\, V_h$", fs=7)
-arrow(5.0, 5.75, 5.0, 6.35)
-ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
+    box(0.9, 0.2, 2.6, 0.7, "query $X$")
+    box(6.5, 0.2, 2.6, 0.7, "memory $Y$")
+    xs = [0.55 + 1.05 * i for i in range(9)]
+    alive = {0, 2, 3, 7}                                  # drawn pattern: most heads starved, a few fed
+    for i, x in enumerate(xs):
+        if i == 5:
+            ax.text(x + 0.35, 2.55, r"$\cdots$", ha="center", va="center", fontsize=8, color=G1)
+            continue
+        on = i in alive
+        box(x, 2.15, 0.7, 0.8, "", edge=K if on else G2, ls="-" if on else (0, (2, 1.5)))
+        ax.text(x + 0.35, 2.55, "head", ha="center", va="center", fontsize=3.6 if PAPER else 5, color=K if on else G2)
+        ax.add_patch(Rectangle((x + 0.2, 3.3), 0.3, 0.9, facecolor=RED if on else "white",
+                               edgecolor=RED if on else G2, lw=0.5))
+        ax.plot([x + 0.35, x + 0.35], [2.95, 3.3], color=K if on else G2, lw=0.5)
+        ax.plot([x + 0.35, x + 0.35], [4.2, 4.8], color=K if on else G2, lw=0.5)
+        ax.plot([x + 0.35, x + 0.35], [1.75, 2.15], color=G1, lw=0.5)
+    ax.plot([xs[0] + 0.35, xs[-1] + 0.35], [1.75, 1.75], color=G1, lw=0.5)
+    arrow(2.2, 0.95, 2.2, 1.75)
+    arrow(7.8, 0.95, 7.8, 1.75)
+    ax.text(-1.55, 3.75, "valve\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
+    box(0.45, 4.8, 9.05, 1.0 if PAPER else 0.9, r"$y = W_O\,\Sigma_h\; g_h\, \mathrm{softmax}(Q_h K_h^{\mathsf{T}})\, V_h$", fs=6 if PAPER else 7)
+    arrow(5.0, 5.75, 5.0, 6.35)
+    ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
+
 
 # ---------------------------------------------------------------- c  one head, one equation
-ax = fig.add_subplot(bot[0])
+ax = fig.add_subplot(SLOT_C)
 E1 = pickle.load(open(os.path.join(ROOT, "results", "proposal", "equations.pkl"), "rb"))
 triv = E1["trivial"]
 ax.plot([0, 4], [triv, 0], color=G2, lw=0.8, ls="--", zorder=1, label="predicted: $1 - k/4$")
@@ -171,42 +189,47 @@ ax.plot([r["different"] for r in copies], [r["loss"] for r in copies], "o", mfc=
         ms=6.5, mew=0.8, label="4 heads on, some\nare copies")
 ax.set(xlabel="$k$ = different heads on", ylabel="loss", xticks=range(5), xlim=(-0.2, 4.3), ylim=(-0.05, 1.45),
        yticks=[0, 0.5, 1.0])
-ax.legend(loc="upper right", handletextpad=0.3, borderaxespad=0, labelspacing=0.3)
-title(ax, "c", "Each different head adds one answer")
+ax.legend(loc="upper right", handletextpad=0.3, borderaxespad=0, labelspacing=0.3,
+          fontsize=4.6 if COLUMN else 5.5 if PAPER else 6.5, bbox_to_anchor=(1.12, 1.02) if COLUMN else None)
+title(ax, "b" if COLUMN else "c", "Each head adds one answer" if PAPER else "Each different head adds one answer")
 
-# ---------------------------------------------------------------- d  which slot each answer points to
-sub = bot[1].subgridspec(1, 2, wspace=0.14)
-GRID = "#c8c8c8"
-for i, (grid, name, acc) in enumerate(((grid_on, "4 kept heads", acc_on),
-                                       (grid_off, f"head {kept[0]} switched off", acc_off))):
-    a = fig.add_subplot(sub[i])
-    a.set(xlim=(-0.5, N - 0.5), ylim=(N - 0.5, -0.5), aspect="equal")
-    for q in range(N):
-        for j in grid_true[q]:                                       # the right slots: grey squares
-            a.add_patch(Rectangle((j - 0.5, q - 0.5), 1, 1, facecolor=GRID, edgecolor="none"))
-        for r in range(R):                                           # the model's answers: dots or crosses
-            j = grid[q, r]
-            if j == grid_true[q][r]:
-                a.plot(j, q, "o", color=RED, ms=2.6, mew=0)
-            else:
-                a.plot(j, q, "x", color=K, ms=3.2, mew=0.7)
-    a.set_xticks([0, 5, 10, 15]); a.set_yticks([0, 5, 10, 15])
-    a.tick_params(length=1.5, labelsize=5.5, pad=1)
-    for sp in a.spines.values():
-        sp.set_visible(True); sp.set_color(G2); sp.set_linewidth(0.5)
-    a.text(0.5, 1.03, name, transform=a.transAxes, ha="center", va="bottom", fontsize=6.5)
-    a.set_xlabel(f"slot\n{100 * acc:.0f}% of answers right", fontsize=6.5, labelpad=1)
-    if i == 0:
-        title(a, "d", "Which slot each answer points to", pad=13)
-        a.set_ylabel("query position $p$", fontsize=6.5, labelpad=1)
-    else:
-        a.set_yticklabels([])
-a.legend(handles=[Rectangle((0, 0), 1, 1, facecolor=GRID, edgecolor="none"),
-                  plt.Line2D([], [], ls="none", marker="o", color=RED, ms=3, mew=0),
-                  plt.Line2D([], [], ls="none", marker="x", color=K, ms=3.5, mew=0.7)],
-         labels=["right slot", "answer, right", "answer, wrong"], loc="upper left",
-         bbox_to_anchor=(1.03, 1.0), handlelength=1, handletextpad=0.4, borderaxespad=0, fontsize=6)
+if not PAPER:
+    # ---------------------------------------------------------------- d  which slot each answer points to
+    sub = bot[1].subgridspec(1, 2, wspace=0.14)
+    GRID = "#c8c8c8"
+    for i, (grid, name, acc) in enumerate(((grid_on, "4 kept heads", acc_on),
+                                           (grid_off, f"head {kept[0]} switched off", acc_off))):
+        a = fig.add_subplot(sub[i])
+        a.set(xlim=(-0.5, N - 0.5), ylim=(N - 0.5, -0.5), aspect="equal")
+        for q in range(N):
+            for j in grid_true[q]:                                       # the right slots: grey squares
+                a.add_patch(Rectangle((j - 0.5, q - 0.5), 1, 1, facecolor=GRID, edgecolor="none"))
+            for r in range(R):                                           # the model's answers: dots or crosses
+                j = grid[q, r]
+                if j == grid_true[q][r]:
+                    a.plot(j, q, "o", color=RED, ms=2.6, mew=0)
+                else:
+                    a.plot(j, q, "x", color=K, ms=3.2, mew=0.7)
+        a.set_xticks([0, 5, 10, 15]); a.set_yticks([0, 5, 10, 15])
+        a.tick_params(length=1.5, labelsize=5.5, pad=1)
+        for sp in a.spines.values():
+            sp.set_visible(True); sp.set_color(G2); sp.set_linewidth(0.5)
+        a.text(0.5, 1.03, name, transform=a.transAxes, ha="center", va="bottom", fontsize=6.5)
+        a.set_xlabel(f"slot\n{100 * acc:.0f}% of answers right", fontsize=6.5, labelpad=1)
+        if i == 0:
+            title(a, "d", "Which slot each answer points to", pad=13)
+            a.set_ylabel("query position $p$", fontsize=6.5, labelpad=1)
+        else:
+            a.set_yticklabels([])
+    a.legend(handles=[Rectangle((0, 0), 1, 1, facecolor=GRID, edgecolor="none"),
+                      plt.Line2D([], [], ls="none", marker="o", color=RED, ms=3, mew=0),
+                      plt.Line2D([], [], ls="none", marker="x", color=K, ms=3.5, mew=0.7)],
+             labels=["right slot", "answer, right", "answer, wrong"], loc="upper left",
+             bbox_to_anchor=(1.03, 1.0), handlelength=1, handletextpad=0.4, borderaxespad=0, fontsize=6)
 
+
+stem = (os.path.join(ROOT, "paper", "neuroai", "fig_task_col") if COLUMN else
+        os.path.join(ROOT, "paper", "neuroai", "fig_task") if PAPER else os.path.join(ROOT, "figures", "fig_setup"))
 for ext in ("png", "pdf"):
-    fig.savefig(os.path.join(ROOT, "figures", f"fig_setup.{ext}"), bbox_inches="tight", facecolor="white")
-print("wrote figures/fig_setup.png and figures/fig_setup.pdf")
+    fig.savefig(f"{stem}.{ext}", bbox_inches="tight", facecolor="white")
+print("wrote", stem + ".pdf")
