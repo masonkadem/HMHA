@@ -152,6 +152,7 @@ class HemoAttn(CrossAttn):
         self.register_buffer("head_ablate", torch.zeros(H))
         self._pick = torch.Generator().manual_seed(cfg.seed + 11)
         self.head_dropout, self.probe_masks = cfg.head_dropout, cfg.probe_masks
+        self.damage_blind = getattr(cfg, "damage_blind", 0)
         self._damage = torch.Generator().manual_seed(cfg.seed + 13)
         self.trial_head, self.trial_taper = None, cfg.trial_taper
         # BASELINE l0: learned hard-concrete gates (Louizos et al. 2018) as used for head
@@ -513,7 +514,7 @@ class HemoAttn(CrossAttn):
 
         open_ = self.open_mask
         blk = torch.arange(H * dk, device=Z.device).view(H, dk)
-        if self.head_dropout > 0:
+        if self.head_dropout > 0 and not self.damage_blind:
             self._probe_under_damage(A, Bm, blk, d_out)
             return
         S = blk[open_].reshape(-1)

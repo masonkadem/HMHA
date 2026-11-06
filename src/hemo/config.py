@@ -162,6 +162,8 @@ class Cfg:
     head_dropout: float = 0.0           # hemo only. Each training step every head fails
                                         # independently with this probability (inverted
                                         # scaling, as dropout). Evaluation is undamaged.
+    damage_blind: int = 0               # local only. CONTROL: train under head_dropout but value
+                                        # heads as if nothing failed, so no backups are kept.
     probe_masks: int = 32               # local only, used when head_dropout > 0. The
                                         # collateral value is averaged over this many random
                                         # failure patterns, so a backup is worth what it
