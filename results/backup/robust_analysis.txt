@@ -1,0 +1,12 @@
+aware 10 runs, kept [5, 5, 6, 6, 6, 6, 6, 6, 6, 7]
+  p=0.1: fixed 0.135 (sd 0.027)  refit 0.009 (sd 0.006)
+  p=0.2: fixed 0.217 (sd 0.028)  refit 0.042 (sd 0.018)
+  p=0.3: fixed 0.307 (sd 0.032)  refit 0.103 (sd 0.033)
+blind 10 runs, kept [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+  p=0.1: fixed 0.136 (sd 0.009)  refit 0.099 (sd 0.009)
+  p=0.2: fixed 0.230 (sd 0.007)  refit 0.196 (sd 0.008)
+  p=0.3: fixed 0.328 (sd 0.013)  refit 0.298 (sd 0.013)
+lean 10 runs, kept [4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+  p=0.1: fixed 0.212 (sd 0.024)  refit 0.099 (sd 0.009)
+  p=0.2: fixed 0.391 (sd 0.031)  refit 0.196 (sd 0.008)
+  p=0.3: fixed 0.554 (sd 0.025)  refit 0.298 (sd 0.013)
