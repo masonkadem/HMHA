@@ -1,0 +1,18 @@
+k*=2 up=0.03 p=0.05: pred 3  got [2.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]  exact 6/7  mean miss 0.14
+k*=2 up=0.03 p=0.1: pred 3  got [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]  exact 7/7  mean miss 0.00
+k*=2 up=0.03 p=0.2: pred 4  got [4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0]  exact 7/7  mean miss 0.00
+k*=2 up=0.03 p=0.3: pred 4  got [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]  exact 0/7  mean miss 1.00
+k*=4 up=0.01 p=0.05: pred 5  got [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]  exact 10/10  mean miss 0.00
+k*=4 up=0.01 p=0.1: pred 6  got [6.0, 6.0, 6.0, 6.0, 6.0, 6.0, 6.0]  exact 7/7  mean miss 0.00
+k*=4 up=0.01 p=0.2: pred 7  got [8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0]  exact 0/7  mean miss 1.00
+k*=4 up=0.03 p=0.05: pred 5  got [5.0, 5.0, 4.0, 4.0, 4.0, 5.0, 4.0]  exact 3/7  mean miss 0.57
+k*=4 up=0.03 p=0.1: pred 5  got [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]  exact 7/7  mean miss 0.00
+k*=4 up=0.03 p=0.2: pred 6  got [6.0, 6.0, 6.0, 6.0, 6.0, 6.0, 6.0]  exact 7/7  mean miss 0.00
+k*=4 up=0.03 p=0.3: pred 7  got [6.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0]  exact 6/7  mean miss 0.14
+k*=8 up=0.01 p=0.1: pred 10  got [10.0, 11.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0]  exact 9/10  mean miss 0.10
+k*=8 up=0.01 p=0.2: pred 12  got [12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0, 12.0]  exact 10/10  mean miss 0.00
+TOTAL exact 79/100 = 79%; within 1: 100/100; misses dist Counter({0.0: 79, 1.0: 15, -1.0: 6})
+
+Against predictions.md: 79/100 exact (bar was 80%), every run within one head (bar met).
+Two cells are off by +1 in every run: k*=2 p=0.3 (flagged borderline in advance, ratio 0.98)
+and k*=4 upkeep 0.01 p=0.2 (ratio 0.67, not expected). k*=4 upkeep 0.03 p=0.05 kept 4 in 4/7 runs.
