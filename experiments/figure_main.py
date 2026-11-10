@@ -5,7 +5,8 @@
   score, use, exact count, never broke  (d) duplicated heads  (e) spare heads under failure  (f) one run per method.
   The task and model are in figure_setup.py; the full comparison table in figure_compare.py.
 
-  python experiments/figure_main.py   ->  figures/fig_main.png and figures/fig_main.pdf
+  python experiments/figure_main.py         ->  figures/fig_main.png and figures/fig_main.pdf
+  python experiments/figure_main.py --abc   ->  figures/fig_main_abc.png and .pdf (panels a, b, c only)
 """
 import glob, os, pickle, sys
 from math import comb
@@ -74,9 +75,14 @@ def compute(r):
 RULE = dict(supply="local", price_frac=0.03, taper=100, budget_hold_frac=0.1, conserve=0)
 SIZES = (2, 3, 4, 6, 8)
 BAR = 0.02
-fig = plt.figure(figsize=(7.2, 8.9))
-outer = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.5, 1.1], hspace=0.2)
-bottom = outer[2].subgridspec(1, 3, wspace=0.5)
+ABC = "--abc" in sys.argv            # only panels a, b and c  ->  figures/fig_main_abc.png and .pdf
+if ABC:
+    fig = plt.figure(figsize=(7.2, 6.6))
+    outer = fig.add_gridspec(2, 1, height_ratios=[1.5, 1.5], hspace=0.2)
+else:
+    fig = plt.figure(figsize=(7.2, 8.9))
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.5, 1.5, 1.1], hspace=0.2)
+    bottom = outer[2].subgridspec(1, 3, wspace=0.5)
 
 # ---------------------------------------------------------------- a, b  training, small multiples
 show = (2, 4, 6, 8)
@@ -192,75 +198,77 @@ ax.text(0, y - 0.35, "Tasks needing 2, 4 and 8 heads, 10 seeds each.   \u25cf ye
 ax.set(xlim=(0, 1), ylim=(y + 0.1, -1.05))
 print("panel c:", [(m, r) for _, m, _, _, _, _, r in rows], "learned-gate penalty", best_lam)
 
-# ---------------------------------------------------------------- d  duplicated heads
-# every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its copy,
-# so it should be removed. One circle per run: heads kept; below, how many pairs kept both twins.
-ax = fig.add_subplot(bottom[0])
-rng = np.random.default_rng(1)
-for i, (value, color) in enumerate((("refit", RED), ("ablate", K))):
-    L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
-    n_kept = np.array([o.sum() for o in L])
-    twins = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16)) for o in L])
-    fill = (0.698, 0.094, 0.169, 0.25) if color == RED else (1, 1, 1, 0.6)
-    ax.plot(i + rng.uniform(-0.17, 0.17, len(n_kept)), n_kept, "o", ms=5, mfc=fill, mec=K, mew=0.9, ls="none", zorder=3)
-    lo, hi = twins.min(), twins.max()
-    ax.text(i, 0.9, f"twin pairs\nkept: {lo}" if lo == hi else f"twin pairs\nkept: {lo}\u2013{hi}", ha="center",
-            va="bottom", fontsize=6, color=color, linespacing=1.15)
-ax.axhline(4, color=G2, lw=0.7, ls="--", zorder=0)
-ax.text(1.55, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="right")
-ax.set(xticks=[0, 1], ylim=(0, 17), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
-ax.set_xticklabels(["hemodynamic\nattenuation", "OBD-style"])
-ax.set_title("Every head given a twin", pad=4)
-AX_D = ax
+if not ABC:
+    # ---------------------------------------------------------------- d  duplicated heads
+    # every run starts with head h + 16 an exact twin of head h; a twin is fully covered by its copy,
+    # so it should be removed. One circle per run: heads kept; below, how many pairs kept both twins.
+    ax = fig.add_subplot(bottom[0])
+    rng = np.random.default_rng(1)
+    for i, (value, color) in enumerate((("refit", RED), ("ablate", K))):
+        L = [x["hist"]["ledger"][-1] > 0 for x in runs(**RULE, n_rel=4, plant_copies=1, local_value=value)]
+        n_kept = np.array([o.sum() for o in L])
+        twins = np.array([sum(bool(o[h] and o[h + 16]) for h in range(16)) for o in L])
+        fill = (0.698, 0.094, 0.169, 0.25) if color == RED else (1, 1, 1, 0.6)
+        ax.plot(i + rng.uniform(-0.17, 0.17, len(n_kept)), n_kept, "o", ms=5, mfc=fill, mec=K, mew=0.9, ls="none", zorder=3)
+        lo, hi = twins.min(), twins.max()
+        ax.text(i, 0.9, f"twin pairs\nkept: {lo}" if lo == hi else f"twin pairs\nkept: {lo}\u2013{hi}", ha="center",
+                va="bottom", fontsize=6, color=color, linespacing=1.15)
+    ax.axhline(4, color=G2, lw=0.7, ls="--", zorder=0)
+    ax.text(1.55, 4.3, "needed", color=G1, fontsize=6, va="bottom", ha="right")
+    ax.set(xticks=[0, 1], ylim=(0, 17), yticks=[0, 4, 8, 12, 16], xlim=(-0.6, 1.6), ylabel="heads kept")
+    ax.set_xticklabels(["hemodynamic\nattenuation", "OBD-style"])
+    ax.set_title("Every head given a twin", pad=4)
+    AX_D = ax
 
-# ---------------------------------------------------------------- e  spare heads under failure
-ax = fig.add_subplot(bottom[1])
-
-
-def predict(R, p, price=0.03):
-    q = 1 - p
-    val = lambda B: q * sum(comb(B - 1, a) * q ** a * p ** (B - 1 - a) for a in range(min(R - 1, B - 1) + 1)) / R
-    return max(B for B in range(1, 33) if val(B) >= price)
+    # ---------------------------------------------------------------- e  spare heads under failure
+    ax = fig.add_subplot(bottom[1])
 
 
-ps = [0.0, 0.05, 0.1, 0.2, 0.3]
-R = 4                                              # one task, needing 4 heads; spares = heads kept - 4
-pred = [predict(R, p) - R for p in ps]
-ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="predicted before the runs")
-for i, p in enumerate(ps):
-    spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
-    jitter = rng.uniform(-0.009, 0.009, len(spares))
-    ax.plot(p + jitter, spares, "o", ms=5, mfc=(0.698, 0.094, 0.169, 0.25), mec=K, mew=0.9, ls="none",
-            label="measured (one circle per run)" if i == 0 else None)
-ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
-       xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
-ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)
-title(ax, "e", "Predicting backup heads ($k^*=4$)")
+    def predict(R, p, price=0.03):
+        q = 1 - p
+        val = lambda B: q * sum(comb(B - 1, a) * q ** a * p ** (B - 1 - a) for a in range(min(R - 1, B - 1) + 1)) / R
+        return max(B for B in range(1, 33) if val(B) >= price)
 
-# ---------------------------------------------------------------- f  what breaking looks like
-ax = fig.add_subplot(bottom[2])
-first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
-for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al. 2019"),
-                             (ONESHOT, G1, "-", "Kurtic et al. 2023"),
-                             (RANDOM, G2, "--", "random"),
-                             (RULE, RED, "-", "ours")):
-    x = first(kw)
-    ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
-ax.axhline(BAR, color=G2, lw=0.6, ls=":")
-ax.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
-ax.set(yscale="log", ylim=(1e-7, 2), yticks=[1, 1e-2, 1e-4, 1e-6], xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
-       xlabel="training step", ylabel="loss")
-ax.minorticks_off()
-ax.legend(loc="lower right", ncol=2, handlelength=1.4, columnspacing=0.8, borderaxespad=0.2, fontsize=5.8)
-title(ax, "f", "What breaking looks like ($k^*=4$)")
+
+    ps = [0.0, 0.05, 0.1, 0.2, 0.3]
+    R = 4                                              # one task, needing 4 heads; spares = heads kept - 4
+    pred = [predict(R, p) - R for p in ps]
+    ax.plot(ps, pred, color=G2, lw=0.9, ls="--", marker="_", ms=7, zorder=1, label="predicted before the runs")
+    for i, p in enumerate(ps):
+        spares = np.array([kept(x) for x in runs(**RULE, n_rel=R, head_dropout=p)][:10]) - R
+        jitter = rng.uniform(-0.009, 0.009, len(spares))
+        ax.plot(p + jitter, spares, "o", ms=5, mfc=(0.698, 0.094, 0.169, 0.25), mec=K, mew=0.9, ls="none",
+                label="measured (one circle per run)" if i == 0 else None)
+    ax.set(xlabel="chance a head fails", ylabel="spare heads kept", ylim=(-0.4, 3.8), xlim=(-0.03, 0.33),
+           xticks=[0, 0.1, 0.2, 0.3], xticklabels=["0", "0.1", "0.2", "0.3"], yticks=[0, 1, 2, 3])
+    ax.legend(loc="upper left", handlelength=2.4, handletextpad=0.3, borderaxespad=0, fontsize=6)
+    title(ax, "e", "Predicting backup heads ($k^*=4$)")
+
+    # ---------------------------------------------------------------- f  what breaking looks like
+    ax = fig.add_subplot(bottom[2])
+    first = lambda kw: next(x for x in runs(**kw, n_rel=4) if get(x, "seed") == 0)
+    for kw, color, ls, label in ((dict(supply="prune"), K, "-", "Michel et al. 2019"),
+                                 (ONESHOT, G1, "-", "Kurtic et al. 2023"),
+                                 (RANDOM, G2, "--", "random"),
+                                 (RULE, RED, "-", "ours")):
+        x = first(kw)
+        ax.plot(x["hist"]["val_step"], x["hist"]["val_loss"], color=color, ls=ls, lw=0.9, label=label)
+    ax.axhline(BAR, color=G2, lw=0.6, ls=":")
+    ax.text(3950, BAR * 1.3, "solved", fontsize=5.5, color=G1, ha="right", va="bottom")
+    ax.set(yscale="log", ylim=(1e-7, 2), yticks=[1, 1e-2, 1e-4, 1e-6], xlim=(0, 4000), xticks=[0, 2000, 4000], xticklabels=["0", "2k", "4k"],
+           xlabel="training step", ylabel="loss")
+    ax.minorticks_off()
+    ax.legend(loc="lower right", ncol=2, handlelength=1.4, columnspacing=0.8, borderaxespad=0.2, fontsize=5.8)
+    title(ax, "f", "What breaking looks like ($k^*=4$)")
 
 X_LETTER = AX_A.get_position().x0 - 0.085           # one column for the left-hand panel letters
-for letter, axis in (("a", AX_A), ("b", AX_B), ("d", AX_D)):
+for letter, axis in (("a", AX_A), ("b", AX_B)) + (() if ABC else (("d", AX_D),)):
     tr = offset_copy(blended_transform_factory(fig.transFigure, axis.transAxes), fig=fig, y=4, units="points")
     fig.text(X_LETTER, 1.0, letter, transform=tr, fontsize=7, fontweight="bold", va="baseline")
 fig.text(X_LETTER, C_TITLE_Y, "c", transform=blended_transform_factory(fig.transFigure, AX_C.transData),
          fontsize=7, fontweight="bold", va="center")
 
+name = "fig_main_abc" if ABC else "fig_main"
 for ext in ("png", "pdf"):
-    fig.savefig(os.path.join(ROOT, "figures", f"fig_main.{ext}"), bbox_inches="tight", facecolor="white")
-print("wrote figures/fig_main.png and figures/fig_main.pdf")
+    fig.savefig(os.path.join(ROOT, "figures", f"{name}.{ext}"), bbox_inches="tight", facecolor="white")
+print(f"wrote figures/{name}.png and figures/{name}.pdf")
