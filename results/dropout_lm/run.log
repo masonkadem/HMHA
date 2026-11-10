@@ -1,0 +1,8 @@
+dropout 0 seed 0: val loss 1.629, heads kept 7 + 7 = 14, loss with kept heads 1.700, 28s
+dropout 0 seed 1: val loss 1.633, heads kept 6 + 7 = 13, loss with kept heads 1.715, 30s
+dropout 0.1 seed 0: val loss 1.644, heads kept 7 + 5 = 12, loss with kept heads 1.724, 29s
+dropout 0.1 seed 1: val loss 1.653, heads kept 7 + 5 = 12, loss with kept heads 1.716, 27s
+dropout 0.2 seed 0: val loss 1.686, heads kept 7 + 3 = 10, loss with kept heads 1.760, 28s
+dropout 0.2 seed 1: val loss 1.692, heads kept 7 + 3 = 10, loss with kept heads 1.766, 30s
+dropout 0.3 seed 0: val loss 1.741, heads kept 6 + 3 = 9, loss with kept heads 1.807, 30s
+dropout 0.3 seed 1: val loss 1.739, heads kept 7 + 2 = 9, loss with kept heads 1.804, 30s

@@ -1,0 +1,4 @@
+Attention layers only, CPU, one thread, median step (forward + backward + AdamW)
+retrieval   heads  32 ->   4   step     68.1 ms ->    10.9 ms ( 6.2x faster)   attention parameters   524,288 ->   65,536 (12%)
+induction   heads  16 ->   3   step     79.3 ms ->    18.8 ms ( 4.2x faster)   attention parameters    65,536 ->   12,288 (19%)
+GPT-2-like  heads 144 ->  17   step   1489.1 ms ->   226.0 ms ( 6.6x faster)   attention parameters 28,311,552 -> 3,342,336 (12%)

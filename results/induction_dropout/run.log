@@ -1,0 +1,21 @@
+p=0 seed=1: kept 2 + 1, final loss 0.002 (bar 0.083), acc 1.000, 229s
+p=0 seed=0: kept 2 + 1, final loss 0.004 (bar 0.083), acc 0.999, 232s
+p=0.1 seed=0: kept 2 + 2, final loss 0.002 (bar 0.083), acc 1.000, 318s
+p=0.1 seed=1: kept 2 + 2, final loss 0.005 (bar 0.083), acc 0.999, 321s
+p=0.3 seed=0: kept 3 + 3, final loss 0.000 (bar 0.083), acc 1.000, 327s
+p=0.2 seed=0: kept 2 + 3, final loss 0.001 (bar 0.083), acc 1.000, 331s
+p=0 seed=2: kept 2 + 1, final loss 0.007 (bar 0.083), acc 0.999, 229s
+p=0.2 seed=1: kept 3 + 3, final loss 0.009 (bar 0.083), acc 0.999, 321s
+p=0.3 seed=1: kept 4 + 2, final loss 0.000 (bar 0.083), acc 1.000, 331s
+p=0.1 seed=2: kept 2 + 2, final loss 0.000 (bar 0.083), acc 1.000, 317s
+p=0.2 seed=2: kept 3 + 2, final loss 0.001 (bar 0.083), acc 1.000, 328s
+p=0.3 seed=2: kept 3 + 4, final loss 0.013 (bar 0.083), acc 0.999, 333s
+p=0 seed=3: kept 2 + 1, final loss 0.002 (bar 0.083), acc 0.999, 230s
+p=0.1 seed=3: kept 3 + 2, final loss 0.027 (bar 0.083), acc 0.998, 319s
+p=0 seed=4: kept 2 + 1, final loss 0.004 (bar 0.083), acc 0.999, 228s
+p=0.2 seed=3: kept 4 + 3, final loss 0.003 (bar 0.083), acc 0.999, 324s
+p=0.3 seed=3: kept 3 + 3, final loss 0.000 (bar 0.083), acc 1.000, 301s
+p=0.1 seed=4: kept 2 + 2, final loss 0.014 (bar 0.083), acc 0.999, 283s
+p=0.2 seed=4: kept 2 + 2, final loss 0.011 (bar 0.083), acc 0.998, 214s
+p=0.3 seed=4: kept 4 + 3, final loss 0.000 (bar 0.083), acc 1.000, 150s
+all done

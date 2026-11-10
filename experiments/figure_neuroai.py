@@ -78,11 +78,18 @@ def score(kw):
     return sum(kept(x) == get(x, "n_rel") for x in rs), sum(stayed_solved(x) for x in rs), len(rs)
 
 
-fig = plt.figure(figsize=(7.0, 1.95))
-gs = fig.add_gridspec(1, 4, width_ratios=[1, 1.1, 1, 1.1], wspace=0.85)
+SIMPLE = "--simple" in sys.argv          # column width: heads closing and upkeep collapse only
+if SIMPLE:
+    fig = plt.figure(figsize=(3.35, 1.55))
+    gs = fig.add_gridspec(1, 2, wspace=0.55)
+    SA, SB, SC, SD = gs[0], None, gs[1], None
+else:
+    fig = plt.figure(figsize=(7.0, 1.95))
+    gs = fig.add_gridspec(1, 4, width_ratios=[1, 1.1, 1, 1.1], wspace=0.85)
+    SA, SB, SC, SD = gs[0], gs[1], gs[2], gs[3]
 
 # ---------------------------------------------------------------- a  heads closing
-ax = fig.add_subplot(gs[0])
+ax = fig.add_subplot(SA)
 for k, shade in zip(EQUAL, (PINK, "#d6604d", RED)):
     r = sorted(runs(**RULE, n_rel=k), key=lambda r: get(r, "seed"))[0]
     on = (r["hist"]["ledger"] > 0).sum(1)
@@ -95,39 +102,40 @@ ax.minorticks_off()
 ax.legend(loc="upper right", handlelength=1.0, borderaxespad=0)
 ax.set_title(r"$\mathbf{a}$   Heads closing", pad=4)
 
-# ---------------------------------------------------------------- b  methods
-gates = {lam: score(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam)) for lam in (0.05, 0.2, 1.0)}
-best = max(gates, key=lambda lam: gates[lam][0] + gates[lam][1])
-rows = [("Ours", score(RULE)),
-        ("ZipLM-style", score({**RULE, "oneshot": 1, "budget_hold_frac": 0.3})),
-        ("Michel et al.", score(dict(supply="prune"))),
-        ("Voita et al.", gates[best]),
-        ("no fade", score({**RULE, "taper": 0})),
-        ("no re-fit", score({**RULE, "local_value": "ablate"})),
-        ("random head", score({**RULE, "local_value": "random"}))]
-print("panel b:", rows)
-ax = fig.add_subplot(gs[1])
-y = np.arange(len(rows))
-for i, (name, (ex, ok, n)) in enumerate(rows):
-    ours = i == 0
-    ax.barh(i - 0.19, ex / n, height=0.36, color=RED if ours else K, lw=0)
-    ax.barh(i + 0.19, ok / n, height=0.36, color=PINK if ours else G2, lw=0)
-    ax.text(1.03, i - 0.19, f"{ex}", va="center", fontsize=5.3, color=RED if ours else K)
-    ax.text(1.03, i + 0.19, f"{ok}", va="center", fontsize=5.3, color=RED if ours else G1)
-ax.axhline(3.5, color=G3, lw=0.5)
-ax.set(yticks=y, xlim=(0, 1), xticks=[0, 0.5, 1], xticklabels=["0", "15", "30"], ylim=(len(rows) - 0.4, -0.6))
-ax.set_yticklabels([r[0] for r in rows])
-ax.get_yticklabels()[0].set_color(RED)
-ax.tick_params(axis="y", length=0)
-from matplotlib.patches import Patch
-ax.legend(handles=[Patch(color=K, label="exact count"), Patch(color=G2, label="never broke")],
-          loc="lower left", bbox_to_anchor=(0.12, 1.0), ncol=2, handlelength=0.8, columnspacing=0.8,
-          borderaxespad=0.1)
-ax.set_title(r"$\mathbf{b}$", pad=4, x=-0.5)
-ax.set_xlabel("runs (of 30)")
+if not SIMPLE:
+    # ---------------------------------------------------------------- b  methods
+    gates = {lam: score(dict(supply="l0", budget_hold_frac=0.1, l0_lambda=lam)) for lam in (0.05, 0.2, 1.0)}
+    best = max(gates, key=lambda lam: gates[lam][0] + gates[lam][1])
+    rows = [("Ours", score(RULE)),
+            ("ZipLM-style", score({**RULE, "oneshot": 1, "budget_hold_frac": 0.3})),
+            ("Michel et al.", score(dict(supply="prune"))),
+            ("Voita et al.", gates[best]),
+            ("no fade", score({**RULE, "taper": 0})),
+            ("no re-fit", score({**RULE, "local_value": "ablate"})),
+            ("random head", score({**RULE, "local_value": "random"}))]
+    print("panel b:", rows)
+    ax = fig.add_subplot(gs[1])
+    y = np.arange(len(rows))
+    for i, (name, (ex, ok, n)) in enumerate(rows):
+        ours = i == 0
+        ax.barh(i - 0.19, ex / n, height=0.36, color=RED if ours else K, lw=0)
+        ax.barh(i + 0.19, ok / n, height=0.36, color=PINK if ours else G2, lw=0)
+        ax.text(1.03, i - 0.19, f"{ex}", va="center", fontsize=5.3, color=RED if ours else K)
+        ax.text(1.03, i + 0.19, f"{ok}", va="center", fontsize=5.3, color=RED if ours else G1)
+    ax.axhline(3.5, color=G3, lw=0.5)
+    ax.set(yticks=y, xlim=(0, 1), xticks=[0, 0.5, 1], xticklabels=["0", "15", "30"], ylim=(len(rows) - 0.4, -0.6))
+    ax.set_yticklabels([r[0] for r in rows])
+    ax.get_yticklabels()[0].set_color(RED)
+    ax.tick_params(axis="y", length=0)
+    from matplotlib.patches import Patch
+    ax.legend(handles=[Patch(color=K, label="exact count"), Patch(color=G2, label="never broke")],
+              loc="lower left", bbox_to_anchor=(0.12, 1.0), ncol=2, handlelength=0.8, columnspacing=0.8,
+              borderaxespad=0.1)
+    ax.set_title(r"$\mathbf{b}$", pad=4, x=-0.5)
+    ax.set_xlabel("runs (of 30)")
 
 # ---------------------------------------------------------------- c  upkeep breakpoint
-ax = fig.add_subplot(gs[2])
+ax = fig.add_subplot(SC)
 for k, shade, mk in zip(EQUAL, (PINK, "#d6604d", RED), ("o", "s", "D")):
     pts = {}
     same = {a: v for a, v in {**PINNED, **RULE, "n_rel": k}.items() if a != "price_frac"}
@@ -142,32 +150,33 @@ ax.set(xscale="log", yscale="log", ylim=(0.8, 12), yticks=[1, 2, 4, 8], yticklab
        xlabel="upkeep / value of\none needed head", ylabel="heads kept")
 ax.minorticks_off()
 ax.text(0.85, 1.25, "predicted\ncollapse", fontsize=5.5, color=G1, va="center", ha="right")
-ax.set_title(r"$\mathbf{c}$   Upkeep", pad=4)
+ax.set_title(r"$\mathbf{b}$   Upkeep" if SIMPLE else r"$\mathbf{c}$   Upkeep", pad=4)
 
-# ---------------------------------------------------------------- d  changing demand
-ax = fig.add_subplot(gs[3])
-total = None
-for r in sorted(SWITCH, key=lambda r: (get(r, "sprout"), get(r, "seed"))):
-    on = (r["hist"]["ledger"] > 0).sum(1)
-    total = len(on)
-    sp = get(r, "sprout") > 0
-    ax.plot(np.arange(len(on)), on, color=RED if sp else K, lw=0.8 if sp else 0.7, alpha=0.8,
-            drawstyle="steps-post")
-if total:
-    ph = [int(c) for c in get(SWITCH[0], "phases")]
-    edges = np.linspace(0, total, len(ph) + 1)
-    for a, b, need in zip(edges[:-1], edges[1:], ph):
-        ax.plot([a, b], [need, need], color=G2, lw=0.6, ls=":")
-    ax.set(xlim=(0, total), xticks=edges, xticklabels=[f"{e / 1000:g}k" for e in edges])
-ax.plot([], [], color=K, label="reopen only")
-ax.plot([], [], color=RED, label="with sprouting")
-ax.set(yscale="log", ylim=(1.5, 45), yticks=[2, 4, 8, 16, 32], yticklabels=["2", "4", "8", "16", "32"],
-       xlabel="training step", ylabel="open heads")
-ax.minorticks_off()
-ax.legend(loc="upper right", handlelength=1.0, borderaxespad=0)
-ax.set_title(r"$\mathbf{d}$   Demand 2$\to$4$\to$2", pad=4)
+if not SIMPLE:
+    # ---------------------------------------------------------------- d  changing demand
+    ax = fig.add_subplot(gs[3])
+    total = None
+    for r in sorted(SWITCH, key=lambda r: (get(r, "sprout"), get(r, "seed"))):
+        on = (r["hist"]["ledger"] > 0).sum(1)
+        total = len(on)
+        sp = get(r, "sprout") > 0
+        ax.plot(np.arange(len(on)), on, color=RED if sp else K, lw=0.8 if sp else 0.7, alpha=0.8,
+                drawstyle="steps-post")
+    if total:
+        ph = [int(c) for c in get(SWITCH[0], "phases")]
+        edges = np.linspace(0, total, len(ph) + 1)
+        for a, b, need in zip(edges[:-1], edges[1:], ph):
+            ax.plot([a, b], [need, need], color=G2, lw=0.6, ls=":")
+        ax.set(xlim=(0, total), xticks=edges, xticklabels=[f"{e / 1000:g}k" for e in edges])
+    ax.plot([], [], color=K, label="reopen only")
+    ax.plot([], [], color=RED, label="with sprouting")
+    ax.set(yscale="log", ylim=(1.5, 45), yticks=[2, 4, 8, 16, 32], yticklabels=["2", "4", "8", "16", "32"],
+           xlabel="training step", ylabel="open heads")
+    ax.minorticks_off()
+    ax.legend(loc="upper right", handlelength=1.0, borderaxespad=0)
+    ax.set_title(r"$\mathbf{d}$   Demand 2$\to$4$\to$2", pad=4)
 
 out = os.path.join(ROOT, "paper", "neuroai")
 for ext in ("pdf", "png"):
-    fig.savefig(os.path.join(out, f"fig_neuroai.{ext}"), bbox_inches="tight", facecolor="white")
+    fig.savefig(os.path.join(out, f"fig_neuroai{'_col' if SIMPLE else ''}.{ext}"), bbox_inches="tight", facecolor="white")
 print("wrote", os.path.join(out, "fig_neuroai.pdf"))

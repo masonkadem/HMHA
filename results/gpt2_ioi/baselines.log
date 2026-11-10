@@ -1,0 +1,15 @@
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+upkeep 0.05, n=11:
+  ours     loss 2.027  logit diff 30%  acc 69.0%  in circuit 11/11
+  one-shot loss 3.232  logit diff -60%  acc 9.3%  in circuit 10/11
+  random   loss 5.406 (best 4.007)  logit diff -3%  acc 46.7% (best 81.3%)
+upkeep 0.02, n=17:
+  ours     loss 0.955  logit diff 88%  acc 89.0%  in circuit 15/17
+  one-shot loss 2.996  logit diff -65%  acc 8.7%  in circuit 13/17
+  random   loss 5.316 (best 4.122)  logit diff -3%  acc 45.8% (best 82.7%)
+upkeep 0.01, n=22:
+  ours     loss 0.586  logit diff 117%  acc 97.0%  in circuit 18/22
+  one-shot loss 1.439  logit diff 13%  acc 56.7%  in circuit 17/22
+  random   loss 5.162 (best 4.050)  logit diff -4%  acc 44.9% (best 84.7%)
+done in 63 s

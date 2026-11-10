@@ -82,6 +82,9 @@ class ICfg:
     prune_patience: int = 4
     val_size: int = 512
     val_every: int = 50
+    head_dropout: float = 0.0       # each head fails with this probability at every training step;
+                                    # the probe then averages head values over fail_masks patterns
+    fail_masks: int = 8
     seed: int = 0
     device: str = "auto"
 
@@ -319,13 +322,16 @@ def train(cfg, verbose=False):
         gate = tone.clone() if cfg.rule != "dense" else torch.ones(H, device=dev)
         if cfg.rule == "prune":
             gate = open_mask.float().clone().requires_grad_(True)
-        loss = lm_loss(model(tok, gate), tok, second, cfg)
+        run_gate = gate
+        if cfg.head_dropout > 0:                                       # heads fail at random this step
+            run_gate = gate * (torch.rand(H, device=dev) >= cfg.head_dropout).float()
+        loss = lm_loss(model(tok, run_gate), tok, second, cfg)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         if cfg.rule == "prune":
             michel.mul_(0.9).add_(0.1 * gate.grad.abs())
         opt.step()
-        hist["ledger"].append(gate.detach().cpu().numpy().copy())
+        hist["ledger"].append(gate.detach().cpu().numpy().copy())     # open heads, not this step's failures
         smooth = loss.item() if smooth is None else 0.92 * smooth + 0.08 * loss.item()
 
         if trial is not None and smooth > cfg.trial_undo * bar:      # undo early, every step
@@ -339,6 +345,17 @@ def train(cfg, verbose=False):
             ptok, psec = make_batch(cfg.probe_batch, cfg, device=dev)
             if cfg.probe == "logit_tone":
                 value, abl, e_triv, e_now = probe_values_logit(model, ptok, psec, cfg, open_mask, tone=tone)
+            elif cfg.head_dropout > 0:
+                # value of each head averaged over random failure patterns (a failed head is worth 0)
+                probe = probe_values_logit if cfg.probe == "logit" else probe_values
+                vs, abls, es = [], [], []
+                for _ in range(cfg.fail_masks):
+                    alive = open_mask & (torch.rand(H, device=dev) >= cfg.head_dropout)
+                    if not alive.any():
+                        alive = open_mask.clone()
+                    v_k, a_k, e_triv, e_k = probe(model, ptok, psec, cfg, alive)
+                    vs.append(v_k); abls.append(a_k); es.append(e_k)
+                value, abl, e_now = np.mean(vs, 0), np.mean(abls, 0), float(np.mean(es))
             else:
                 probe = probe_values_logit if cfg.probe == "logit" else probe_values
                 value, abl, e_triv, e_now = probe(model, ptok, psec, cfg, open_mask)

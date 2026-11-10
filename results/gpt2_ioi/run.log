@@ -1,0 +1,39 @@
+all open: loss 0.934, logit diff 2.96, IO>S 99.0%
+all closed: loss 5.834, logit diff -0.05, IO>S 42.7%
+Wang et al. circuit (26 heads), held out: loss 1.957, logit diff 2.63, IO>S 97.3%
+
+price 0.02 x gap: kept 17 heads after 127 decisions (0 reopenings), 1659 s
+  held out: loss 0.955, logit diff 2.59 (88% of full), IO>S 89.0%
+  in Wang's circuit: 15/17 kept; by role:
+    name mover           3/3  ['9.9', '9.6', '10.0']
+    backup name mover    4/8  ['10.10', '10.6', '10.2', '11.2']
+    negative name mover  0/2  []
+    S-inhibition         3/4  ['7.9', '8.6', '8.10']
+    induction            2/4  ['5.5', '5.8']
+    duplicate token      2/3  ['0.1', '3.0']
+    previous token       1/2  ['4.11']
+  kept outside Wang's circuit: ['11.1', '11.6']
+
+price 0.01 x gap: kept 22 heads after 122 decisions (0 reopenings), 5281 s
+  held out: loss 0.586, logit diff 3.48 (117% of full), IO>S 97.0%
+  in Wang's circuit: 18/22 kept; by role:
+    name mover           3/3  ['9.9', '9.6', '10.0']
+    backup name mover    4/8  ['10.10', '10.6', '10.2', '11.2']
+    negative name mover  0/2  []
+    S-inhibition         3/4  ['7.9', '8.6', '8.10']
+    induction            4/4  ['5.5', '5.8', '5.9', '6.9']
+    duplicate token      2/3  ['0.1', '3.0']
+    previous token       2/2  ['2.2', '4.11']
+  kept outside Wang's circuit: ['8.3', '11.1', '11.3', '11.6']
+
+price 0.05 x gap: kept 11 heads after 133 decisions (0 reopenings), 5738 s
+  held out: loss 2.027, logit diff 0.85 (30% of full), IO>S 69.0%
+  in Wang's circuit: 11/11 kept; by role:
+    name mover           3/3  ['9.9', '9.6', '10.0']
+    backup name mover    2/8  ['10.10', '11.2']
+    negative name mover  0/2  []
+    S-inhibition         2/4  ['7.9', '8.6']
+    induction            1/4  ['5.5']
+    duplicate token      2/3  ['0.1', '3.0']
+    previous token       1/2  ['4.11']
+  kept outside Wang's circuit: []

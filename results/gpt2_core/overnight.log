@@ -1,0 +1,51 @@
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+
+[greater] all open: loss 0.045 acc 100.0%;  all closed: loss 1.609 acc 23.0%;  upkeep 0.0313
+[greater] kept 5 after 139 decisions, 289 s; held out: loss 0.110 (full 0.047), acc 99.0% (full 100.0%)
+[greater] kept: 0.1 6.9 7.10 8.11 9.1
+[greater] same 5 heads: one-shot acc 96.0%, random acc 29.3% (best 60.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (7, 10), (8, 11)]
+
+[ioi] all open: loss 0.934 acc 99.0%;  all closed: loss 5.834 acc 42.7%;  upkeep 0.0980
+[ioi] kept 17 after 127 decisions, 12489 s; held out: loss 0.955 (full 0.926), acc 89.0% (full 99.7%)
+[ioi] kept: 0.1 3.0 4.11 5.5 5.8 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.1 11.2 11.6
+[ioi] same 17 heads: one-shot acc 8.7%, random acc 49.3% (best 74.3%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (8, 10), (9, 6), (11, 6)]
+
+[repeat] all open: loss 1.838 acc 84.0%;  all closed: loss 11.947 acc 0.0%;  upkeep 0.2022
+[repeat] kept 23 after 121 decisions, 4437 s; held out: loss 2.852 (full 2.011), acc 73.1% (full 83.0%)
+[repeat] kept: 0.10 1.1 2.9 2.11 3.3 3.7 4.11 5.1 5.5 5.6 5.9 6.2 6.9 6.10 7.2 7.6 8.5 9.6 9.9 10.0 10.1 10.6 11.9
+[repeat] same 23 heads: one-shot acc 26.9%, random acc 0.0% (best 0.9%); kept heads a one-shot value would drop: [(0, 10), (1, 1), (2, 9), (2, 11), (3, 3), (3, 7), (5, 5), (5, 6), (5, 9), (6, 2), (6, 9), (6, 10), (7, 2), (8, 5), (9, 6), (9, 9), (10, 0), (10, 1), (10, 6), (11, 9)]
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+
+[greater] all open: loss 0.045 acc 100.0%;  all closed: loss 1.609 acc 23.0%;  upkeep 0.0782
+[greater] kept 3 after 141 decisions, 289 s; held out: loss 0.220 (full 0.047), acc 96.0% (full 100.0%)
+[greater] kept: 7.10 8.11 9.1
+[greater] same 3 heads: one-shot acc 96.0%, random acc 26.5% (best 39.0%); kept heads a one-shot value would drop: [(7, 10), (8, 11)]
+
+[ioi] all open: loss 0.934 acc 99.0%;  all closed: loss 5.834 acc 42.7%;  upkeep 0.2450
+[ioi] kept 11 after 133 decisions, 12875 s; held out: loss 2.027 (full 0.926), acc 69.0% (full 99.7%)
+[ioi] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 10.10 11.2
+[ioi] same 11 heads: one-shot acc 9.3%, random acc 48.1% (best 76.3%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (7, 9), (9, 6), (10, 10), (11, 2)]
+
+[repeat] all open: loss 1.838 acc 84.0%;  all closed: loss 11.947 acc 0.0%;  upkeep 0.5054
+[repeat] kept 11 after 133 decisions, 4732 s; held out: loss 6.936 (full 2.011), acc 18.0% (full 83.0%)
+[repeat] kept: 0.10 2.9 3.7 4.11 5.1 5.6 6.9 7.6 9.6 9.9 11.9
+[repeat] same 11 heads: one-shot acc 2.1%, random acc 0.0% (best 0.0%); kept heads a one-shot value would drop: [(0, 10), (2, 9), (3, 7), (4, 11), (5, 1), (5, 6), (6, 9), (7, 6), (9, 6), (9, 9), (11, 9)]
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+
+[greater] all open: loss 0.045 acc 100.0%;  all closed: loss 1.609 acc 23.0%;  upkeep 0.0156
+[greater] kept 6 after 138 decisions, 283 s; held out: loss 0.084 (full 0.047), acc 99.0% (full 100.0%)
+[greater] kept: 0.1 6.9 7.10 8.8 8.11 9.1
+[greater] same 6 heads: one-shot acc 98.0%, random acc 27.4% (best 60.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (8, 8)]
+
+[ioi] all open: loss 0.934 acc 99.0%;  all closed: loss 5.834 acc 42.7%;  upkeep 0.0490
+[ioi] kept 22 after 122 decisions, 12264 s; held out: loss 0.586 (full 0.926), acc 97.0% (full 99.7%)
+[ioi] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.3 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.1 11.2 11.3 11.6
+[ioi] same 22 heads: one-shot acc 56.7%, random acc 43.1% (best 80.0%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (8, 10), (9, 6)]
+
+[repeat] all open: loss 1.838 acc 84.0%;  all closed: loss 11.947 acc 0.0%;  upkeep 0.1011
+[repeat] kept 29 after 115 decisions, 4091 s; held out: loss 1.968 (full 2.011), acc 83.0% (full 83.0%)
+[repeat] kept: 0.10 1.1 2.5 2.9 2.11 3.0 3.3 3.7 4.11 5.1 5.5 5.6 5.9 6.2 6.7 6.9 6.10 7.0 7.2 7.6 8.1 8.5 9.6 9.9 10.0 10.1 10.6 11.6 11.9
+[repeat] same 29 heads: one-shot acc 56.4%, random acc 0.1% (best 3.8%); kept heads a one-shot value would drop: [(0, 10), (1, 1), (2, 5), (2, 9), (2, 11), (3, 0), (3, 3), (3, 7), (5, 5), (5, 6), (6, 2), (6, 7), (6, 10), (7, 0), (7, 2), (8, 1), (9, 6), (9, 9), (11, 6)]

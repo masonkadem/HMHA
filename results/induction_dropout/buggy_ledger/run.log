@@ -1,0 +1,9 @@
+p=0 seed=0: kept 2 + 1, final loss 0.004 (bar 0.083), acc 0.999, 160s
+p=0.1 seed=0: kept 2 + 2, final loss 0.002 (bar 0.083), acc 1.000, 212s
+p=0.3 seed=0: kept 1 + 2, final loss 0.000 (bar 0.083), acc 1.000, 221s
+p=0.2 seed=0: kept 2 + 3, final loss 0.001 (bar 0.083), acc 1.000, 223s
+p=0 seed=1: kept 2 + 1, final loss 0.002 (bar 0.083), acc 1.000, 156s
+p=0.1 seed=1: kept 2 + 2, final loss 0.005 (bar 0.083), acc 0.999, 187s
+p=0.2 seed=1: kept 1 + 3, final loss 0.009 (bar 0.083), acc 0.999, 187s
+p=0.3 seed=1: kept 2 + 1, final loss 0.000 (bar 0.083), acc 1.000, 188s
+all done
