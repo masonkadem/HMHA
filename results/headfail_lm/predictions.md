@@ -15,3 +15,11 @@ heads stay, valued two ways on the same model:
 
 Failure: aware count flat or falling with p, or aware no larger than blind.
 Contrast: with ordinary dropout the count fell as p rose (results/dropout_lm).
+
+## Rerun with a fixed upkeep (written 2026-11-10, after the first run, before this one)
+First run: inconclusive. The upkeep was a fraction of the closed-open gap, which shrinks with p (0.11 -> 0.06),
+and at p = 0 two of three seeds collapsed to 2 heads. Rerun: the same absolute upkeep, 0.03 nats, at every p;
+5 seeds; files hf_p*_s*_abs.pkl. Same predictions 1 and 2:
+1. Aware heads kept (mean over 5 seeds) rises with p: p=0 < 0.1 < 0.2 < 0.3.
+2. At every p > 0, aware keeps more heads than blind (mean over seeds, by at least one head).
+Failure: either does not hold. If it fails, the backup law is not shown for a language model trained on text.

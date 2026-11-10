@@ -55,6 +55,7 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     ap.add_argument("--steps", type=int, default=2500)
     ap.add_argument("--frac", type=float, default=0.05)
+    ap.add_argument("--abs_price", type=float, default=None, help="same upkeep (nats) at every p")
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -98,7 +99,7 @@ def main():
             res = dict(p=p, seed=seed, train_seconds=time.time() - t0)
             for mode, aware in (("aware", True), ("blind", False)):
                 full, empty = val_loss(model, ones, aware), val_loss(model, zeros, aware)
-                price = a.frac * (empty - full)
+                price = a.abs_price if a.abs_price is not None else a.frac * (empty - full)
                 gate, log = ones.clone(), []
                 for _ in range(300):                               # the rule, on the frozen model
                     L0 = val_loss(model, gate, aware)
@@ -122,7 +123,7 @@ def main():
                 print(f"p {p:g} seed {seed} [{mode}]: loss all open {full:.3f}, closed {empty:.3f}, "
                       f"kept {kept[0]} + {kept[1]} = {sum(kept)}, loss with kept {res[mode]['kept_loss']:.3f}", flush=True)
             res["seconds"] = time.time() - t0
-            pickle.dump(res, open(os.path.join(OUT, f"hf_p{p:g}_s{seed}.pkl"), "wb"))
+            pickle.dump(res, open(os.path.join(OUT, f"hf_p{p:g}_s{seed}{'_abs' if a.abs_price is not None else ''}.pkl"), "wb"))
 
 
 if __name__ == "__main__":
