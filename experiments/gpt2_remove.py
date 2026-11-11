@@ -25,7 +25,10 @@ K = 20
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
+    ap.add_argument("--target", choices=["loss", "margin"], default="loss",
+                    help="what removal maximises: loss on the correct name, or minus (correct - subject logit)")
     a = ap.parse_args()
+    tag = "" if a.target == "loss" else "margin_"
     os.makedirs(OUT, exist_ok=True)
     dev = torch.device("cuda")
     tok = Tokenizer.from_file(hf_hub_download("gpt2", "tokenizer.json"))
@@ -35,6 +38,15 @@ def main():
 
     for seed in a.seeds:
         fit, test, stats = TASKS["ioiwang"](tok, model, dev, seed)
+        if a.target == "margin":                              # "loss" below is then minus the logit margin
+            def stats(h, E, g):
+                d = []
+                for c in range(0, h.size(0), 1500):
+                    lg = h[c:c + 1500, 0] @ E.T
+                    io, s = g["io"][c:c + 1500], g["s"][c:c + 1500]
+                    d.append(lg.gather(1, io[:, None])[:, 0] - lg.gather(1, s[:, None])[:, 0])
+                d = torch.cat(d)
+                return -d, (d > 0).float()
 
         def evaluate(gates, data):
             """gates (G, L, H) -> mean loss and accuracy per gate setting."""
@@ -100,7 +112,7 @@ def main():
                   + ";  loss after 5/10: " + ", ".join(f"{res[key + '_test'][0][k - 1]:.2f}" for k in (5, 10)))
         print("  one-shot order: " + " ".join(name(i) for i in oneshot[:10]))
         print("  re-valued order: " + " ".join(name(i) for i in greedy[:10]), flush=True)
-        pickle.dump(res, open(os.path.join(OUT, f"remove_s{seed}.pkl"), "wb"))
+        pickle.dump(res, open(os.path.join(OUT, f"remove_{tag}s{seed}.pkl"), "wb"))
 
 
 if __name__ == "__main__":

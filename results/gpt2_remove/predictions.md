@@ -20,3 +20,36 @@ Failure: one-shot reaches 50% with as few heads as re-valuing in 3 or more seeds
 
 Limit, stated in advance: this tests re-routing through frozen weights only. It does not test whether
 fine-tuning brings the ability back, which is what "stays removed" needs in the end.
+
+## Result (2026-11-10, 5 seeds, 1500 held-out prompts each; run.log)
+Full model 99.1-99.8%. Neither method reached 50% within 20 heads in any seed.
+
+| heads removed | one-shot acc | re-valued acc | random acc | one-shot loss | re-valued loss |
+|---|---|---|---|---|---|
+| 3 | 87-89% | 93-94% | 99% | | |
+| 5 | 77-82% | 90-91% | 99% | 2.4-2.8 | 3.6 |
+| 10 | 81-83% | 82-84% | 97-98% | 4.7 | 6.2 |
+| 20 | 68-70% | 77-80% | 93-96% | | |
+
+Published sets: 3 name movers removed 98.1-99.3%; name movers + 8 backups (11 heads) 85-87%.
+
+1. Self-repair: **holds** (98.1-99.3% after removing the three name movers, 5/5 seeds).
+2. Fewer heads to 50%: **fails**. Neither reaches 50%; one-shot accuracy is lower than re-valued at 3, 5 and 20 heads.
+3. Higher loss at 5 and 10 heads: **holds** in 5/5 seeds (3.6 vs 2.4-2.8; 6.2 vs 4.7).
+4. Picks outside the one-shot top 10: **holds** (9.6, 10.10, 11.6, 10.1 in every seed).
+
+Reading: the target was wrong for the goal. Re-valuing was told to raise the loss on the correct name, and it
+did (prediction 3). It did so by removing the heads that write names to the output (name movers and their
+backups: 10.0, 9.9, 9.6, 10.10, 11.6, 10.1). That lowers both names together, so the correct name still wins
+the comparison. One-shot happened to include 5.5 and 7.9, which decide WHICH name is written, and so hurt
+accuracy more. The ability was not removed by either method.
+
+## Second test: target the comparison itself (written 2026-11-10, after the result above, before this run)
+Same script with --target margin: removal now maximises minus (correct-name logit - subject logit) on the fit
+prompts, for both one-shot ranking and re-valuing. Files remove_margin_s*.pkl. This test was designed after
+seeing the first result and should be reported as such.
+
+1. Re-valuing on the margin reaches 50% or below within 20 heads in every seed.
+2. It needs fewer heads than one-shot ranking on the margin in at least 4 of 5 seeds.
+3. Its first 5 removals include at least one S-inhibition head (7.3, 7.9, 8.6, 8.10) in every seed.
+Failure: re-valuing does not reach 50% within 20 heads, or one-shot needs as few heads in 3 or more seeds.
