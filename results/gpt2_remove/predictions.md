@@ -53,3 +53,22 @@ seeing the first result and should be reported as such.
 2. It needs fewer heads than one-shot ranking on the margin in at least 4 of 5 seeds.
 3. Its first 5 removals include at least one S-inhibition head (7.3, 7.9, 8.6, 8.10) in every seed.
 Failure: re-valuing does not reach 50% within 20 heads, or one-shot needs as few heads in 3 or more seeds.
+
+## Result of the margin-target rerun (2026-11-12, 5 seeds, run_margin.log)
+| heads removed | one-shot acc | re-valued acc | random acc |
+|---|---|---|---|
+| 3 | 78-80% | 72-73% | 99% |
+| 5 | 54-58% | 42-45% | 99% |
+| 10 | 40-43% | 2.5-4.3% | 97-98% |
+| 20 | 27-41% | 1.1-2.1% | 93-96% |
+Heads to reach 50%: re-valued 5, one-shot 6, in every seed. Random never.
+
+1. Re-valued reaches 50% or below within 20 heads in every seed: **holds** (5 heads).
+2. Fewer heads than one-shot in at least 4 of 5 seeds: **holds**, by one head in all 5 (5 vs 6).
+3. An S-inhibition head in the first 5 re-valued removals in every seed: **holds** (8.6, 8.10, 7.9, 7.3 are
+   the first four in every seed).
+Beyond the predictions: one-shot levels off near 40% (27-43%); re-valued goes on to 1-4%, so the model then
+picks the subject almost every time. Re-valued then removes 10.7 and 11.10 (negative name movers) as well.
+Reading: below chance means the behaviour is reversed, not removed; the target here rewards that. A target of
+"chance" would need the margin pushed to zero, not minimised. Frozen weights only; recovery under fine-tuning
+not tested. Re-valued orders are identical across seeds, one-shot orders nearly so.

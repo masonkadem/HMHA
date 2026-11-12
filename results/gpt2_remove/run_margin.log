@@ -1,0 +1,47 @@
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 0] full model: acc 99.3%
+  remove 3 name movers: acc 99.1%;  name movers + 8 backups (11): acc 86.9%
+  oneshot  heads to reach 50%: 6;  acc after 3/5/10/20 removed: 79.1%, 55.5%, 40.1%, 39.1%;  loss after 5/10: -0.25, 0.28
+  greedy   heads to reach 50%: 5;  acc after 3/5/10/20 removed: 72.9%, 42.1%, 2.5%, 1.1%;  loss after 5/10: 0.43, 3.38
+  random   heads to reach 50%: None;  acc after 3/5/10/20 removed: 99.1%, 98.9%, 97.0%, 92.8%;  loss after 5/10: -3.51, -3.16
+  one-shot order: 8.6 5.5 7.9 8.10 3.0 7.3 6.9 5.9 10.0 9.7
+  re-valued order: 8.6 8.10 7.9 7.3 10.7 11.10 5.5 3.0 0.10 0.1
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 1] full model: acc 99.3%
+  remove 3 name movers: acc 98.9%;  name movers + 8 backups (11): acc 86.1%
+  oneshot  heads to reach 50%: 6;  acc after 3/5/10/20 removed: 78.6%, 54.1%, 39.5%, 37.9%;  loss after 5/10: -0.24, 0.29
+  greedy   heads to reach 50%: 5;  acc after 3/5/10/20 removed: 72.7%, 42.9%, 4.3%, 2.1%;  loss after 5/10: 0.34, 3.27
+  random   heads to reach 50%: None;  acc after 3/5/10/20 removed: 98.9%, 98.8%, 98.1%, 95.9%;  loss after 5/10: -3.43, -3.42
+  one-shot order: 8.6 5.5 7.9 8.10 3.0 7.3 6.9 10.0 5.9 9.7
+  re-valued order: 8.6 8.10 7.9 7.3 10.7 11.10 5.5 3.0 0.10 0.1
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 2] full model: acc 99.7%
+  remove 3 name movers: acc 99.3%;  name movers + 8 backups (11): acc 86.1%
+  oneshot  heads to reach 50%: 6;  acc after 3/5/10/20 removed: 80.3%, 56.8%, 43.0%, 41.3%;  loss after 5/10: -0.32, 0.21
+  greedy   heads to reach 50%: 5;  acc after 3/5/10/20 removed: 72.5%, 42.6%, 3.9%, 1.7%;  loss after 5/10: 0.30, 3.24
+  random   heads to reach 50%: None;  acc after 3/5/10/20 removed: 99.2%, 98.9%, 97.9%, 94.5%;  loss after 5/10: -3.44, -3.09
+  one-shot order: 8.6 5.5 7.9 8.10 3.0 7.3 6.9 10.0 5.9 9.7
+  re-valued order: 8.6 8.10 7.9 7.3 10.7 11.10 5.5 3.0 0.10 0.1
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 3] full model: acc 99.1%
+  remove 3 name movers: acc 98.1%;  name movers + 8 backups (11): acc 84.7%
+  oneshot  heads to reach 50%: 6;  acc after 3/5/10/20 removed: 78.5%, 56.9%, 42.1%, 39.1%;  loss after 5/10: -0.27, 0.27
+  greedy   heads to reach 50%: 5;  acc after 3/5/10/20 removed: 71.5%, 45.4%, 3.1%, 1.9%;  loss after 5/10: 0.30, 3.20
+  random   heads to reach 50%: None;  acc after 3/5/10/20 removed: 99.0%, 98.8%, 98.1%, 93.9%;  loss after 5/10: -3.58, -3.47
+  one-shot order: 8.6 5.5 7.9 8.10 3.0 7.3 6.9 10.0 9.7 5.9
+  re-valued order: 8.6 8.10 7.9 7.3 10.7 11.10 5.5 3.0 0.10 0.1
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 4] full model: acc 99.8%
+  remove 3 name movers: acc 98.8%;  name movers + 8 backups (11): acc 85.2%
+  oneshot  heads to reach 50%: 6;  acc after 3/5/10/20 removed: 78.8%, 57.5%, 42.6%, 27.1%;  loss after 5/10: -0.28, 0.24
+  greedy   heads to reach 50%: 5;  acc after 3/5/10/20 removed: 73.2%, 44.9%, 2.9%, 1.3%;  loss after 5/10: 0.31, 3.21
+  random   heads to reach 50%: None;  acc after 3/5/10/20 removed: 99.4%, 99.4%, 97.7%, 95.1%;  loss after 5/10: -3.52, -3.19
+  one-shot order: 8.6 5.5 7.9 8.10 3.0 7.3 6.9 10.0 5.9 9.7
+  re-valued order: 8.6 8.10 7.9 7.3 10.7 11.10 5.5 3.0 0.10 0.1
