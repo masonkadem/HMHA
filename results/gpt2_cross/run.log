@@ -1,0 +1,47 @@
+C:\Users\mason\miniconda3\envs\xmodal\lib\site-packages\requests\__init__.py:86: RequestsDependencyWarning: Unable to find acceptable character detection dependency (chardet or charset_normalizer).
+  warnings.warn(
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 0] IOI logit difference, full 3.67; as a fraction of full (accuracy):
+  published 26: 0.85 (99.0%)
+  upkeep 0.05: rule 10 heads 0.26 (68.0%);  ranked once -0.56 (9.7%)
+  upkeep 0.02: rule 17 heads 0.90 (93.5%);  ranked once -0.63 (8.3%)
+  upkeep 0.01: rule 20 heads 1.21 (97.8%);  ranked once -0.22 (33.1%)
+  greater: full 100.0%;  only the 20 IOI heads open 42.0% (random 20: 39.6%);  only the IOI heads closed 100.0% (random 20 closed: 98.6%, min 87.0%)
+  repeat: full 83.0%;  only the 20 IOI heads open 17.5% (random 20: 0.0%);  only the IOI heads closed 12.2% (random 20 closed: 75.5%, min 52.1%)
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 1] IOI logit difference, full 3.62; as a fraction of full (accuracy):
+  published 26: 0.86 (99.1%)
+  upkeep 0.05: rule 10 heads 0.27 (67.3%);  ranked once -0.56 (10.2%)
+  upkeep 0.02: rule 17 heads 0.92 (94.7%);  ranked once -0.63 (8.8%)
+  upkeep 0.01: rule 20 heads 1.23 (98.5%);  ranked once -0.20 (34.9%)
+  greater: full 100.0%;  only the 20 IOI heads open 42.0% (random 20: 33.3%);  only the IOI heads closed 100.0% (random 20 closed: 99.5%, min 93.0%)
+  repeat: full 83.0%;  only the 20 IOI heads open 17.5% (random 20: 0.0%);  only the IOI heads closed 12.2% (random 20 closed: 76.7%, min 62.8%)
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 2] IOI logit difference, full 3.67; as a fraction of full (accuracy):
+  published 26: 0.88 (99.2%)
+  upkeep 0.05: rule 11 heads 0.27 (66.8%);  ranked once -0.50 (11.3%)
+  upkeep 0.02: rule 18 heads 1.09 (97.3%);  ranked once -0.53 (13.2%)
+  upkeep 0.01: rule 21 heads 1.21 (97.9%);  ranked once -0.18 (36.1%)
+  greater: full 100.0%;  only the 21 IOI heads open 42.0% (random 21: 33.7%);  only the IOI heads closed 100.0% (random 21 closed: 99.4%, min 94.0%)
+  repeat: full 83.0%;  only the 21 IOI heads open 19.0% (random 21: 0.0%);  only the IOI heads closed 10.7% (random 21 closed: 76.3%, min 59.7%)
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 3] IOI logit difference, full 3.66; as a fraction of full (accuracy):
+  published 26: 0.88 (99.4%)
+  upkeep 0.05: rule 11 heads 0.27 (66.8%);  ranked once -0.50 (12.6%)
+  upkeep 0.02: rule 17 heads 0.94 (94.8%);  ranked once -0.59 (10.9%)
+  upkeep 0.01: rule 20 heads 1.24 (98.3%);  ranked once -0.16 (37.5%)
+  greater: full 100.0%;  only the 20 IOI heads open 42.0% (random 20: 44.2%);  only the IOI heads closed 100.0% (random 20 closed: 98.5%, min 89.0%)
+  repeat: full 83.0%;  only the 20 IOI heads open 17.5% (random 20: 0.0%);  only the IOI heads closed 12.2% (random 20 closed: 77.6%, min 68.0%)
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[seed 4] IOI logit difference, full 3.67; as a fraction of full (accuracy):
+  published 26: 0.86 (99.4%)
+  upkeep 0.05: rule 10 heads 0.29 (68.5%);  ranked once -0.53 (10.0%)
+  upkeep 0.02: rule 18 heads 1.07 (96.9%);  ranked once -0.53 (13.3%)
+  upkeep 0.01: rule 20 heads 1.23 (98.2%);  ranked once -0.17 (37.8%)
+  greater: full 100.0%;  only the 20 IOI heads open 42.0% (random 20: 34.7%);  only the IOI heads closed 100.0% (random 20 closed: 99.5%, min 96.0%)
+  repeat: full 83.0%;  only the 20 IOI heads open 17.5% (random 20: 0.0%);  only the IOI heads closed 12.2% (random 20 closed: 78.3%, min 67.1%)
