@@ -135,7 +135,7 @@ ax.text(7.5, -2.5, r"needs $k^*=4$ heads", ha="center", va="center", color=G1)
 if not COLUMN:
     # ---------------------------------------------------------------- b  model
     ax = fig.add_subplot(SLOT_B)
-    title(ax, "b", "Model: 32 heads, each with a valve" if PAPER else "Model: one attention layer, 32 heads, each with a valve")
+    title(ax, "b", "Model: one attention layer" if PAPER else "Model: one attention layer, 32 heads, each with a valve")
     ax.axis("off")
     ax.set(xlim=(-1.6, 10), ylim=(0, 6.6))
 
@@ -152,29 +152,58 @@ if not COLUMN:
                     arrowprops=dict(arrowstyle="-|>", color=K, lw=0.6, mutation_scale=6, shrinkA=0, shrinkB=0))
 
 
-    box(0.9, 0.2, 2.6, 0.7, "query $X$")
-    box(6.5, 0.2, 2.6, 0.7, "memory $Y$")
-    xs = [0.55 + 1.05 * i for i in range(9)]
-    alive = {0, 2, 3, 7}                                  # drawn pattern: most heads starved, a few fed
-    for i, x in enumerate(xs):
-        if i == 5:
-            ax.text(x + 0.35, 2.55, r"$\cdots$", ha="center", va="center", fontsize=8, color=G1)
-            continue
-        on = i in alive
-        box(x, 2.15, 0.7, 0.8, "", edge=K if on else G2, ls="-" if on else (0, (2, 1.5)))
-        ax.text(x + 0.35, 2.55, "head", ha="center", va="center", fontsize=3.6 if PAPER else 5, color=K if on else G2)
-        ax.add_patch(Rectangle((x + 0.2, 3.3), 0.3, 0.9, facecolor=RED if on else "white",
-                               edgecolor=RED if on else G2, lw=0.5))
-        ax.plot([x + 0.35, x + 0.35], [2.95, 3.3], color=K if on else G2, lw=0.5)
-        ax.plot([x + 0.35, x + 0.35], [4.2, 4.8], color=K if on else G2, lw=0.5)
-        ax.plot([x + 0.35, x + 0.35], [1.75, 2.15], color=G1, lw=0.5)
-    ax.plot([xs[0] + 0.35, xs[-1] + 0.35], [1.75, 1.75], color=G1, lw=0.5)
-    arrow(2.2, 0.95, 2.2, 1.75)
-    arrow(7.8, 0.95, 7.8, 1.75)
-    ax.text(-1.55, 3.75, "valve\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
-    box(0.45, 4.8, 9.05, 1.0 if PAPER else 0.9, r"$y = W_O\,\Sigma_h\; g_h\, \mathrm{softmax}(Q_h K_h^{\mathsf{T}})\, V_h$", fs=6 if PAPER else 7)
-    arrow(5.0, 5.75, 5.0, 6.35)
-    ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
+    if PAPER:                                             # architecture style, as figures/fig_architecture_dims
+        LW_ = 0.7
+        xs = [1.3, 2.15, 3.0, 3.85, 6.15, 7.0, 7.85, 8.7]
+        alive = {0, 2, 3, 6}
+        ax.text(1.3, 6.45, "query $X$  16 × 128", ha="center", va="center", fontsize=5.6)
+        ax.text(8.7, 6.45, "memory $Y$  16 × 128", ha="center", va="center", fontsize=5.6)
+        arrow(1.3, 6.15, 1.3, 5.45); arrow(8.7, 6.15, 8.7, 5.45)
+        ax.plot([1.3, 8.7], [5.45, 5.45], color=K, lw=LW_)
+        ax.plot([4.75, 5.0, 5.25], [4.3] * 3, "o", ms=1.4, color=G1)
+        for i, x in enumerate(xs):
+            on = i in alive
+            arrow(x, 5.45, x, 5.05)
+            ax.add_patch(Rectangle((x - 0.24, 3.65), 0.48, 1.4, facecolor="white", edgecolor=K if on else G2,
+                                   lw=LW_, ls="-" if on else (0, (2, 1.5))))
+            ax.plot([x, x], [3.65, 3.4], color=K if on else G2, lw=LW_)
+            ax.add_patch(Rectangle((x - 0.15, 2.95), 0.3, 0.45, facecolor=RED if on else "white",
+                                   edgecolor=RED if on else G2, lw=0.6))
+            ax.plot([x, x], [2.95, 2.6], color=K if on else G2, lw=LW_)
+        ax.plot([xs[0], xs[-1]], [2.6, 2.6], color=K, lw=LW_)
+        ax.text(-1.5, 4.35, "32 heads\n32 × 32", ha="left", va="center", fontsize=5.4)
+        ax.text(-1.5, 3.18, "valve $g_h$", ha="left", va="center", fontsize=5.8, color=RED)
+        arrow(5.0, 2.6, 5.0, 2.2)
+        from matplotlib.patches import Polygon as _Poly
+        ax.add_patch(_Poly([(3.0, 2.2), (7.0, 2.2), (5.6, 1.15), (4.4, 1.15)], closed=True, facecolor="white",
+                           edgecolor=K, lw=LW_))
+        ax.text(7.3, 1.68, "$W_O$  1024 → 64", ha="left", va="center", fontsize=5.4)
+        arrow(5.0, 1.15, 5.0, 0.45)
+        ax.text(5.3, 0.55, "4 answers", ha="left", va="center", fontsize=5.6, color=G1)
+    else:
+        box(0.9, 0.2, 2.6, 0.7, "query $X$")
+        box(6.5, 0.2, 2.6, 0.7, "memory $Y$")
+        xs = [0.55 + 1.05 * i for i in range(9)]
+        alive = {0, 2, 3, 7}
+        for i, x in enumerate(xs):
+            if i == 5:
+                ax.text(x + 0.35, 2.55, r"$\cdots$", ha="center", va="center", fontsize=8, color=G1)
+                continue
+            on = i in alive
+            box(x, 2.15, 0.7, 0.8, "", edge=K if on else G2, ls="-" if on else (0, (2, 1.5)))
+            ax.text(x + 0.35, 2.55, "head", ha="center", va="center", fontsize=5, color=K if on else G2)
+            ax.add_patch(Rectangle((x + 0.2, 3.3), 0.3, 0.9, facecolor=RED if on else "white",
+                                   edgecolor=RED if on else G2, lw=0.5))
+            ax.plot([x + 0.35, x + 0.35], [2.95, 3.3], color=K if on else G2, lw=0.5)
+            ax.plot([x + 0.35, x + 0.35], [4.2, 4.8], color=K if on else G2, lw=0.5)
+            ax.plot([x + 0.35, x + 0.35], [1.75, 2.15], color=G1, lw=0.5)
+        ax.plot([xs[0] + 0.35, xs[-1] + 0.35], [1.75, 1.75], color=G1, lw=0.5)
+        arrow(2.2, 0.95, 2.2, 1.75)
+        arrow(7.8, 0.95, 7.8, 1.75)
+        ax.text(-1.55, 3.75, "valve\n$g_h$", ha="left", va="center", fontsize=6.5, color=RED)
+        box(0.45, 4.8, 9.05, 0.9, r"$y = W_O\,\Sigma_h\; g_h\, \mathrm{softmax}(Q_h K_h^{\mathsf{T}})\, V_h$", fs=7)
+        arrow(5.0, 5.75, 5.0, 6.35)
+        ax.text(5.15, 6.1, "4 answers", ha="left", va="center", fontsize=6.5, color=G1)
 
 
 # ---------------------------------------------------------------- c  one head, one equation
