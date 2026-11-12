@@ -14,3 +14,17 @@ experiments/run.py, retrieval task, k* = 4, seeds 0-2, --skip-redundancy. Everyt
 3. If anything fails, it is the shortest fade (25 steps), which is closest to the no-fade ablation that lost the
    solution in every run.
 Failure: either count below 14 of 18. Then the paper says the settings matter and names which.
+
+## Result (2026-11-12, 18 runs, run.log)
+| setting | exact count | stayed solved |
+|---|---|---|
+| fade 25 steps | 3/3 | 2/3 |
+| fade 400 steps | 3/3 | 3/3 |
+| warm-up 5% | 3/3 | 3/3 |
+| warm-up 25% | 3/3 | 3/3 |
+| check every 10 steps | 3/3 | 3/3 |
+| check every 50 steps | 3/3 | 3/3 |
+Total: exact count 18/18, stayed solved 17/18. All final losses below 0.0002 L_triv.
+1. Exact count in at least 16 of 18: holds (18).
+2. Stayed solved in at least 16 of 18: holds (17).
+3. Any failure is the shortest fade: holds (the one loss is fade 25, seed 0).

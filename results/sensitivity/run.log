@@ -1,0 +1,92 @@
+=== start Thu Nov 12 14:45:31 EST 2026
+--- seed 0 --taper 25 14:45
+    rho(neg_entropy , ablation) = -0.566
+    rho(outnorm     , ablation) = -0.551
+    rho(demand      , ablation) = -0.542
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp25_hf0.1_cv0_s0.pkl in 39s
+--- seed 0 --taper 400 14:46
+    rho(neg_entropy , ablation) = -0.566
+    rho(outnorm     , ablation) = -0.562
+    rho(demand      , ablation) = -0.562
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp400_hf0.1_cv0_s0.pkl in 28s
+--- seed 0 --budget_hold_frac 0.05 14:46
+    rho(neg_entropy , ablation) = -0.541
+    rho(outnorm     , ablation) = -0.450
+    rho(demand      , ablation) = -0.450
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_hf0.05_cv0_s0.pkl in 29s
+--- seed 0 --budget_hold_frac 0.25 14:47
+    rho(neg_entropy , ablation) = -0.585
+    rho(outnorm     , ablation) = -0.556
+    rho(demand      , ablation) = -0.556
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_cv0_s0.pkl in 25s
+--- seed 0 --probe_every 10 14:47
+    rho(neg_entropy , ablation) = -0.557
+    rho(outnorm     , ablation) = -0.559
+    rho(demand      , ablation) = -0.559
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe10_tp100_hf0.1_cv0_s0.pkl in 41s
+--- seed 0 --probe_every 50 14:48
+    rho(neg_entropy , ablation) = -0.577
+    rho(outnorm     , ablation) = -0.531
+    rho(demand      , ablation) = -0.531
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe50_tp100_hf0.1_cv0_s0.pkl in 23s
+--- seed 1 --taper 25 14:48
+    rho(neg_entropy , ablation) = -0.188
+    rho(outnorm     , ablation) = -0.158
+    rho(demand      , ablation) = -0.158
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp25_hf0.1_cv0_s1.pkl in 28s
+--- seed 1 --taper 400 14:49
+    rho(neg_entropy , ablation) = -0.077
+    rho(outnorm     , ablation) = -0.187
+    rho(demand      , ablation) = -0.187
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp400_hf0.1_cv0_s1.pkl in 27s
+--- seed 1 --budget_hold_frac 0.05 14:49
+    rho(neg_entropy , ablation) = -0.136
+    rho(outnorm     , ablation) = -0.200
+    rho(demand      , ablation) = -0.200
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_hf0.05_cv0_s1.pkl in 27s
+--- seed 1 --budget_hold_frac 0.25 14:50
+    rho(neg_entropy , ablation) = -0.130
+    rho(outnorm     , ablation) = -0.141
+    rho(demand      , ablation) = -0.141
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_cv0_s1.pkl in 28s
+--- seed 1 --probe_every 10 14:50
+    rho(neg_entropy , ablation) = -0.172
+    rho(outnorm     , ablation) = -0.257
+    rho(demand      , ablation) = -0.256
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe10_tp100_hf0.1_cv0_s1.pkl in 43s
+--- seed 1 --probe_every 50 14:51
+    rho(neg_entropy , ablation) = -0.172
+    rho(outnorm     , ablation) = -0.154
+    rho(demand      , ablation) = -0.154
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe50_tp100_hf0.1_cv0_s1.pkl in 24s
+--- seed 2 --taper 25 14:52
+    rho(neg_entropy , ablation) = -0.135
+    rho(outnorm     , ablation) = -0.022
+    rho(demand      , ablation) = -0.022
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp25_hf0.1_cv0_s2.pkl in 28s
+--- seed 2 --taper 400 14:52
+    rho(neg_entropy , ablation) = -0.145
+    rho(outnorm     , ablation) = +0.008
+    rho(demand      , ablation) = +0.010
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp400_hf0.1_cv0_s2.pkl in 27s
+--- seed 2 --budget_hold_frac 0.05 14:53
+    rho(neg_entropy , ablation) = -0.179
+    rho(outnorm     , ablation) = +0.017
+    rho(demand      , ablation) = +0.017
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_hf0.05_cv0_s2.pkl in 28s
+--- seed 2 --budget_hold_frac 0.25 14:53
+    rho(neg_entropy , ablation) = -0.143
+    rho(outnorm     , ablation) = -0.032
+    rho(demand      , ablation) = -0.032
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_tp100_cv0_s2.pkl in 26s
+--- seed 2 --probe_every 10 14:54
+    rho(neg_entropy , ablation) = -0.154
+    rho(outnorm     , ablation) = +0.001
+    rho(demand      , ablation) = +0.001
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe10_tp100_hf0.1_cv0_s2.pkl in 41s
+--- seed 2 --probe_every 50 14:54
+    rho(neg_entropy , ablation) = -0.156
+    rho(outnorm     , ablation) = +0.011
+    rho(demand      , ablation) = +0.014
+  wrote multi_relation_R4_N16_dk32_st4000_local_outnorm_ema_T8_tau0_k1.5_b0_lk0_pf0.03_pe50_tp100_hf0.1_cv0_s2.pkl in 23s
+=== sensitivity done Thu Nov 12 14:55:22 EST 2026
