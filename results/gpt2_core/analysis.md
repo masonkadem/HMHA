@@ -31,3 +31,11 @@ IOI numbers reproduce the earlier results/gpt2_ioi runs exactly (same kept sets)
 Re-valuing after each step matters when the task uses a multi-step circuit with backups (IOI, induction-like
 repeated tokens). For a task carried by a few late heads (greater-than: 7.10, 8.11, 9.1), ranking once is enough.
 Single seed, single prompt set; the one-shot baseline is top-n by the first-step values.
+
+## Seeds 1-4 at upkeep 0.02 (added 2026-11-12, seeds.log; seed 0 above)
+| task | heads kept | rule (held out) | same heads ranked once | random sets |
+|---|---|---|---|---|
+| greater-than | 5, 5, 5, 5 | 97%, 98%, 100%, 99% | 93%, 95%, 97%, 94% | 19-22% |
+| repeated tokens | 22, 23, 22, 23 | 73.8%, 73.9%, 73.1%, 72.3% (full 84-85%) | 32%, 30%, 29%, 34% | 0% |
+Re-valuing beats ranking once in 4/4 seeds on both tasks: by 2-6 points on greater-than, by about 40 points on
+repeated tokens. Head 6.9 is kept on greater-than in all seeds (also kept for IOI).

@@ -1,0 +1,70 @@
+
+[greater] all open: loss 0.046 acc 100.0%;  all closed: loss 1.703 acc 26.0%;  upkeep 0.0166
+=== restarted 12 Nov 2026 09:42:15
+
+[greater] all open: loss 0.046 acc 100.0%;  all closed: loss 1.703 acc 26.0%;  upkeep 0.0166
+[greater] kept 6 after 138 decisions, 1363 s; held out: loss 0.095 (full 0.055), acc 100.0% (full 99.0%)
+[greater] kept: 0.1 6.9 7.10 8.8 8.11 9.1
+[greater] same 6 heads: one-shot acc 96.0%, random acc 19.4% (best 51.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (8, 8)]
+
+[repeat] all open: loss 1.964 acc 84.0%;  all closed: loss 11.925 acc 0.0%;  upkeep 0.0996
+=== overnight seeds, middle upkeep, Thu Nov 12 14:55:22 EST 2026
+Traceback (most recent call last):
+  File "C:\Users\mason\OneDrive - McMaster University\2026\hmha\experiments\gpt2_core.py", line 17, in <module>
+    from huggingface_hub import hf_hub_download
+ModuleNotFoundError: No module named 'huggingface_hub'
+Traceback (most recent call last):
+  File "C:\Users\mason\OneDrive - McMaster University\2026\hmha\experiments\gpt2_core.py", line 17, in <module>
+    from huggingface_hub import hf_hub_download
+ModuleNotFoundError: No module named 'huggingface_hub'
+Traceback (most recent call last):
+  File "C:\Users\mason\OneDrive - McMaster University\2026\hmha\experiments\gpt2_core.py", line 17, in <module>
+    from huggingface_hub import hf_hub_download
+ModuleNotFoundError: No module named 'huggingface_hub'
+Traceback (most recent call last):
+  File "C:\Users\mason\OneDrive - McMaster University\2026\hmha\experiments\gpt2_core.py", line 17, in <module>
+    from huggingface_hub import hf_hub_download
+ModuleNotFoundError: No module named 'huggingface_hub'
+=== seeds done Thu Nov 12 14:55:31 EST 2026
+=== overnight seeds (relaunch), middle upkeep, Thu Nov 12 14:55:55 EST 2026
+
+[greater] all open: loss 0.046 acc 100.0%;  all closed: loss 1.703 acc 26.0%;  upkeep 0.0331
+[greater] kept 5 after 139 decisions, 286 s; held out: loss 0.127 (full 0.055), acc 97.0% (full 99.0%)
+[greater] kept: 0.1 6.9 7.10 8.11 9.1
+[greater] same 5 heads: one-shot acc 93.0%, random acc 19.6% (best 51.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (7, 10), (8, 11)]
+
+[repeat] all open: loss 1.964 acc 84.0%;  all closed: loss 11.925 acc 0.0%;  upkeep 0.1992
+[repeat] kept 22 after 122 decisions, 617 s; held out: loss 2.836 (full 1.842), acc 73.8% (full 85.0%)
+[repeat] kept: 0.10 2.2 2.9 3.0 3.7 4.11 5.1 5.5 5.6 5.9 6.2 6.7 6.9 7.2 7.6 8.5 9.6 9.9 10.0 10.1 10.6 11.9
+[repeat] same 22 heads: one-shot acc 32.3%, random acc 0.0% (best 0.7%); kept heads a one-shot value would drop: [(0, 10), (2, 2), (2, 9), (3, 0), (3, 7), (5, 5), (5, 6), (5, 9), (6, 2), (6, 7), (6, 9), (7, 2), (8, 5), (9, 6), (9, 9), (10, 0), (10, 1), (10, 6), (11, 9)]
+
+[greater] all open: loss 0.047 acc 100.0%;  all closed: loss 1.908 acc 25.0%;  upkeep 0.0372
+[greater] kept 5 after 139 decisions, 285 s; held out: loss 0.112 (full 0.052), acc 98.0% (full 99.0%)
+[greater] kept: 6.9 7.10 8.8 8.11 9.1
+[greater] same 5 heads: one-shot acc 95.0%, random acc 22.3% (best 63.0%); kept heads a one-shot value would drop: [(6, 9), (7, 10), (8, 8), (8, 11)]
+
+[repeat] all open: loss 1.905 acc 83.5%;  all closed: loss 12.020 acc 0.0%;  upkeep 0.2023
+[repeat] kept 23 after 121 decisions, 612 s; held out: loss 2.807 (full 1.853), acc 73.9% (full 84.6%)
+[repeat] kept: 0.10 1.1 2.9 2.11 3.0 3.7 4.11 5.1 5.5 5.6 5.9 6.2 6.7 6.9 7.2 7.6 8.5 9.6 9.9 10.0 10.1 10.6 11.9
+[repeat] same 23 heads: one-shot acc 29.6%, random acc 0.1% (best 3.0%); kept heads a one-shot value would drop: [(0, 10), (1, 1), (2, 9), (2, 11), (3, 0), (3, 7), (5, 5), (5, 6), (5, 9), (6, 2), (6, 7), (6, 9), (7, 2), (8, 5), (9, 6), (9, 9), (10, 0), (10, 1), (10, 6), (11, 9)]
+
+[greater] all open: loss 0.044 acc 100.0%;  all closed: loss 1.855 acc 15.0%;  upkeep 0.0362
+[greater] kept 5 after 139 decisions, 285 s; held out: loss 0.097 (full 0.048), acc 100.0% (full 100.0%)
+[greater] kept: 0.1 6.9 7.10 8.11 9.1
+[greater] same 5 heads: one-shot acc 97.0%, random acc 18.8% (best 58.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (7, 10), (8, 11)]
+
+[repeat] all open: loss 1.879 acc 83.7%;  all closed: loss 11.873 acc 0.0%;  upkeep 0.1999
+[repeat] kept 22 after 122 decisions, 616 s; held out: loss 2.875 (full 1.881), acc 73.1% (full 84.4%)
+[repeat] kept: 0.10 1.1 2.2 2.9 2.10 3.0 3.7 4.11 5.1 5.6 5.9 6.9 6.10 7.2 7.6 8.5 9.6 9.9 10.0 10.1 10.6 11.9
+[repeat] same 22 heads: one-shot acc 28.8%, random acc 0.1% (best 1.7%); kept heads a one-shot value would drop: [(0, 10), (1, 1), (2, 2), (2, 9), (2, 10), (3, 0), (3, 7), (5, 6), (5, 9), (6, 9), (6, 10), (7, 2), (8, 5), (9, 6), (9, 9), (10, 0), (10, 1), (10, 6), (11, 9)]
+
+[greater] all open: loss 0.046 acc 100.0%;  all closed: loss 1.889 acc 21.0%;  upkeep 0.0369
+[greater] kept 5 after 139 decisions, 285 s; held out: loss 0.121 (full 0.056), acc 99.0% (full 100.0%)
+[greater] kept: 0.1 6.9 7.10 8.11 9.1
+[greater] same 5 heads: one-shot acc 94.0%, random acc 18.5% (best 51.0%); kept heads a one-shot value would drop: [(0, 1), (6, 9), (7, 10), (8, 11)]
+
+[repeat] all open: loss 1.985 acc 81.1%;  all closed: loss 11.846 acc 0.0%;  upkeep 0.1972
+[repeat] kept 23 after 121 decisions, 611 s; held out: loss 2.833 (full 1.837), acc 72.3% (full 83.7%)
+[repeat] kept: 0.10 2.2 2.9 2.11 3.0 3.7 4.11 5.1 5.5 5.6 5.9 6.2 6.7 6.9 7.2 7.6 8.5 9.6 9.9 10.0 10.1 10.6 11.9
+[repeat] same 23 heads: one-shot acc 34.0%, random acc 0.1% (best 0.9%); kept heads a one-shot value would drop: [(0, 10), (2, 2), (2, 9), (2, 11), (3, 0), (3, 7), (5, 5), (5, 6), (5, 9), (6, 2), (6, 7), (6, 9), (7, 2), (8, 5), (9, 6), (9, 9), (10, 0), (10, 1), (10, 6), (11, 9)]
+=== seeds done Thu Nov 12 15:56:19 EST 2026
