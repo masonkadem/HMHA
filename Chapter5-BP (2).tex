@@ -1,0 +1,392 @@
+% =====================================================================
+% Chapter 5. A mechanistic audit of blood pressure models
+% Labels: ch:audit (chapter), sec:audit (method, kept so old refs work)
+% =====================================================================
+\chapter{A Causal Audit of Deep Learning Models for Blood Pressure Estimation}
+\label{ch:audit}
+
+\section{Overview}
+
+Each heartbeat sends a pressure wave along the large arteries, from the heart to the periphery, and the timing of that wave carries information about blood pressure. The hemodynamics of these vessels therefore defines what a correct blood pressure model must compute. Chapters~\ref{ch:sleep} and~\ref{ch:crosssite} constrained models we built. This chapter audits models without constraining them, by testing whether a cuffless blood pressure estimator follows the law that links transit time to pressure.
+
+The motivating task is faithful cuffless blood pressure estimation, from ECG and PPG or from PPG alone at two sites, in which the model computes pressure through pulse transit rather than a shortcut. Blood pressure, one of the most important hemodynamic measurements, is still measured on the same principle as around 1900. A cuff is inflated around the upper arm until it stops the flow of blood, then released while the device senses the pressure oscillations as blood forces its way back through the artery. The result is two numbers, systolic and diastolic, at one moment, while pressure varies across the day with activity, posture and sleep~\cite{parati2013assessment}. The continuous reference, a pressure sensor inside an artery, is used only in intensive care and during surgery. Neither allows accessible continuous monitoring.
+
+Pulse transit time offers a way around both. Timing the pressure wave between two points on the body gives its speed, and the wave travels faster when pressure is higher. When the left ventricle ejects blood into the aorta, the blood itself moves at about 1~m/s, while the stretch of the arterial wall travels along the arterial tree at 4 to 15~m/s, depending on how stiff the arteries are. Transit time measures this wave in the wall, and the stiffness of the wall depends on pressure in a way that differs between people. Other features of the waveform, such as its shape, can also covary with pressure in a given dataset. A cuffless estimator can then match reference pressure on a benchmark while computing nothing related to pulse propagation, and accuracy alone cannot reveal this.
+
+The audit introduced here shifts the PPG in time relative to the ECG, while holding both waveforms fixed, and tests whether predicted pressure moves in the direction the transit-time law requires. We validate the audit on simulated signals with a known law, then apply it to deep models trained on clinical data. Models of similar accuracy differed in whether they followed the law, and diastolic models moved in the opposite direction.
+
+%=========================================================================================
+\section{Related Work}
+\label{sec:audit-rw}
+
+\paragraph{Cuffless blood pressure.}
+Pulse transit time shortens as arterial pressure rises, which offers a physical route to continuous measurement without a cuff~\citep{mukkamala2015toward}. Most systems measure arrival time from the ECG instead, and that interval includes the pre-ejection period, a delay that varies independently of pressure. Deep models trained on raw PPG and ECG waveforms report competitive accuracy, but whether their predictions actually depend on transit time is seldom tested.
+
+\paragraph{Input perturbation and its limits.}
+Head ablation and activation patching intervene inside a network (Section~\ref{sec:rw-mech}).
+Perturbation methods test it from outside, by altering the input and
+measuring the change in prediction. Occlusion replaces a region with a
+constant~\cite{zeiler2014visualizing}, LIME fits a local surrogate to
+randomly masked copies of the input~\cite{ribeiro2016why}, and KernelSHAP
+estimates Shapley values by replacing features with background
+values~\cite{lundberg2017unified}. These methods alter raw samples without
+regard to how the input was generated, which raises three problems for a
+physiological model. First, the perturbed input can lie off the data
+distribution, so a change in output may reflect an unfamiliar input
+rather than lost information~\cite{hooker2019benchmark,hase2021ood}, the
+input-level analogue of zero ablation. Models can even detect such inputs
+and behave differently on them~\cite{slack2020fooling}, and the problem is
+sharper in time series, where a masked or noised segment rarely resembles
+a real signal~\cite{ismail2020benchmarking}. Second, masking part of a PPG
+window removes several physical variables at once, among them pulse
+timing, amplitude and shape, so the change in output cannot be assigned
+to any one of them. Third, there is no expected answer. A perturbation
+shows how sensitive a model is to part of its input, not whether that
+sensitivity is correct. The audit in this chapter addresses all three. It
+changes one physiological variable, arrival time, it keeps each waveform
+realistic, and the transit-time law predicts the sign of the response.
+
+\paragraph{Structured interventions.}
+The interventions in this thesis differ from perturbation methods in three ways. Each acts on a single physical variable or a single directed component, each keeps the model's inputs or activations within distribution, and each is interpreted against physiology or against a task whose answer is known. Shifting the PPG in time relative to the ECG (this chapter) changes pulse arrival time while holding both waveforms fixed. It tests the model causally from its input, without opening it. This is an intervention on one variable of $z$ in Equation~\eqref{eq:forward} in the causal sense~\cite{janzing2020feature,geiger2021causal,geiger2025causal}, the transit-time law predicts the sign of the response, and no access to the model's weights is needed. Resample ablation (Section~\ref{sec:rw-mech}) substitutes the output a head produces on another input, so the activation is realistic but carries no information about the current one~\cite{chan2022causal}. Because cross-attention places each direction of flow between sites in its own heads, the same substitution cuts one directed pathway along the arterial path. Valve closure with re-fit (Chapter~\ref{ch:micro}) removes a head while the remaining heads compensate~\citep{obs}, and is scored against tasks whose minimal circuit is known before training. For the time shift, each waveform stays within distribution but their pairing may not, a limitation discussed in Section~\ref{sec:audit}.
+
+%=========================================================================================
+
+
+%=========================================================================================
+\section{Method}
+\label{sec:audit}
+
+Two estimators with the same average error on a dataset can compute different functions of their input. Suppose that in a training set a waveform-shape feature happens to track pressure as closely as transit time does. An estimator that reads transit time and one that reads the shape feature are then equally accurate on that set. They diverge when the relationship between shape and pressure changes, for example in a new population, while the first remains tied to the governing law of Equation~\eqref{eq:p_ptt}. Held-out accuracy cannot tell them apart, so auditing a model requires intervening on it.
+
+\paragraph{Simulated signals.} To test the audit where the answer is known, we generated ECG and PPG signals whose heartbeat shapes were fitted to VitalDB, and set blood pressure to depend on arrival time by design. A parameter $\alpha$ controls how much of the pressure follows arrival time, with the rest following heart rate,
+\begin{equation}
+  P = \alpha\,P_{\mathrm{PAT}} + (1-\alpha)\,P_{\mathrm{HR}} + \text{noise},
+  \label{eq:sim}
+\end{equation}
+where $P_{\mathrm{PAT}}$ is the component of pressure that falls with arrival time, by 0.22~mmHg per ms, and $P_{\mathrm{HR}}$ is a component that rises with heart rate, a cue a model could use instead. We write the law on PAT rather than PTT because the model receives ECG and PPG, from which only arrival time can be measured. We trained a transformer on these signals for each $\alpha$ and checked that the audit recovers the dependence we injected.
+
+\paragraph{Models audited.} We trained transformers with one or three layers to predict systolic or diastolic pressure from ten-second segments of ECG and PPG from VitalDB, a public dataset of vital signs recorded during surgery~\cite{lee2022vitaldb}. Each configuration was trained on 12,000 or 140,000 segments from 1,164 patients, three runs each, and audited on 144 held-out patients. Arrival time was measured from each ECG R-peak, detected with the Pan--Tompkins algorithm~\citep{pan1985realtime}, to the foot of the corresponding PPG pulse, located by the intersecting-tangent method~\citep{chiu1991determination}.
+
+\paragraph{Audit.} The audit moves the PPG 16 to 48~ms earlier relative to the ECG, which shortens the arrival time without changing either waveform, and checks how the predicted pressure responds. The transit-time law predicts that pressure should rise, and we report the share of held-out patients for whom it does. Two fixed formulas serve as controls. They convert measured arrival time into pressure with a decreasing law, $P = a/\mathrm{PAT} + b$ with $a>0$, which has the sign of Equation~\eqref{eq:p_ptt}, or with its inverse ($a<0$), and should score 100\% and 0\%.
+
+\paragraph{Limitation of the shift.} Each waveform stays realistic under the shift, but their pairing may not, because in vivo a change in arrival time may come with a change in pulse shape. We therefore keep shifts small (16 to 48~ms) and interpret the result as the model's response to a counterfactual arrival time.
+
+%=========================================================================================
+\section{Preliminary Results}
+\label{sec:audit-results}
+
+\begin{figure}[hbtp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{fig/fig_story.png}
+  \caption[An audit of whether blood pressure models use arrival time]{An audit of whether blood
+  pressure models use pulse arrival time. \textbf{a}, Simulated ECG and PPG with a known
+  arrival-time law (Equation~\eqref{eq:sim}); dashed lines join each R-peak to its PPG foot.
+  \textbf{b}, Slope measured by the audit against the slope injected into the simulated data
+  (mean $\pm$ s.d., three runs); dashed, perfect recovery. \textbf{c}, Real ECG and PPG from VitalDB.
+  \textbf{d}, Improvement over predicting the training mean against the
+  share of 144 held-out patients whose predicted pressure falls as arrival time lengthens.
+  Transformers with one (triangles) or three (circles) layers predict systolic (red) or diastolic
+  (blue) pressure, trained on 12{,}000 (hollow) or 140{,}000 (filled) ten-second segments from the
+  same 1{,}164 patients; mean $\pm$ s.d. over three runs. Right margin, the same share in the data
+  itself, and positive ($+$) and negative ($-$) controls. Grey line, chance.}
+  \label{fig:audit}
+\end{figure}
+
+\paragraph{Simulated signals.}
+On real data, how strongly pressure depends on arrival time is unknown, so the audit's output cannot be checked against a true value. Simulation provides that value, because we set the law ourselves. On simulated ECG and PPG with a known arrival-time law (Figure~\ref{fig:audit}a; Equation~\eqref{eq:sim}), the audit read zero when no law was present, scaled linearly with the injected law, and recovered 90\% of its magnitude, meaning the slope it measured was about 90\% of the slope injected into the data (Figure~\ref{fig:audit}b).
+
+\paragraph{The law in VitalDB.}
+We first asked whether the law is present in the data. For each patient, we regressed the reference pressure of each 10-second segment, measured by the arterial line, on its arrival time, and checked whether the slope was negative, as Equation~\eqref{eq:p_ptt} predicts. It was in 89\% of patients for systolic and 79\% for diastolic pressure (Figure~\ref{fig:audit}d, right margin). Measuring arrival time to the arterial-line pulse instead of the PPG gave a similar result (87\% and 74\%).
+
+\paragraph{Audited models.}
+The two control formulas scored 100\% and 0\%, confirming that the audit detects either sign on real signals. With more training data, systolic models approached the law in the data (58\% to 79\% of patients across configurations, best run 82\%, against 89\% in the data), as expected for arrival time~\citep{payne2006pulse}. Diastolic models became more accurate yet stayed below chance (30\% to 40\%), although the law was present in 79\% of patients (Figure~\ref{fig:audit}d). Accuracy therefore did not reveal whether a model used arrival time correctly. The diastolic failure is consistent with the pre-ejection period masking the diastolic relation in arrival time (Equation~\eqref{eq:pat}), and motivates the two-site measurement of Equation~\eqref{eq:pat_diff}.
+
+%=========================================================================================
+\section{Next Steps}
+\label{sec:audit-next}
+
+\paragraph{1. Two-site transit time.}
+PEP variability can also obscure the link between arterial pressure and transit time, so a model that learns from ECG-to-PPG arrival time may recover the law more readily for systolic than for diastolic pressure. A single camera can record the pulse at two skin sites in the same frame (remote PPG), giving the PEP-free difference of Equation~\eqref{eq:pat_diff} without an ECG and without the timing offsets between separate devices. Models trained on ECG-to-PPG arrival time came close to the law for systolic but not for diastolic pressure, consistent with the pre-ejection period masking the diastolic relation. A measurement free of PEP should remove this asymmetry. The audit applies unchanged in principle. Instead of shifting the PPG relative to the ECG, it shifts the pulse at one site relative to the other, which changes the transit time of Equation~\eqref{eq:pat_diff} and nothing else. It will be applied to estimators that compute pressure from two-site transit time with an explicit law (Equation~\eqref{eq:p_ptt}), including published camera-based estimators that time the pulse between two skin regions.
+
+\paragraph{2. Published open-source estimators.}
+The arrival-time audit needs only a model's predictions, not its weights. We will apply it unchanged to published open-source cuffless estimators trained on ECG and PPG, to test whether models that report competitive accuracy follow the law.
+
+%=========================================================================================
+
+
+
+% =====================================================================
+\chapter{Hemodynamic Attenuation of the Micro Architecture}
+\label{ch:micro}
+\setcounter{figure}{0}
+
+\section{Overview}
+\label{sec:ha}
+
+Attention-based models of physiological signals often carry more computation than their tasks need, a cost that matters on wearables, where memory, energy and latency are limited. The full cross-site transformer (Chapter~\ref{ch:crosssite}) has 1.34M parameters and 40 attention heads, yet the compact variant, with 105K parameters and 12 heads, reaches nearly the same error (6.66 against 6.52 BPM). The cost of each head also grows with the square of the window length, since every one of the 200 query tokens attends to all 200 tokens of the other site.
+
+How many heads a task needs is not known in advance. It is set by hand or found by a search that trains many models. The fewest heads is also not always best, because trained transformers keep backup heads that take over when others are removed~\citep{wang2023interpretability,mcgrath2023hydra}. The problem is therefore to find, within one training run, the fewest heads that meet the task's accuracy and reliability, and to remove the rest. We address it with hemodynamic attenuation and test it on tasks whose minimal number of heads is known.
+
+Hemodynamic attenuation borrows five properties of cerebral blood supply (Section~\ref{sec:hemo-micro}), and each answers a limitation of existing pruning (Section 6.2). A fixed cost per head replaces a target size, and gradual closure replaces removal in one step. Re-fitting the remaining heads gives an exact copy zero value, while a backup that covers inputs where another head fails keeps its value.
+
+%=========================================================================================
+\section{Related Work}
+\label{sec:pruning}
+
+\paragraph{Pruning.}
+Pruning removes parameters while preserving accuracy, and methods differ in the unit they remove~\citep{hoefler2021sparsity}. Unstructured methods remove single weights, by magnitude~\citep{han2015learning}, by the loss a removal causes~\citep{obd}, or by that loss after the remaining weights are re-fitted~\citep{obs}. The lottery ticket hypothesis shows that sparse subnetworks found this way can be trained to full accuracy~\citep{frankle2019lottery}. Sparse weights, however, rarely reduce latency on standard hardware, so structured methods remove whole units instead, such as convolutional filters~\citep{li2017pruning}, channels~\citep{liu2017learning}, layers~\citep{fan2020reducing} or attention heads.
+
+\paragraph{Attention heads.}
+Head pruning shows that many heads are unnecessary. Michel et al.~\citep{michel2019sixteen} removed a large share of the heads in translation models and BERT with little loss, ranking heads by a gradient score. Voita et al.~\citep{voita2019analyzing} learned a gate per head under a relaxed $L_0$ penalty~\citep{louizos2018learning} and found that a few specialized heads, positional, syntactic and rare-word, do most of the work. Causal head gating~\citep{nam2025causal} learns a similar gate per head on a frozen model and finds several sparse sub-circuits that each suffice for a task. Later methods prune heads jointly with layers and hidden dimensions~\citep{xia2022structured,hou2020dynabert}, apply the Optimal Brain Surgeon score to whole heads to meet a latency target~\citep{ziplm}, or remove structures from large language models in one shot after training~\citep{frantar2023sparsegpt,ma2023llmpruner,ashkboos2024slicegpt}.
+
+\paragraph{Pruning during training.}
+Most of these methods prune a trained model. Gradual magnitude pruning instead removes weights during training, on a schedule toward a target sparsity~\citep{zhu2017prune}, and dynamic sparse training lets pruned connections regrow~\citep{evci2020rigging}. Regrowth is the closest precedent for reopening a closed head, but both methods fix the final sparsity in advance.
+
+\paragraph{Circuit discovery.}
+Circuit discovery asks the same question from the side of interpretability, namely which components implement a behaviour. Only a handful of circuits have been characterized in full, among them the induction heads that support in-context learning and the circuit for indirect object identification in GPT-2 small~\cite{olsson2022,wang2023interpretability}. Learned masks find subnetworks that encode a property or implement a function~\citep{cao2021low,csordas2021neural}, and automated methods remove edges whose effect falls below a threshold~\citep{conmy2023towards,syed2023attribution} or learn edge masks directly~\citep{bhaskar2024finding}. Their circuits are judged against circuits mapped by hand~\citep{wang2023interpretability} or compiled into a model~\citep{lindner2023tracr,gupta2024interpbench}.
+
+\paragraph{Gaps.}
+These methods leave four gaps (Table~\ref{tab:ha-compare}). The final size is fixed in advance, through a target, a penalty or a threshold. Scores that do not let the remaining heads compensate cannot tell a needed head from its copy, and none decides how much redundancy to keep. Removing heads at once can break a model, as every published method did here at the same solved threshold (Figure~\ref{fig:ha}c). And benchmarks with known circuits impose them by construction, so they do not test whether a rule finds the minimal circuit among the redundant heads that training produces.
+
+\definecolor{art}{RGB}{150,20,40}   % arterial red, as in Figure 1.1
+\newcommand{\yes}{\tikz[baseline=-0.6ex]\fill (0,0) circle (0.75mm);}
+\newcommand{\yesHA}{\tikz[baseline=-0.6ex]\fill[art] (0,0) circle (0.75mm);}
+\newcommand{\no}{\textcolor{black!50}{--}}
+\newcommand{\grp}[1]{\multicolumn{7}{@{}l}{\scriptsize\textcolor{black!55}{#1}}\\[-2pt]}
+\newcommand{\meth}[2]{\begin{tabular}[t]{@{}l@{}}#1\\[-3pt]{\scriptsize\textcolor{black!60}{#2}}\end{tabular}}
+\newcommand{\hd}[1]{\scriptsize\bfseries #1}
+
+\begin{table}[t]
+\centering\footnotesize
+\caption{Hemodynamic attenuation compared with head pruning, circuit discovery and weight pruning. A known minimal circuit means the method is tested on a task whose minimal circuit, in both size and roles, is known before training. Only hemodynamic attenuation has all six properties. CHG, causal head gating; OBS, Optimal Brain Surgeon.}
+\label{tab:ha-compare}
+\setlength{\tabcolsep}{1pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{@{}p{2.9cm}*{6}{>{\centering\arraybackslash}p{1.32cm}}@{}}
+\toprule
+\textbf{Method} & \hd{Re-fit\newline score} & \hd{During\newline training} &
+\hd{Removes\newline in\newline steps} & \hd{Fades\newline each\newline head} &
+\hd{No\newline user-set\newline size} & \hd{Known\newline minimal\newline circuit} \\
+\midrule
+\rowcolor{art!10}
+\parbox[t]{2.9cm}{\raggedright\textcolor{art}{\textbf{Hemodynamic attenuation}}} & \yesHA & \yesHA & \yesHA & \yesHA & \yesHA & \yesHA \\[4pt]
+\grp{Head pruning}
+\meth{CHG~\citep{nam2025causal}}{2025, gate per head} & \no & \no & \no & \no & \no & \no \\
+\meth{ZipLM~\citep{ziplm}}{2023, same re-fit score} & \yes & \no & \yes & \no & \no & \no \\
+\meth{Michel et al.~\citep{michel2019sixteen}}{2019, after training} & \no & \no & \yes & \no & \no & \no \\
+\meth{Voita et al.~\citep{voita2019analyzing}}{2019, gate per head} & \no & \no & \no & \no & \no & \no \\[1pt]
+\grp{Circuit discovery}
+\meth{ACDC~\citep{conmy2023towards}}{2023, fixed circuits} & \no & \no & \yes & \no & \no & \no \\[1pt]
+\grp{Weight pruning}
+\meth{RigL~\citep{evci2020rigging}}{2020, regrows weights} & \no & \yes & \yes & \no & \no & \no \\
+\meth{Gradual pruning~\citep{zhu2017prune}}{2017, during training} & \no & \yes & \yes & \no & \no & \no \\
+\meth{OBS~\citep{obs}}{1993, the re-fit score} & \yes & \no & \yes & \no & \no & \no \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\par\smallskip
+\begin{minipage}{\linewidth}\scriptsize
+\yes\ yes \quad \no\ no
+\end{minipage}
+\end{table}
+
+%=========================================================================================
+\section{Hemodynamic Attenuation}
+\label{sec:rule}
+
+Hemodynamic attenuation acts on any multi-head attention layer (Equation~\eqref{eq:attn-merge}). It has three parts, a valve on each head, a value for each head, and a schedule that closes and reopens valves during training.
+
+\subsection{Valves}
+
+Each head's output is multiplied by its valve $g_h\in[0,1]$ before the heads are added together,
+\begin{equation}
+  \hat{\bm T} = \sum_{h=1}^{H} g_h\, \bm W_O^h\, \bm O_h .
+  \label{eq:valve}
+\end{equation}
+A head with $g_h = 0$ contributes nothing and receives no gradient, so a model with $k$ open valves is exactly a $k$-head model. The valve is one gain on a block of weights, the output weights $\bm W_O^h$ of one head, as the astrocyte in the model of \citet{kozachkov2023} is one gain on a block of synapses. The correspondence is algebraic only.
+
+\subsection{Collateral value}
+
+The collateral value of head $h$ is the increase in the best-fit loss when the head is removed and the other open heads re-fit their output weights,
+\begin{equation}
+  v_h = \min_{\bm W} L(\text{without } h) - \min_{\bm W} L(\text{all open heads}).
+  \label{eq:collateral}
+\end{equation}
+The re-fit needs no further training. It solves a least-squares problem for the output weights on a batch of cached head outputs, in closed form from one matrix inverse. This is the Optimal Brain Surgeon score~\citep{obs}, applied to whole heads as in ZipLM~\citep{ziplm}. The score is not new. The contribution is its use during training, with a gradual fade and no target size. The re-fit is what makes a copy worthless. If two heads output the same signal with weights $(0.5, 0.5)$, removing one without re-fitting halves the output, so both look important. With re-fitting, the remaining head takes weight 1 and the loss is unchanged, so the duplicate has zero value and is closed.
+
+\subsection{Schedule}
+
+All valves start open. After a warm-up of 10\% of training, every 25 steps the rule (1) computes the collateral value of every open head, (2) closes the lowest-valued head if its value is below the cost $\pi=0.03\,\Ltriv$, and (3) reopens the highest-valued closed head if its value exceeds twice the cost. A closing valve decreases by $1/100$ per step, so a head fades out over 100 steps. These settings were chosen without tuning, and Table~\ref{tab:ha-params} lists the planned sensitivity sweep.
+
+\begin{table}[hbt]
+  \centering
+  \footnotesize
+  \caption{Parameters of hemodynamic attenuation and the planned sensitivity sweep.}
+  \label{tab:ha-params}
+  \begin{tabular}{@{}llp{0.38\linewidth}l@{}}
+    \toprule
+    Parameter & Value & Reason & Tested \\
+    \midrule
+    Cost $\pi$ & $0.03\,L_{\text{triv}}$ & Between redundant ($\approx 0$) and needed ($\approx L_{\text{triv}}/k^\star$) & $0.01$--$0.1\,L_{\text{triv}}$ \\
+    Reopen threshold & $2\pi$ & Hysteresis, intended to prevent oscillation & Not yet \\
+    Warm-up & 10\% of training & Intended to let heads specialize before scoring & Not yet \\
+    Check interval & 25 steps & Chosen without tuning & Not yet \\
+    Fade & 100 steps & Four check intervals & Not yet \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{The cost does not set the size}
+
+Every method that shrinks a model must trade model size against performance. Existing methods set the size directly, as a target sparsity~\citep{zhu2017prune}, or through a parameter the size depends on, such as a penalty strength~\citep{voita2019analyzing} or a discovery threshold~\citep{conmy2023towards}. Hemodynamic attenuation instead charges a cost per open head, as maintaining a vessel costs energy, so a head is kept only while the loss it prevents justifies that cost. The number of heads it keeps does not depend on the cost. A needed head is worth about $\Ltriv/\kstar$ and a redundant head about zero, so any cost between the two gives the same answer, and every cost from $0.01$ to $0.1\,\Ltriv$ gave the exact count. The size is set by the task.
+
+\subsection{Correspondence to cerebral blood supply}
+\label{sec:ha-analogy}
+
+Table~\ref{tab:analogy} lists how each element of the rule follows the regulation of cerebral blood supply described in Section~\ref{sec:hemo-micro}. The correspondence is a design analogy, not a biological model. The name collateral value comes from collateral circulation.
+
+\begin{table}[hbt]
+  \centering
+  \small
+  \caption{Hemodynamic attenuation as an analogy to cerebral blood supply.}
+  \label{tab:analogy}
+  \begin{tabular}{@{}p{0.50\linewidth}p{0.42\linewidth}@{}}
+    \toprule
+    Cerebral blood supply & Hemodynamic attenuation \\
+    \midrule
+    Vessel & Attention head \\
+    Vessel diameter, set by smooth muscle and pericytes & Valve $g_h \in [0,1]$ \\
+    Astrocytes sense local demand and signal to vessels & Rule that computes $v_h$ and compares it with $\pi$ \\
+    Flow a vessel carries for local demand & Collateral value $v_h$ \\
+    Metabolic cost of maintaining a vessel & Fixed cost $\pi$ per open head \\
+    Gradual regression over days & Fade over 100 training steps \\
+    Collateral flow through neighbouring vessels & Re-fit of the remaining heads \\
+    Regrowth where demand returns & Reopening a closed head \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+%=========================================================================================
+\section{Experimental Setup}
+\label{sec:ha-setup}
+
+\subsection{Multi-offset retrieval task}
+
+Judging a circuit-discovery method requires a model whose minimal circuit is known, which is rarely the case for trained models. We therefore adapted the sparse retrieval task of Chapter~\ref{ch:crosssite}, itself based on \citet{sanford2023representational}. There, each query returns the average of $q$ sources, which a single head can compute, so the task constrains embedding width rather than the number of heads. Here, each query returns $R$ items separately, at $R$ fixed offsets. A head returns one weighted average per query, so it can deliver only one item, and the task needs exactly $R$ heads, one per offset. The minimal circuit is therefore known in both size and roles. The task is a benchmark, not an application. The tests on trained models of practical interest are the cross-site transformer and GPT-2 small~\cite{olsson2022,wang2023interpretability} (Section~\ref{sec:remaining}).
+
+\begin{figure}[t]
+\centering
+\figfile{\linewidth}{fig/ha1.png}
+\caption[Multi-offset retrieval task and model]{Multi-offset retrieval task and model.
+(a) A query carries a position $p$, and the target is the items stored $1, 5, 9, 13$ slots ahead, so 4 heads are needed. Here $y$ denotes the target, written $\text{target}(p)$ in Equation~\eqref{eq:p}.
+(b) One attention layer with 32 heads, each with a valve $g_h$. Filled valves are open. Here $y$ denotes the model's output, written $\hat{\bm T}$ in Equation~\eqref{eq:valve}, and one output projection is drawn for brevity where the equation gives each head its own.
+(c) Loss with $k$ different heads on a trained 4-head model, against the prediction $1-k/4$.
+(d) The slot each answer points to. All are correct with the 4 kept heads, and 76\% with head 6 switched off.}
+\label{fig:setup}
+\end{figure}
+
+The memory has $N = 16$ slots, each holding a random item $c_j$. A query specifies a position $p$, and the target is the items at $R$ fixed offsets (Figure~\ref{fig:setup}a),
+\begin{equation}
+  \text{target}(p) = \big(c_{p+\delta_1},\ \dots,\ c_{p+\delta_R}\big),
+  \qquad \text{slots modulo } N.
+  \label{eq:p}
+\end{equation}
+Items are redrawn for every example, so the model must learn where to attend.
+
+A head returns, for each query, one weighted average over all $N$ items, $\sum_{j} a_{pj}\, c_j$. Weight on a non-target item adds noise, so a useful head places its weight on the $R$ target slots, giving one linear combination of the $R$ target items. Recovering $R$ items needs $R$ independent combinations, so the task needs $k^\star = R$ heads, and with $k < R$ heads the lowest achievable loss is
+\begin{equation}
+  \text{loss}(k) = \Big(1 - \frac{k}{R}\Big)\, \Ltriv,
+  \label{eq:law}
+\end{equation}
+where $\Ltriv$ is the loss of predicting the mean. The task counts as solved when the loss is below $0.02\,\Ltriv$, equivalent to $R^2\geq0.98$.
+
+\subsection{Models}
+
+\paragraph{Retrieval model.} One cross-attention layer (Equation~\eqref{eq:attn-head}) with $H = 32$ heads and no MLP, with queries $\bm X$ and memory $\bm Y$, model width 128 and head width $d_k = 32$, for 461{,}888 parameters. Each head owns 14{,}432 of them, its slices of $\bm W_Q$, $\bm W_K$ and $\bm W_V$ (with biases) and its block of $\bm W_O$. Only the 64 entries of the output bias are shared, so a model with $k$ open heads has $14{,}432\,k + 64$ parameters.
+
+\paragraph{Induction model.} Two attention-only layers with $8 + 8$ heads, model width 64 and head width 16, for 76{,}352 parameters. Each head owns 4{,}096 of them. The token and position embeddings and the unembedding, 10{,}816 parameters, are shared and never pruned. The minimal induction circuit is one previous-token head and one induction head~\citep{olsson2022}. Cross-entropy has no closed-form re-fit, so on induction a head is closed only if the loss without it stays below $0.05\,\Ltriv$, with $\Ltriv = \ln 64 \approx 4.16$ nats, and the most recently closed head reopens if the loss exceeds twice that bar. The rule starts after 25\% of 6{,}000 training steps.
+
+\subsection{Baselines and evaluation}
+
+All methods share the model, task, training schedule and number of runs. We implemented each published method in our code and applied it within the same training run. The published methods are ZipLM-style pruning~\cite{ziplm}, which applies the same score once and then fine-tunes; Michel et al.~\cite{michel2019sixteen}, given the true number of heads; and Voita et al.~\cite{voita2019analyzing}, which learns head gates with an $L_0$ penalty. Three ablations each remove one part of the rule, namely no fade, no re-fit (the Optimal Brain Damage score~\citep{obd}) and no score (random choice). We report exact count (open heads over the last 40\% of training equal $\kstar$) and never broke (after first falling below the solved threshold, the loss never exceeds it), on $\kstar = 2, 4, 8$ with 10 seeds each, and on the induction task~\citep{olsson2022} with 10 seeds.
+
+%=========================================================================================
+\section{Preliminary Results}
+\label{sec:ha-results}
+
+\begin{figure}[htb]
+\centering
+\figfile{0.95\linewidth}{fig/fig_main_abc.png}
+\caption[Hemodynamic attenuation during training]{Hemodynamic attenuation during training.
+(a) Loss of the dense model (black) and with hemodynamic attenuation (red).
+(b) Open heads, with $\kstar$ dotted.
+(c) All methods on the same 30 runs.}
+\label{fig:ha}
+\end{figure}
+
+\paragraph{Count and stability.}
+Hemodynamic attenuation kept exactly $\kstar$ heads in 29 of 30 runs and never broke the model in 30 of 30. No other method achieved both (Figure~\ref{fig:ha}c). Michel et al., given the true count, kept it in 28 of 30 runs, ZipLM-style pruning in 24 of 30 and Voita et al. in 9 of 30, and all three broke the model in every run. Without the fade the model broke in every run. Without the re-fit it kept too many heads. With random choice it broke in 24 of 30 runs.
+
+\paragraph{Induction.}
+Hemodynamic attenuation kept 2 + 1 heads in 10 of 10 runs and never broke the model, and reopening fired in every run, 2 to 7 times. The kept heads had the expected roles in all 10 runs. Switching off the layer-2 head reduced accuracy on the repeat from 99.9\% to 1.8\%, chance level for 64 tokens (Figure~\ref{fig:induction}). Layer 2 kept the single head it needs, and layer 1 kept two that may back each other up. Alone, each layer-1 head missed about 1 in 8 repeated tokens, and together they missed about 1 in 200. The method of \citet{michel2019sixteen} broke the model in all 10 runs.
+
+\begin{figure}[hbtp]
+\centering
+\figfile{\linewidth}{fig/ha3.png}
+\caption[Two-layer induction]{Two-layer induction.
+(a) A sequence containing a repeated segment. With the kept heads the model predicts all 7 tokens of the repeat, and with the layer-2 head switched off it predicts none.
+(b) Open heads in each layer during training, 10 runs. Layer 2 closes to the one head needed, and layer 1 stops at two.
+(c) Final loss of fixed architectures, 10 runs each. Only two layers with one head each solve the task.}
+\label{fig:induction}
+\end{figure}
+
+\paragraph{Size and training cost.}
+When the rule keeps exactly $\kstar$ heads, deleting the closed heads leaves 6.3\% to 25\% of the retrieval model's parameters, for example 57{,}792 of 461{,}888 (12.5\%) for $\kstar = 4$ (Table~\ref{tab:params}). On induction, keeping $2 + 1$ of the 16 heads leaves 23{,}104 of 76{,}352 parameters (30.3\%), and 18.8\% of the attention parameters. These savings apply once the closed heads are deleted. During training the closed heads are still computed, so the saving in training compute is nominal. Counting only open heads, training used 0.31 to 0.45 of the dense model's head-steps. The final loss was 1.1 to 7 times the dense model's, but well below the solved threshold.
+
+\begin{table}[h]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lcrrr}
+\toprule
+ & heads & \multicolumn{2}{c}{parameters} & kept \\
+\cmidrule(lr){3-4}
+model & (all $\to$ kept) & all & kept & (\%) \\
+\midrule
+retrieval, $k^\star = 2$ & $32 \to 2$         & 461{,}888 & 28{,}928  & 6.3  \\
+retrieval, $k^\star = 4$ & $32 \to 4$         & 461{,}888 & 57{,}792  & 12.5 \\
+retrieval, $k^\star = 8$ & $32 \to 8$         & 461{,}888 & 115{,}520 & 25.0 \\
+induction                & $8{+}8 \to 2{+}1$  & 76{,}352  & 23{,}104  & 30.3 \\
+\bottomrule
+\end{tabular}
+\caption{Model size before and after pruning. A head owns its slices of $\bm W_Q$, $\bm W_K$, $\bm W_V$ and its block of $\bm W_O$. The output bias, embeddings and unembedding are shared and not pruned. Rows assume exactly $k^\star$ heads are kept, which held in 29 of the 30 retrieval runs and in all 10 induction runs.}
+\label{tab:params}
+\end{table}
+
+%=========================================================================================
+\section{Next Steps}
+\label{sec:remaining}
+
+\paragraph{1. Induction backup heads}
+On induction, the rule values a head by re-fitting only the output weights, so it cannot tell whether the second layer-1 head is a backup or a head that layer 2 could replace. We will value each head at its own layer, by asking the other heads of that layer to rebuild what the next layer reads, as in layer-wise pruning of language models~\citep{ziplm}. If the second head survives, it is a backup that lowers error. If it closes, the rule recovers the minimal circuit, one head per layer. 
+
+\paragraph{2. Compressing and auditing the Cross-Site Transformer.}
+We will train the compact cross-site transformer (Chapter~\ref{ch:crosssite}) with hemodynamic attenuation on all 16 leave-one-subject-out folds. Resample ablation has already ranked every head of every fold, so part of the answer is known in advance. The criteria are accuracy within a margin of the dense model fixed before the runs and survival of the wrist$\leftarrow$chest pathway in every fold.
+
+\paragraph{3. A pretrained language model.}
+We will apply the rule to GPT-2 small on indirect object identification, whose circuit has been mapped by hand~\citep{wang2023interpretability}. The rule runs while the model is fine-tuned on the task, and the criterion is the overlap between the heads kept and the heads of the published circuit. This tests the rule on a model it did not shape from the start, against a known answer.
+
+\paragraph{4. Sensitivity.}
+We will test sensitivity to warm-up, check interval, fade length and reopening threshold (Table~\ref{tab:ha-params}).
+
+%=========================================================================================
+\chapter{Timeline}
+\label{ch:timeline}
+\setcounter{figure}{0}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\textwidth}{!}{\input{figures/timeline-gantt}}
+  \caption[Timeline]{Timeline from the proposal to the defence.}
+  \label{fig:timeline}
+\end{figure}
