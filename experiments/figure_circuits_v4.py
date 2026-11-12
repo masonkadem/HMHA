@@ -84,7 +84,7 @@ assert kept["0.05"] <= kept["0.02"] <= kept["0.01"], "not nested"
 # ---------------------------------------------------------------- b  circuit as a flow diagram
 from matplotlib.patches import FancyBboxPatch
 ax = fig.add_subplot(gs[1]); ax.axis("off")
-ax.set(xlim=(0, 10.6), ylim=(0, 6.2))
+ax.set(xlim=(-0.12, 10.68), ylim=(0, 6.2))
 tier = lambda h: next((f for f in FR if h in kept[f]), None)
 TXT = {"0.05": "white", "0.02": K, "0.01": K, None: G2}
 CW, CH = 0.78, 0.42                                             # chip size
