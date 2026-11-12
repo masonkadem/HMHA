@@ -1,6 +1,6 @@
 """Figure 1, from vessels to heads (illustration, not data).
 
-  a  a lateral view of the brain with a cortical artery tree: branches that carry flow stay (red),
+  a  a vessel tree: branches that carry flow stay (red),
      branches that carry little regress (dashed gray)
   b  an attention layer in the style of figures/fig_architecture_dims: head bars, a valve under each
      (red = open), summed and read out
@@ -30,54 +30,28 @@ title = lambda ax, letter, text: ax.set_title(rf"$\mathbf{{{letter}}}$   {text}"
 fig = plt.figure(figsize=(3.35, 2.75))
 gs = fig.add_gridspec(2, 2, height_ratios=[1.1, 1], hspace=0.42, wspace=0.22)
 
-# ---------------------------------------------------------------- a  brain with a cortical artery tree
-ax = fig.add_subplot(gs[0, 0]); ax.axis("off"); ax.set(xlim=(0.2, 9.8), ylim=(-0.2, 7.0)); ax.set_aspect("equal")
-P = np.array([(0.6, 3.3), (0.9, 4.7), (1.8, 5.8), (3.2, 6.5), (4.8, 6.75), (6.4, 6.55), (7.8, 5.95), (8.9, 4.95),
-              (9.45, 3.8), (9.35, 2.75), (8.85, 2.15), (8.75, 1.45), (8.2, 0.85), (7.2, 0.8), (6.5, 1.2),
-              (6.15, 0.95), (6.05, 0.1), (5.45, 0.1), (5.5, 1.25), (4.6, 1.35), (3.3, 1.55), (2.55, 2.0),
-              (2.35, 2.55), (1.5, 2.65), (0.85, 2.85)])
-tck, _ = splprep([np.r_[P[:, 0], P[0, 0]], np.r_[P[:, 1], P[0, 1]]], s=0.3, per=True)
-bx, by = splev(np.linspace(0, 1, 400), tck)
-brain = Polygon(np.c_[bx, by], closed=True, fc="#f2f2f2", ec=G1, lw=0.7, zorder=1)
-ax.add_patch(brain)
-
-
-def curve(pts, lw=0.5, color=G2):
-    pts = np.array(pts)
-    t, _ = splprep([pts[:, 0], pts[:, 1]], s=0, k=min(3, len(pts) - 1))
-    x, y = splev(np.linspace(0, 1, 60), t)
-    ln, = ax.plot(x, y, color=color, lw=lw, zorder=2)
-    ln.set_clip_path(brain)
-
-
-curve([(2.5, 2.75), (3.8, 3.35), (5.2, 3.75), (6.3, 3.95)], lw=0.7)          # lateral (Sylvian) fissure
-curve([(5.6, 6.7), (5.1, 5.6), (5.0, 4.9), (4.6, 4.2)], lw=0.6)              # central sulcus
-for pts in ([(3.0, 6.3), (2.9, 5.3), (2.2, 4.6)], [(7.4, 6.0), (7.0, 5.1), (7.4, 4.3)],
-            [(3.6, 2.3), (4.8, 2.5), (6.0, 2.7)], [(8.4, 4.8), (7.9, 3.9), (8.5, 3.1)],
-            [(1.5, 4.3), (2.2, 3.9), (3.0, 4.2)]):
-    curve(pts, lw=0.45, color="#c4c4c4")
-
-rng = np.random.default_rng(7)
-FADE = {(1, 0), (0, 1, 1), (1, 1, 0, 1), (0, 0, 0)}                          # branches with little flow
+# ---------------------------------------------------------------- a  vessel tree
+ax = fig.add_subplot(gs[0, 0]); ax.axis("off"); ax.set(xlim=(-0.95, 0.95), ylim=(-0.02, 1.02))
+rng = np.random.default_rng(3)
+FADE = {(0, 1), (1, 1, 0), (0, 0, 0, 1)}                            # low-flow branches that regress
 
 
 def branch(path, x, y, ang, length, width, depth, faded):
     x2, y2 = x + length * np.cos(ang), y + length * np.sin(ang)
     faded = faded or tuple(path) in FADE
     if faded:
-        ln, = ax.plot([x, x2], [y, y2], color=G1, lw=max(0.5, width * 0.6), ls=(0, (1.4, 1.0)), zorder=3)
+        ax.plot([x, x2], [y, y2], color=G2, lw=max(0.6, width * 0.55), ls=(0, (1.6, 1.1)), zorder=2)
     else:
-        ln, = ax.plot([x, x2], [y, y2], color=RED, lw=width, solid_capstyle="round", zorder=4)
-    ln.set_clip_path(brain)
+        ax.plot([x, x2], [y, y2], color=RED, lw=width, solid_capstyle="round", zorder=3)
     if depth == 0:
         return
     for i, d in enumerate((-1, 1)):
-        branch(path + [i], x2, y2, ang + d * (0.45 + 0.2 * rng.random()), length * 0.74, width * 0.7, depth - 1, faded)
+        branch(path + [i], x2, y2, ang + d * (0.42 + 0.12 * rng.random()), length * 0.72, width * 0.68, depth - 1, faded)
 
 
-branch([], 2.6, 2.8, np.radians(28), 1.45, 2.6, 4, False)                    # an artery from the lateral fissure
-ax.text(0.25, 6.95, "kept", fontsize=5.3, color=RED, ha="left", va="top")
-ax.text(9.75, 6.95, "regresses", fontsize=5.3, color=G1, ha="right", va="top")
+branch([], 0, 0, np.pi / 2, 0.3, 4.5, 4, False)
+ax.text(0.95, 0.1, "little flow:\nregresses", fontsize=5.3, color=G1, ha="right", va="bottom")
+ax.text(-0.95, 0.1, "flow:\nkept", fontsize=5.3, color=RED, ha="left", va="bottom")
 title(ax, "a", "Brain vessels")
 
 # ---------------------------------------------------------------- b  attention heads, architecture style

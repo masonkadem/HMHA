@@ -28,8 +28,8 @@ plt.rcParams.update({
 title = lambda ax, letter, text="": ax.set_title(rf"$\mathbf{{{letter}}}$   {text}", pad=4)
 LW = 0.7
 
-fig = plt.figure(figsize=(7.0, 2.15))
-gs = fig.add_gridspec(1, 3, width_ratios=[0.6, 0.66, 3.1], wspace=0.26)
+fig = plt.figure(figsize=(7.0, 2.25))
+gs = fig.add_gridspec(1, 3, width_ratios=[0.7, 0.7, 2.95], wspace=0.26)
 
 
 def arrow(ax, x0, y0, x1, y1, color=K, lw=LW, ms=4.5):
@@ -108,7 +108,7 @@ kept = set.intersection(*(set(map(tuple, r["kept"])) for r in R))
 outside = sorted(h for h in kept if h not in role)
 CR = [pickle.load(open(os.path.join(ROOT, "results", "gpt2_cross", f"cross_s{s}.pkl"), "rb")) for s in range(5)]
 
-ax = fig.add_subplot(gs[2]); ax.axis("off"); ax.set(xlim=(-0.05, 11.0), ylim=(-0.4, 6.25))
+ax = fig.add_subplot(gs[2]); ax.axis("off"); ax.set(xlim=(-0.05, 11.0), ylim=(-0.75, 6.25))
 CW, CH, GAP = 0.8, 0.5, 0.1
 
 
@@ -157,13 +157,16 @@ def pr(v):
 
 
 nk = [len(r["kept"]) for r in R]
-l1 = f"Correct name, held out:  ours ({min(nk)}\u2013{max(nk)} heads) {pr([c['acc']['rule']['0.01'] for c in CR])}"
-l2 = (f"published (26) {pr([c['acc']['published'] for c in CR])}"
-      f"  \u00b7  full (144) {pr([c['acc']['full'] for c in CR])}"
-      f"  \u00b7  ranked once {pr([c['acc']['once']['0.01'] for c in CR])}")
-ax.text(0.0, 0.15, l1, fontsize=5.6, va="center", color=K)
-ax.text(0.0, -0.2, l2, fontsize=5.6, va="center", color=K)
-line = l1 + " | " + l2
+ld = lambda key: [(c["ld"][key]["0.01"] if isinstance(c["ld"][key], dict) else c["ld"][key]) / c["ld"]["full"] for c in CR]
+cells = [
+    (0.0, -0.2, f"ours, {min(nk)}\u2013{max(nk)} heads:  {pr([c['acc']['rule']['0.01'] for c in CR])}  \u00b7  {pr(ld('rule'))}", RED),
+    (5.75, -0.2, f"published, 26 heads:  {pr([c['acc']['published'] for c in CR])}  \u00b7  {pr(ld('published'))}", K),
+    (0.0, -0.55, f"full model, 144 heads:  {pr([c['acc']['full'] for c in CR])}  \u00b7  100%", K),
+    (5.75, -0.55, f"ranked once, {min(nk)}\u2013{max(nk)} heads:  {pr([c['acc']['once']['0.01'] for c in CR])}  \u00b7  below 0", K)]
+ax.text(0.0, 0.15, "Held out:  correct name  \u00b7  logit difference (% of full model)", fontsize=5.6, va="center", color=G1)
+for x, y, t, col in cells:
+    ax.text(x, y, t, fontsize=5.6, va="center", color=col, fontweight="bold" if col == RED else "normal")
+line = " | ".join(c[2] for c in cells)
 title(ax, "c", "GPT-2 small: the published circuit, heads our rule keeps filled")
 
 out = os.path.join(ROOT, "paper", "neuroai", "fig_circuits_v8")

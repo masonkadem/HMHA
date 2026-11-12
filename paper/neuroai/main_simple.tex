@@ -56,7 +56,7 @@ Transformers keep more attention heads than their tasks need, and pruning method
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{fig_circuits_v8.pdf}
-\caption{Known circuits. \textbf{(a)} The induction model: two attention-only layers of 8 heads on a residual stream, each head with a valve. \textbf{(b)} Open heads per layer during training, 10 runs. Layer 2 closes to the one induction head. \textbf{(c)} GPT-2 small on indirect object identification, frozen weights, prompts of \citet{wang2023interpretability}. The 26 heads of the published circuit are grouped by the roles they assigned, from early to late layers, and a head (layer.head) is filled if our rule keeps it at the lowest upkeep in all 5 seeds. The rule assigns no roles. Bottom: held-out accuracy, ranges over seeds. \emph{Ranked once}: the same number of heads, chosen by their single removal from the full model.}
+\caption{Known circuits. \textbf{(a)} The induction model: two attention-only layers of 8 heads on a residual stream, each head with a valve. \textbf{(b)} Open heads per layer during training, 10 runs. Layer 2 closes to the one induction head. \textbf{(c)} GPT-2 small on indirect object identification, frozen weights, prompts of \citet{wang2023interpretability}. The 26 heads of the published circuit are grouped by the roles they assigned, from early to late layers, and a head (layer.head) is filled if our rule keeps it at the lowest upkeep in all 5 seeds. The rule assigns no roles. Bottom: held-out accuracy and logit difference (as \% of the full model), ranges over seeds. \emph{Ranked once}: the same number of heads, chosen by their single removal from the full model.}
 \label{fig:circuits}
 \end{figure*}
 
