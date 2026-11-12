@@ -28,7 +28,7 @@ plt.rcParams.update({
 title = lambda ax, letter, text="": ax.set_title(rf"$\mathbf{{{letter}}}$   {text}", pad=4)
 LW = 0.7
 
-fig = plt.figure(figsize=(7.0, 2.25))
+fig = plt.figure(figsize=(7.0, 2.55))
 gs = fig.add_gridspec(1, 3, width_ratios=[0.7, 0.7, 2.95], wspace=0.26)
 
 
@@ -38,7 +38,7 @@ def arrow(ax, x0, y0, x1, y1, color=K, lw=LW, ms=4.5):
 
 
 # ---------------------------------------------------------------- a  induction model, architecture style
-ax = fig.add_subplot(gs[0]); ax.axis("off"); ax.set(xlim=(0, 6.2), ylim=(0, 12.6))
+ax = fig.add_subplot(gs[0]); ax.axis("off"); ax.set(xlim=(0, 6.2), ylim=(0.4, 12.4))
 xr = 0.9                                                    # residual stream
 ax.text(xr, 12.15, "tokens", ha="center", va="center", fontsize=5.4)
 arrow(ax, xr, 11.8, xr, 11.25)
@@ -108,7 +108,7 @@ kept = set.intersection(*(set(map(tuple, r["kept"])) for r in R))
 outside = sorted(h for h in kept if h not in role)
 CR = [pickle.load(open(os.path.join(ROOT, "results", "gpt2_cross", f"cross_s{s}.pkl"), "rb")) for s in range(5)]
 
-ax = fig.add_subplot(gs[2]); ax.axis("off"); ax.set(xlim=(-0.05, 11.0), ylim=(-0.75, 6.25))
+ax = fig.add_subplot(gs[2]); ax.axis("off"); ax.set(xlim=(-0.05, 11.0), ylim=(-1.7, 6.25))
 CW, CH, GAP = 0.8, 0.5, 0.1
 
 
@@ -136,7 +136,7 @@ I = box(2.65, 3.0, 2.0, "induction", WANG["induction"], 2)
 S = box(5.3, 2.15, 2.0, "S-inhibition", WANG["S-inhibition"], 2)
 N = box(7.95, 4.6, 3.0, "name movers", WANG["name movers"], 3)
 B = box(7.95, 1.65, 3.0, "backup name movers", WANG["backup name movers"], 3)
-M = box(7.95, 0.0, 3.0, "negative name movers", WANG["negative name movers"], 3)
+M = box(7.95, 0.3, 3.0, "negative name movers", WANG["negative name movers"], 3)
 arrow(ax, P["r"], P["m"], I["l"], P["m"])
 arrow(ax, I["r"], I["m"], S["l"], S["m"] + 0.3)
 arrow(ax, D["r"], D["m"], S["l"], S["m"] - 0.3)
@@ -158,15 +158,30 @@ def pr(v):
 
 nk = [len(r["kept"]) for r in R]
 ld = lambda key: [(c["ld"][key]["0.01"] if isinstance(c["ld"][key], dict) else c["ld"][key]) / c["ld"]["full"] for c in CR]
-cells = [
-    (0.0, -0.2, f"ours, {min(nk)}\u2013{max(nk)} heads:  {pr([c['acc']['rule']['0.01'] for c in CR])}  \u00b7  {pr(ld('rule'))}", RED),
-    (5.75, -0.2, f"published, 26 heads:  {pr([c['acc']['published'] for c in CR])}  \u00b7  {pr(ld('published'))}", K),
-    (0.0, -0.55, f"full model, 144 heads:  {pr([c['acc']['full'] for c in CR])}  \u00b7  100%", K),
-    (5.75, -0.55, f"ranked once, {min(nk)}\u2013{max(nk)} heads:  {pr([c['acc']['once']['0.01'] for c in CR])}  \u00b7  below 0", K)]
-ax.text(0.0, 0.15, "Held out:  correct name  \u00b7  logit difference (% of full model)", fontsize=5.6, va="center", color=G1)
-for x, y, t, col in cells:
-    ax.text(x, y, t, fontsize=5.6, va="center", color=col, fontweight="bold" if col == RED else "normal")
-line = " | ".join(c[2] for c in cells)
+# small held-out bars under the circuit: correct name and logit difference, mean over 5 seeds, line = range
+ROWS = [(f"ours ({min(nk)}\u2013{max(nk)})", [c["acc"]["rule"]["0.01"] for c in CR], ld("rule"), RED),
+        ("published (26)", [c["acc"]["published"] for c in CR], ld("published"), G2),
+        ("full model (144)", [c["acc"]["full"] for c in CR], [1.0] * len(CR), K),
+        (f"ranked once ({min(nk)}\u2013{max(nk)})", [c["acc"]["once"]["0.01"] for c in CR], ld("once"), "#cfcfcf")]
+for k_, (x0, w, key, name, lim) in enumerate(((2.15, 3.0, 1, "correct name (%)", (0, 1.0)),
+                                               (6.4, 3.6, 2, "logit difference (% of full)", (-0.3, 1.3)))):
+    ia = ax.inset_axes([x0, -1.6, w, 1.35], transform=ax.transData)
+    for i, row in enumerate(ROWS):
+        v = np.asarray(row[key])
+        ia.barh(i, v.mean(), height=0.62, color=row[3], lw=0)
+        ia.hlines(i, v.min(), v.max(), color=K, lw=0.6)
+        ia.text(max(v.max(), 0) + 0.03 * (lim[1] - lim[0]), i, f"{v.mean() * 100:.0f}", va="center", fontsize=5,
+                color=RED if i == 0 else K, fontweight="bold" if i == 0 else "normal")
+    ia.axvline(0, color=K, lw=0.5)
+    ia.set(xlim=lim, ylim=(len(ROWS) - 0.45, -0.55), yticks=range(len(ROWS)), xticks=[])
+    ia.set_yticklabels([r[0] for r in ROWS] if k_ == 0 else [], fontsize=5.3)
+    if k_ == 0:
+        ia.get_yticklabels()[0].set_color(RED)
+    ia.tick_params(axis="y", length=0, pad=2)
+    for sp in ("top", "right", "bottom", "left"):
+        ia.spines[sp].set_visible(False)
+    ia.set_title(name, fontsize=5.2, color=G1, pad=1.0, loc="left")
+line = "; ".join(f"{r[0]}: acc {np.mean(r[1]):.3f}, ld {np.mean(r[2]):.2f}" for r in ROWS)
 title(ax, "c", "GPT-2 small: the published circuit, heads our rule keeps filled")
 
 out = os.path.join(ROOT, "paper", "neuroai", "fig_circuits_v8")

@@ -79,7 +79,12 @@ def score(kw):
 
 
 SIMPLE = "--simple" in sys.argv          # column width: heads closing and upkeep collapse only
-if SIMPLE:
+COL3 = "--col3" in sys.argv              # column width: heads closing and upkeep on top, every method below
+if COL3:
+    fig = plt.figure(figsize=(3.35, 3.25))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.25], hspace=0.95, wspace=0.55)
+    SA, SB, SC, SD = gs[0, 0], gs[1, :], gs[0, 1], None
+elif SIMPLE:
     fig = plt.figure(figsize=(3.35, 1.55))
     gs = fig.add_gridspec(1, 2, wspace=0.55)
     SA, SB, SC, SD = gs[0], None, gs[1], None
@@ -109,29 +114,33 @@ if not SIMPLE:
     rows = [("Ours", score(RULE)),
             ("ZipLM-style", score({**RULE, "oneshot": 1, "budget_hold_frac": 0.3})),
             ("Michel et al.", score(dict(supply="prune"))),
-            ("Voita et al.", gates[best]),
+            *((("$L_0$, weak penalty", gates[0.05]), ("$L_0$, strong penalty", gates[1.0])) if COL3
+              else (("Voita et al.", gates[best]),)),
             ("no fade", score({**RULE, "taper": 0})),
             ("no re-fit", score({**RULE, "local_value": "ablate"})),
             ("random head", score({**RULE, "local_value": "random"}))]
     print("panel b:", rows)
-    ax = fig.add_subplot(gs[1])
+    ax = fig.add_subplot(SB)
     y = np.arange(len(rows))
     for i, (name, (ex, ok, n)) in enumerate(rows):
         ours = i == 0
         ax.barh(i - 0.19, ex / n, height=0.36, color=RED if ours else K, lw=0)
         ax.barh(i + 0.19, ok / n, height=0.36, color=PINK if ours else G2, lw=0)
-        ax.text(1.03, i - 0.19, f"{ex}", va="center", fontsize=5.3, color=RED if ours else K)
-        ax.text(1.03, i + 0.19, f"{ok}", va="center", fontsize=5.3, color=RED if ours else G1)
-    ax.axhline(3.5, color=G3, lw=0.5)
+        if COL3:
+            ax.text(1.03, i, f"{ex}  {ok}", va="center", fontsize=5.6, color=RED if ours else K)
+        else:
+            ax.text(1.03, i - 0.19, f"{ex}", va="center", fontsize=5.3, color=RED if ours else K)
+            ax.text(1.03, i + 0.19, f"{ok}", va="center", fontsize=5.3, color=RED if ours else G1)
+    ax.axhline(4.5 if COL3 else 3.5, color=G3, lw=0.5)
     ax.set(yticks=y, xlim=(0, 1), xticks=[0, 0.5, 1], xticklabels=["0", "15", "30"], ylim=(len(rows) - 0.4, -0.6))
     ax.set_yticklabels([r[0] for r in rows])
     ax.get_yticklabels()[0].set_color(RED)
     ax.tick_params(axis="y", length=0)
     from matplotlib.patches import Patch
-    ax.legend(handles=[Patch(color=K, label="exact count"), Patch(color=G2, label="never broke")],
-              loc="lower left", bbox_to_anchor=(0.12, 1.0), ncol=2, handlelength=0.8, columnspacing=0.8,
-              borderaxespad=0.1)
-    ax.set_title(r"$\mathbf{b}$", pad=4, x=-0.5)
+    ax.legend(handles=[Patch(color=K, label="exact count"), Patch(color=G2, label="stayed solved" if COL3 else "never broke")],
+              loc="lower left", bbox_to_anchor=(0.42, 1.0) if COL3 else (0.12, 1.0), ncol=2, handlelength=0.8,
+              columnspacing=0.8, borderaxespad=0.1)
+    ax.set_title(r"$\mathbf{c}$   Same 30 runs" if COL3 else r"$\mathbf{b}$", pad=4, x=-0.42 if COL3 else -0.5)
     ax.set_xlabel("runs (of 30)")
 
 # ---------------------------------------------------------------- c  upkeep breakpoint
@@ -150,9 +159,9 @@ ax.set(xscale="log", yscale="log", ylim=(0.8, 12), yticks=[1, 2, 4, 8], yticklab
        xlabel="upkeep / value of\none needed head", ylabel="heads kept")
 ax.minorticks_off()
 ax.text(0.85, 1.25, "predicted\ncollapse", fontsize=5.5, color=G1, va="center", ha="right")
-ax.set_title(r"$\mathbf{b}$   Upkeep" if SIMPLE else r"$\mathbf{c}$   Upkeep", pad=4)
+ax.set_title(r"$\mathbf{b}$   Upkeep" if (SIMPLE or COL3) else r"$\mathbf{c}$   Upkeep", pad=4)
 
-if not SIMPLE:
+if not (SIMPLE or COL3):
     # ---------------------------------------------------------------- d  changing demand
     ax = fig.add_subplot(gs[3])
     total = None
@@ -178,5 +187,5 @@ if not SIMPLE:
 
 out = os.path.join(ROOT, "paper", "neuroai")
 for ext in ("pdf", "png"):
-    fig.savefig(os.path.join(out, f"fig_neuroai{'_col' if SIMPLE else ''}.{ext}"), bbox_inches="tight", facecolor="white")
+    fig.savefig(os.path.join(out, f"fig_neuroai{'_col3' if COL3 else '_col' if SIMPLE else ''}.{ext}"), bbox_inches="tight", facecolor="white")
 print("wrote", os.path.join(out, "fig_neuroai.pdf"))

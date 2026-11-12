@@ -48,8 +48,8 @@ Transformers keep more attention heads than their tasks need, and pruning method
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{fig_neuroai_col.pdf}
-\caption{\textbf{(a)} Open heads during training, one run per task size, with $\kstar$ dotted. \textbf{(b)} Heads kept against the upkeep, in units of the value of one needed head, $\Ltriv/R$. Theory predicts $\kstar$ heads left of 1 and one head right of it. Three seeds per point.}
+\includegraphics[width=\columnwidth]{fig_neuroai_col3.pdf}
+\caption{\textbf{(a)} Open heads during training, one run per task size, with $\kstar$ dotted. \textbf{(b)} Heads kept against the upkeep, in units of the value of one needed head, $\Ltriv/R$. Theory predicts $\kstar$ heads left of 1 and one head right of it. Three seeds per point. \textbf{(c)} Every method on the same 30 runs ($\kstar=2,4,8$, 10 seeds each), implemented in our code and applied within the same training run \citep{ziplm,michel2019sixteen,voita2019analyzing}. ZipLM uses our score once, then fine-tunes. ZipLM and Michel et al.\ were given the true count. $L_0$ gates are shown at the weakest and strongest of three penalties ($\lambda=0.05$ and $1$). The lower three rows each remove one part of our rule.}
 \label{fig:results}
 \end{figure}
 
@@ -124,30 +124,7 @@ confirmed on trained models to within $0.003\,\Ltriv$ (Figure~\ref{fig:task}c). 
 
 \section{Results}
 
-\begin{table}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{1.6pt}
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Method & Size given & Exact count & Stayed solved \\
-\midrule
-\textbf{Ours} & no & \textbf{29} & \textbf{30} \\
-ZipLM-style & yes & 24 & 0 \\
-Michel et al. & yes & 28 & 0 \\
-$L_0$ gates, weak penalty & no & 0 & 3 \\
-$L_0$ gates, strong penalty & no & 9 & 0 \\
-\midrule
-\quad no fade & no & 30 & 0 \\
-\quad no re-fit & no & 2 & 30 \\
-\quad random head & no & 30 & 6 \\
-\bottomrule
-\end{tabular}
-\caption{The same 30 runs ($\kstar=2,4,8$, 10 seeds each) for every method, implemented in our code and applied within the same training run \citep{ziplm,michel2019sixteen,voita2019analyzing}. ZipLM uses the same score as ours, applied once and followed by fine-tuning. $L_0$ gates \citep{voita2019analyzing} are shown at the weakest and strongest of three penalties ($\lambda=0.05$, $1$).}
-\label{tab:methods}
-\end{table}
-
-\paragraph{Exact count while the task stays solved.} The rule kept exactly $\kstar$ heads in 29 of 30 runs, and the loss never left the solved range (Figure~\ref{fig:results}a, Table~\ref{tab:methods}). No published method did both. Michel et al.\ and ZipLM, given the true count, lost the solution during pruning in every run: the loss rose to a median of $0.52$ and $0.38\,\Ltriv$ before further training recovered it, and all runs ended solved. ZipLM uses our score, so its failure lies in how the score is used: all at once, without a fade. $L_0$ gates trade one failure for the other: a weak penalty kept the loss near the bar but never reached the count, and a strong one reached it in 9 runs but left 26 of 30 unsolved at the end. Removing one part at a time shows its role. Without the fade the solution was lost, as with a vessel cut rather than regressed. Without the re-fit the rule valued copies and kept too many heads. With a random choice of head the solution was lost in 24 of 30 runs. Deleting closed heads leaves 6--25\% of the parameters.
+\paragraph{Exact count while the task stays solved.} The rule kept exactly $\kstar$ heads in 29 of 30 runs, and the loss never left the solved range (Figure~\ref{fig:results}a,c). No published method did both. Michel et al.\ and ZipLM, given the true count, lost the solution during pruning in every run: the loss rose to a median of $0.52$ and $0.38\,\Ltriv$ before further training recovered it, and all runs ended solved. ZipLM uses our score, so its failure lies in how the score is used: all at once, without a fade. $L_0$ gates trade one failure for the other: a weak penalty kept the loss near the bar but never reached the count, and a strong one reached it in 9 runs but left 26 of 30 unsolved at the end. Removing one part at a time shows its role. Without the fade the solution was lost, as with a vessel cut rather than regressed. Without the re-fit the rule valued copies and kept too many heads. With a random choice of head the solution was lost in 24 of 30 runs. Deleting closed heads leaves 6--25\% of the parameters.
 
 \paragraph{The upkeep does not set the size, until theory says it should.} Every upkeep from $0.01$ to $0.1\,\Ltriv$ gave the exact count. Above $\pi=\Ltriv/R$ every needed head costs more than it saves, so the rule should close down to one head. All 18 runs below this point kept exactly $\kstar$ heads and all 18 above it kept one (Figure~\ref{fig:results}b), with the final loss Equation~\eqref{eq:law} gives for one head.
 
@@ -162,9 +139,9 @@ $L_0$ gates, strong penalty & no & 9 & 0 \\
 
 Because the rule minimizes a stated cost, it can be judged as a theory is, by predictions made before the run: the head count, the upkeep at which it gives up, and the redundancy kept under failure were each computed first and then observed. In a pretrained model, where no such calculation exists, it recovered a hand-mapped circuit stably, including heads that ranking once misses.
 
-\paragraph{For neuroscience.} The correspondence in Figure~\ref{fig:hero} runs both ways. The same redundancy calculation would give the number of collateral vessels worth keeping from how often a vessel is occluded and what it costs to maintain: more where occlusion is likelier or tissue costlier to lose, none where upkeep exceeds the expected loss. That is a quantitative prediction about collateral supply that can be tested.
+\paragraph{What it predicts for the brain.} The correspondence in Figure~\ref{fig:hero} runs both ways. The same redundancy calculation would give the number of collateral vessels worth keeping from how often a vessel is occluded and what it costs to maintain: more where occlusion is likelier or tissue costlier to lose, none where upkeep exceeds the expected loss. That is a quantitative prediction about collateral supply that can be tested.
 
-\paragraph{Scope and next steps.} The models trained from scratch are small so that their circuits are known in advance, and GPT-2 small was studied with frozen weights. The proposition covers fixed heads. For heads that are still learning, the fade is what keeps the task solved (Table~\ref{tab:methods}). We will next apply the rule while training a language model.
+\paragraph{Scope and next steps.} The models trained from scratch are small so that their circuits are known in advance, and GPT-2 small was studied with frozen weights. The proposition covers fixed heads. For heads that are still learning, the fade is what keeps the task solved (Figure~\ref{fig:results}c). We will next apply the rule while training a language model.
 
 \bibliography{refs}
 
