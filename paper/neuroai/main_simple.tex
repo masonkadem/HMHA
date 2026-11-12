@@ -39,19 +39,15 @@ Transformers keep more attention heads than their tasks need, and pruning method
 \label{fig:hero}
 \end{figure}
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \includegraphics[width=\textwidth]{fig_task.pdf}
-\caption{Hemodynamic attenuation on a task with a known minimal circuit. \textbf{(a)} A query names a position $p$, and the target is the items at $R$ fixed offsets. Here $R=4$, so 4 heads are needed. \textbf{(b)} The model, with sizes. Each head has a valve $g_h$ (red when open) and pays an upkeep while open. \textbf{(c)} Loss of a trained model with only $k$ heads on (black) follows $1-k/R$ (dashed). With copies among the heads (red), only \emph{different} heads count: a copy is worth nothing. Units of $\Ltriv$.}
+
+\vspace{2pt}
+\includegraphics[width=\textwidth]{fig_neuroai_row.pdf}
+\caption{A task with a known minimal circuit, and the results on it. \textbf{(a)} A query names a position $p$, and the target is the items at $R$ fixed offsets. Here $R=4$, so 4 heads are needed. \textbf{(b)} The model, with sizes. Each head has a valve $g_h$ (red when open) and pays an upkeep while open. \textbf{(c)} Loss of a trained model with only $k$ heads on (black) follows $1-k/R$ (dashed). With copies among the heads (red), only \emph{different} heads count: a copy is worth nothing. Units of $\Ltriv$. \textbf{(d)} Open heads during training, one run per task size, with $\kstar$ dotted. \textbf{(e)} Every method on the same 30 runs ($\kstar=2,4,8$, 10 seeds each), all run in our code \citep{ziplm,michel2019sixteen,voita2019analyzing}. ZipLM uses our score once, then fine-tunes. It and Michel et al.\ were given the true count. $L_0$ gates are shown at the weakest and strongest of three penalties ($\lambda=0.05$ and $1$). The lower three rows each remove one part of our rule. \textbf{(f)} Heads kept against the upkeep, in units of the value of one needed head, $\Ltriv/R$. Theory predicts $\kstar$ heads left of 1 and one head right of it (3 seeds per point).}
 \label{fig:task}
 \end{figure*}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{fig_neuroai_col3.pdf}
-\caption{\textbf{(a)} Open heads during training, one run per task size, with $\kstar$ dotted. \textbf{(b)} Heads kept against the upkeep, in units of the value of one needed head, $\Ltriv/R$. Theory predicts $\kstar$ heads left of 1 and one head right of it. Three seeds per point. \textbf{(c)} Every method on the same 30 runs ($\kstar=2,4,8$, 10 seeds each), implemented in our code and applied within the same training run \citep{ziplm,michel2019sixteen,voita2019analyzing}. ZipLM uses our score once, then fine-tunes. ZipLM and Michel et al.\ were given the true count. $L_0$ gates are shown at the weakest and strongest of three penalties ($\lambda=0.05$ and $1$). The lower three rows each remove one part of our rule.}
-\label{fig:results}
-\end{figure}
 
 \begin{figure*}[t]
 \centering
@@ -124,11 +120,11 @@ confirmed on trained models to within $0.003\,\Ltriv$ (Figure~\ref{fig:task}c). 
 
 \section{Results}
 
-\paragraph{Exact count while the task stays solved.} The rule kept exactly $\kstar$ heads in 29 of 30 runs, and the loss never left the solved range (Figure~\ref{fig:results}a,c). No published method did both. Michel et al.\ and ZipLM, given the true count, lost the solution during pruning in every run: the loss rose to a median of $0.52$ and $0.38\,\Ltriv$ before further training recovered it, and all runs ended solved. ZipLM uses our score, so its failure lies in how the score is used: all at once, without a fade. $L_0$ gates trade one failure for the other: a weak penalty kept the loss near the bar but never reached the count, and a strong one reached it in 9 runs but left 26 of 30 unsolved at the end. Removing one part at a time shows its role. Without the fade the solution was lost, as with a vessel cut rather than regressed. Without the re-fit the rule valued copies and kept too many heads. With a random choice of head the solution was lost in 24 of 30 runs. Deleting closed heads leaves 6--25\% of the parameters.
+\paragraph{Exact count while the task stays solved.} The rule kept exactly $\kstar$ heads in 29 of 30 runs, and the loss never left the solved range (Figure~\ref{fig:task}d,e). No published method did both. Michel et al.\ and ZipLM, given the true count, lost the solution during pruning in every run: the loss rose to a median of $0.52$ and $0.38\,\Ltriv$ before further training recovered it, and all runs ended solved. ZipLM uses our score, so its failure lies in how the score is used: all at once, without a fade. $L_0$ gates trade one failure for the other: a weak penalty kept the loss near the bar but never reached the count, and a strong one reached it in 9 runs but left 26 of 30 unsolved at the end. Removing one part at a time shows its role. Without the fade the solution was lost, as with a vessel cut rather than regressed. Without the re-fit the rule valued copies and kept too many heads. With a random choice of head the solution was lost in 24 of 30 runs. 
 
-\paragraph{The upkeep does not set the size, until theory says it should.} Every upkeep from $0.01$ to $0.1\,\Ltriv$ gave the exact count. Above $\pi=\Ltriv/R$ every needed head costs more than it saves, so the rule should close down to one head. All 18 runs below this point kept exactly $\kstar$ heads and all 18 above it kept one (Figure~\ref{fig:results}b), with the final loss Equation~\eqref{eq:law} gives for one head.
+\paragraph{The upkeep does not set the size, until theory says it should.} Every upkeep from $0.01$ to $0.1\,\Ltriv$ gave the exact count. Above $\pi=\Ltriv/R$ every needed head costs more than it saves, so the rule should close down to one head. All 18 runs below this point kept exactly $\kstar$ heads and all 18 above it kept one (Figure~\ref{fig:task}f), with the final loss Equation~\eqref{eq:law} gives for one head.
 
-\paragraph{A third prediction: redundancy under failure.} The objective also says how much redundancy to keep. If each head fails independently with probability $p$ at every training step, the value of the $B$-th head is $v(B)=\frac{1-p}{R}\Pr[\mathrm{Bin}(B-1,1-p)<R]\,\Ltriv$: it pays only when it works and fewer than $R$ of the others do, a $k$-out-of-$n$ calculation from reliability theory \citep{barlow1965reliability}, and the rule should keep the largest $B$ with $v(B)\ge\pi$. There is no free parameter. We committed predictions for 100 new runs before starting them, over $\kstar=2,4,8$, $p$ from 0.05 to 0.3 and two upkeeps. 79 matched exactly and all 100 were within one head. Keeping $\kstar$ heads, or enough that $\kstar$ work on average, would match 4 and about 33. It tests the objective on a task where the answer is known.
+\paragraph{A third prediction: redundancy under failure.} The objective also says how much redundancy to keep. If each head fails independently with probability $p$ at every training step, the value of the $B$-th head is $v(B)=\frac{1-p}{R}\Pr[\mathrm{Bin}(B-1,1-p)<R]\,\Ltriv$: it pays only when it works and fewer than $R$ of the others do, a $k$-out-of-$n$ calculation from reliability theory \citep{barlow1965reliability}, and the rule should keep the largest $B$ with $v(B)\ge\pi$. There is no free parameter. We committed predictions for 100 new runs before starting them, over $\kstar=2,4,8$, $p$ from 0.05 to 0.3 and two upkeeps. 79 matched exactly and all 100 were within one head. Keeping $\kstar$ heads, or enough that $\kstar$ work on average, would match 4 and about 33.
 
 
 \paragraph{Induction.} A two-layer attention-only model with $8+8$ heads was trained to continue a repeated sequence. Its known circuit is a previous-token head in layer 1 and an induction head in layer 2 \citep{olsson2022}. Cross-entropy has no closed-form re-fit, so here a head is valued by the loss without it. The rule kept $2+1$ heads with the expected roles in 10 of 10 runs, and the task stayed solved (Figure~\ref{fig:circuits}a,b). The second layer-1 head acts as a backup, cutting errors on the repeat from 1 in 8 to 1 in 200. Switching off the layer-2 head dropped accuracy from 99.9\% to chance.
@@ -141,7 +137,7 @@ Because the rule minimizes a stated cost, it can be judged as a theory is, by pr
 
 \paragraph{What it predicts for the brain.} The correspondence in Figure~\ref{fig:hero} runs both ways. The same redundancy calculation would give the number of collateral vessels worth keeping from how often a vessel is occluded and what it costs to maintain: more where occlusion is likelier or tissue costlier to lose, none where upkeep exceeds the expected loss. That is a quantitative prediction about collateral supply that can be tested.
 
-\paragraph{Scope and next steps.} The models trained from scratch are small so that their circuits are known in advance, and GPT-2 small was studied with frozen weights. The proposition covers fixed heads. For heads that are still learning, the fade is what keeps the task solved (Figure~\ref{fig:results}c). We will next apply the rule while training a language model.
+\paragraph{Scope and next steps.} The models trained from scratch are small so that their circuits are known in advance, and GPT-2 small was studied with frozen weights. The proposition covers fixed heads. For heads that are still learning, the fade is what keeps the task solved (Figure~\ref{fig:task}e). We will next apply the rule while training a language model.
 
 \bibliography{refs}
 
