@@ -1,0 +1,105 @@
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.743 acc 99.0%;  all closed: loss 6.961 acc 51.3%;  upkeep 0.0622
+[ioiwang] kept 20 after 124 decisions, 2889 s; held out: loss 0.561 (full 0.748), acc 97.8% (full 99.3%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.1 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 20 heads: one-shot acc 33.1%, random acc 35.3% (best 64.6%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (8, 10), (9, 6)]
+[ioiwang] published 26-head circuit: loss 1.648, acc 99.0%; 19 of 20 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.777 acc 99.3%;  all closed: loss 6.885 acc 48.3%;  upkeep 0.0611
+[ioiwang] kept 20 after 124 decisions, 1271 s; held out: loss 0.539 (full 0.762), acc 98.5% (full 99.3%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.1 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 20 heads: one-shot acc 34.9%, random acc 39.0% (best 66.8%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (8, 10), (9, 6)]
+[ioiwang] published 26-head circuit: loss 1.650, acc 99.1%; 19 of 20 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.774 acc 99.7%;  all closed: loss 6.981 acc 47.7%;  upkeep 0.0621
+[ioiwang] kept 21 after 123 decisions, 1168 s; held out: loss 0.496 (full 0.752), acc 97.9% (full 99.7%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3 11.6 11.9
+[ioiwang] same 21 heads: one-shot acc 36.1%, random acc 37.3% (best 67.1%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (8, 10), (9, 6)]
+[ioiwang] published 26-head circuit: loss 1.627, acc 99.2%; 19 of 21 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.766 acc 99.0%;  all closed: loss 7.037 acc 50.0%;  upkeep 0.0627
+[ioiwang] kept 20 after 124 decisions, 1178 s; held out: loss 0.548 (full 0.753), acc 98.3% (full 99.1%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.1 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 20 heads: one-shot acc 37.5%, random acc 39.9% (best 64.9%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (8, 10), (9, 6)]
+[ioiwang] published 26-head circuit: loss 1.635, acc 99.4%; 19 of 20 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.744 acc 99.3%;  all closed: loss 6.931 acc 50.3%;  upkeep 0.0619
+[ioiwang] kept 20 after 124 decisions, 1179 s; held out: loss 0.548 (full 0.745), acc 98.2% (full 99.8%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.8 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.1 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 20 heads: one-shot acc 37.8%, random acc 41.8% (best 73.5%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (8, 10), (9, 6)]
+[ioiwang] published 26-head circuit: loss 1.660, acc 99.4%; 19 of 20 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.743 acc 99.0%;  all closed: loss 6.961 acc 51.3%;  upkeep 0.1244
+[ioiwang] kept 17 after 127 decisions, 1207 s; held out: loss 0.880 (full 0.748), acc 93.5% (full 99.3%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 17 heads: one-shot acc 8.3%, random acc 41.9% (best 67.6%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 9), (6, 9), (8, 10), (9, 6), (10, 10)]
+[ioiwang] published 26-head circuit: loss 1.648, acc 99.0%; 16 of 17 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.777 acc 99.3%;  all closed: loss 6.885 acc 48.3%;  upkeep 0.1222
+[ioiwang] kept 17 after 127 decisions, 1207 s; held out: loss 0.854 (full 0.762), acc 94.7% (full 99.3%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 17 heads: one-shot acc 8.8%, random acc 38.1% (best 68.9%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 9), (6, 9), (8, 10), (9, 6), (10, 10)]
+[ioiwang] published 26-head circuit: loss 1.650, acc 99.1%; 16 of 17 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.774 acc 99.7%;  all closed: loss 6.981 acc 47.7%;  upkeep 0.1241
+[ioiwang] kept 18 after 126 decisions, 1198 s; held out: loss 0.729 (full 0.752), acc 97.3% (full 99.7%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 18 heads: one-shot acc 13.2%, random acc 41.1% (best 77.7%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (5, 9), (6, 9), (8, 10), (9, 6), (10, 10)]
+[ioiwang] published 26-head circuit: loss 1.627, acc 99.2%; 17 of 18 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.766 acc 99.0%;  all closed: loss 7.037 acc 50.0%;  upkeep 0.1254
+[ioiwang] kept 17 after 127 decisions, 1206 s; held out: loss 0.851 (full 0.753), acc 94.8% (full 99.1%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 17 heads: one-shot acc 10.9%, random acc 39.6% (best 67.5%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 9), (6, 9), (8, 10), (9, 6), (10, 10)]
+[ioiwang] published 26-head circuit: loss 1.635, acc 99.4%; 16 of 17 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.744 acc 99.3%;  all closed: loss 6.931 acc 50.3%;  upkeep 0.1237
+[ioiwang] kept 18 after 126 decisions, 1197 s; held out: loss 0.743 (full 0.745), acc 96.9% (full 99.8%)
+[ioiwang] kept: 0.1 2.2 3.0 4.11 5.5 5.9 6.9 7.9 8.6 8.10 9.6 9.9 10.0 10.2 10.6 10.10 11.2 11.3
+[ioiwang] same 18 heads: one-shot acc 13.3%, random acc 37.9% (best 70.3%); kept heads a one-shot value would drop: [(0, 1), (2, 2), (3, 0), (4, 11), (5, 9), (6, 9), (8, 10), (9, 6), (10, 10)]
+[ioiwang] published 26-head circuit: loss 1.660, acc 99.4%; 17 of 18 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.743 acc 99.0%;  all closed: loss 6.961 acc 51.3%;  upkeep 0.3109
+[ioiwang] kept 10 after 134 decisions, 1272 s; held out: loss 2.318 (full 0.748), acc 68.0% (full 99.3%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 11.2
+[ioiwang] same 10 heads: one-shot acc 9.7%, random acc 45.7% (best 69.4%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 5), (7, 9), (9, 6), (9, 9), (11, 2)]
+[ioiwang] published 26-head circuit: loss 1.648, acc 99.0%; 10 of 10 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.777 acc 99.3%;  all closed: loss 6.885 acc 48.3%;  upkeep 0.3054
+[ioiwang] kept 10 after 134 decisions, 1272 s; held out: loss 2.296 (full 0.762), acc 67.3% (full 99.3%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 11.2
+[ioiwang] same 10 heads: one-shot acc 10.2%, random acc 44.9% (best 65.9%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 5), (7, 9), (9, 6), (9, 9), (11, 2)]
+[ioiwang] published 26-head circuit: loss 1.650, acc 99.1%; 10 of 10 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.774 acc 99.7%;  all closed: loss 6.981 acc 47.7%;  upkeep 0.3103
+[ioiwang] kept 11 after 133 decisions, 1263 s; held out: loss 1.963 (full 0.752), acc 66.8% (full 99.7%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 10.2 11.2
+[ioiwang] same 11 heads: one-shot acc 11.3%, random acc 37.3% (best 68.2%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 5), (7, 9), (9, 6), (9, 9), (10, 2), (11, 2)]
+[ioiwang] published 26-head circuit: loss 1.627, acc 99.2%; 11 of 11 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.766 acc 99.0%;  all closed: loss 7.037 acc 50.0%;  upkeep 0.3136
+[ioiwang] kept 11 after 133 decisions, 1262 s; held out: loss 1.970 (full 0.753), acc 66.8% (full 99.1%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 10.2 11.2
+[ioiwang] same 11 heads: one-shot acc 12.6%, random acc 42.4% (best 67.1%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 5), (7, 9), (9, 6), (9, 9), (10, 2), (11, 2)]
+[ioiwang] published 26-head circuit: loss 1.635, acc 99.4%; 11 of 11 kept heads are in it
+[ioiwang] 30 templates, 99/99 names, 8 places, 8 objects; fit 10, test 50 per template
+
+[ioiwang] all open: loss 0.744 acc 99.3%;  all closed: loss 6.931 acc 50.3%;  upkeep 0.3094
+[ioiwang] kept 10 after 134 decisions, 1271 s; held out: loss 2.279 (full 0.745), acc 68.5% (full 99.8%)
+[ioiwang] kept: 0.1 3.0 4.11 5.5 7.9 8.6 9.6 9.9 10.0 11.2
+[ioiwang] same 10 heads: one-shot acc 10.0%, random acc 42.6% (best 68.1%); kept heads a one-shot value would drop: [(0, 1), (3, 0), (4, 11), (5, 5), (7, 9), (9, 6), (9, 9), (11, 2)]
+[ioiwang] published 26-head circuit: loss 1.660, acc 99.4%; 10 of 10 kept heads are in it

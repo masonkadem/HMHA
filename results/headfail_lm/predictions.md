@@ -23,3 +23,17 @@ and at p = 0 two of three seeds collapsed to 2 heads. Rerun: the same absolute u
 1. Aware heads kept (mean over 5 seeds) rises with p: p=0 < 0.1 < 0.2 < 0.3.
 2. At every p > 0, aware keeps more heads than blind (mean over seeds, by at least one head).
 Failure: either does not hold. If it fails, the backup law is not shown for a language model trained on text.
+
+## Result of the fixed-upkeep rerun (2026-11-10, 5 seeds, heads kept of 32)
+| p | aware | blind |
+|---|---|---|
+| 0 | 27, 26, 26, 24, 27 (26.0) | same |
+| 0.1 | 18, 16, 17, 17, 19 (17.4) | 16, 16, 16, 16, 16 (16.0) |
+| 0.2 | 15, 15, 15, 15, 14 (14.8) | 12, 13, 13, 13, 13 (12.8) |
+| 0.3 | 15, 14, 13, 15, 14 (14.2) | 12, 12, 10, 12, 12 (11.6) |
+
+1. Count rises with p: **fails**. It falls, 26 -> 17 -> 15 -> 14.
+2. Aware keeps more than blind: **holds** at every p > 0, by 1.4, 2.0 and 2.6 heads.
+By the stated failure condition the backup law is not shown for a language model trained on text.
+Reading: training under head failure makes the model need fewer heads (work is spread, each head matters
+less); valuing under failure still keeps 1-3 more heads than valuing without, the direction the tree gives.
