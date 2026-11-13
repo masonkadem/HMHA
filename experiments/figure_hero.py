@@ -82,7 +82,7 @@ ax.add_patch(Polygon([(2.6, 2.75), (7.4, 2.75), (5.7, 1.45), (4.3, 1.45)], close
 arrow(5.0, 1.45, 5.0, 0.6)
 ax.text(9.15, 6.0, "heads", fontsize=5.2, color=G1, ha="left", va="center")
 ax.text(9.15, 4.27, "valves", fontsize=5.2, color=RED, ha="left", va="center")
-ax.text(7.7, 2.1, "sum", fontsize=5.2, color=G1, ha="left", va="center")
+ax.text(7.7, 2.1, "read-out", fontsize=5.2, color=G1, ha="left", va="center")
 title(ax, "b", "Attention heads")
 
 # ---------------------------------------------------------------- c  Murray's law
