@@ -82,7 +82,7 @@ SIMPLE = "--simple" in sys.argv          # column width: heads closing and upkee
 ROW = "--row" in sys.argv                # full width, second row of Figure 2: panels d, e, f
 COL3 = "--col3" in sys.argv or ROW       # the methods panel in its COL3 form (weak and strong L0 rows)
 if ROW:
-    fig = plt.figure(figsize=(7.0, 1.4))
+    fig = plt.figure(figsize=(7.0, 1.28))
     gs = fig.add_gridspec(1, 3, width_ratios=[1.0, 1.35, 1.0], wspace=0.75)
     SA, SB, SC, SD = gs[0], gs[1], gs[2], None
 elif COL3:

@@ -28,7 +28,7 @@ plt.rcParams.update({
 title = lambda ax, letter, text="": ax.set_title(rf"$\mathbf{{{letter}}}$   {text}", pad=4)
 LW = 0.7
 
-fig = plt.figure(figsize=(7.0, 2.55))
+fig = plt.figure(figsize=(7.0, 2.3))
 gs = fig.add_gridspec(1, 3, width_ratios=[0.7, 0.7, 2.95], wspace=0.26)
 
 

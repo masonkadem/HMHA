@@ -27,7 +27,7 @@ plt.rcParams.update({
     "savefig.dpi": 450, "pdf.fonttype": 42})
 title = lambda ax, letter, text: ax.set_title(rf"$\mathbf{{{letter}}}$   {text}", pad=4)
 
-fig = plt.figure(figsize=(3.35, 2.75))
+fig = plt.figure(figsize=(3.35, 2.4))
 gs = fig.add_gridspec(2, 2, height_ratios=[1.1, 1], hspace=0.42, wspace=0.22)
 
 # ---------------------------------------------------------------- a  vessel tree
