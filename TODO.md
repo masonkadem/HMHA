@@ -134,6 +134,39 @@ vessels with low flow regress and loops are pruned (Chen et al. 2012, zebrafish)
   circulation is well supported. Never claim biological support from the astrocyte-attention
   literature for supply-based gating.
 
+## Workshop paper revision notes (`paper/neuroai/main_simple.tex`, `main_archival.tex`)
+
+Not yet applied.
+
+1. One premise, stated once and repeated: "Keep a head only while it earns its upkeep."
+   Land on it in the first paragraph of the introduction; each result opens by naming which
+   consequence of it is being tested.
+2. Make Figure 2d (32 heads close down to exactly what the task needs, no target given) the
+   first and largest results panel, annotated "no target given", counts landing on 2, 4, 8.
+3. Redundancy in the archival version:
+   - GPT-2 results appear twice (bars under the circuit in Figure 5, and Table 3). Keep the
+     table, drop the bars, give the circuit diagram more room.
+   - Sensitivity results appear twice (Table 2 and a paragraph restating it). Keep the table
+     and one sentence.
+   - Figure 2 has six panels. Split into the task (a-c) and the results (d-f, d enlarged),
+     or move the rank-law panel (c) next to the equation.
+   - Too many variants of the rule (loss-bar induction, sprouting, frozen GPT-2). State the
+     one rule, then mark each variant where it is used ("here, without re-fit, because...").
+   - Archival abstract is about 250 words; the short version's 175 is cleaner. Fold backup
+     and demand results into one clause.
+   - Too many numbers in running text. Ranges (99.0-99.4%, 121-124%) go in tables; one
+     number per claim in the text.
+4. Plain-language pass on both versions. Patterns to remove:
+   - "X, not Y" contrasts ("a circuit, not a smaller model", "trims the circuit rather than
+     changing it", "a design principle, not a model of blood flow").
+   - Tidy closing lines ("The regressed vessel and the closed head share a limitation...",
+     "an independent check that the rule finds mechanism").
+   - Runs of three ("during training, gradually, with reopening, and with an upkeep").
+   - Grand framings ("turns a principle of the cerebral circulation into...").
+   Say what was measured, then what it shows, once.
+5. Keep: Figure 1 (vessels to heads), the circuit diagram, predictions written before the
+   runs, comparison against published methods on the same 30 runs, the single 1% upkeep.
+
 ## Housekeeping
 
 - [x] Push to origin (branch `claude/latest-experiment-ideas-fualsp`).
